@@ -1,0 +1,151 @@
+// Prisma Schema for pNode Pulse
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Core Models
+// ============================================
+
+/// Registry of all known pNodes
+model Node {
+  id        Int      @id @default(autoincrement())
+  /// IP:Port address (e.g., "192.190.136.36:6000")
+  address   String   @unique
+  /// Gossip address (e.g., "192.190.136.36:9001")
+  gossipAddress String?
+  /// Base58 public key
+  pubkey    String?
+  /// pNode software version
+  version   String?
+  /// First time this node was seen
+  firstSeen DateTime @default(now()) @map("first_seen")
+  /// Last time we successfully polled this node
+  lastSeen  DateTime? @map("last_seen")
+  /// Whether the node is currently reachable
+  isActive  Boolean  @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  metrics   NodeMetric[]
+  peers     NodePeer[]   @relation("NodePeers")
+  peeredBy  NodePeer[]   @relation("PeeredByNodes")
+
+  @@index([address])
+  @@index([pubkey])
+  @@index([isActive])
+  @@map("nodes")
+}
+
+/// Time-series metrics for each node (TimescaleDB hypertable)
+/// Note: Prisma doesn't support hypertables directly, use raw SQL migration
+model NodeMetric {
+  id              BigInt   @id @default(autoincrement())
+  time            DateTime @default(now())
+  nodeId          Int      @map("node_id")
+
+  // System metrics
+  cpuPercent      Float?   @map("cpu_percent")
+  ramUsed         BigInt?  @map("ram_used")
+  ramTotal        BigInt?  @map("ram_total")
+  uptime          Int?
+
+  // Storage metrics
+  fileSize        BigInt?  @map("file_size")
+  totalBytes      BigInt?  @map("total_bytes")
+  totalPages      Int?     @map("total_pages")
+  currentIndex    Int?     @map("current_index")
+
+  // Network metrics
+  packetsReceived Int?     @map("packets_received")
+  packetsSent     Int?     @map("packets_sent")
+  activeStreams   Int?     @map("active_streams")
+
+  // Relations
+  node            Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId, time(sort: Desc)])
+  @@map("node_metrics")
+}
+
+/// Peer relationships between nodes (from get-pods)
+model NodePeer {
+  id            Int      @id @default(autoincrement())
+  nodeId        Int      @map("node_id")
+  peerNodeId    Int?     @map("peer_node_id")
+  /// Peer address if not yet registered as a node
+  peerAddress   String   @map("peer_address")
+  lastSeenAt    DateTime @map("last_seen_at")
+  peerVersion   String?  @map("peer_version")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  node          Node     @relation("NodePeers", fields: [nodeId], references: [id], onDelete: Cascade)
+  peerNode      Node?    @relation("PeeredByNodes", fields: [peerNodeId], references: [id], onDelete: SetNull)
+
+  @@unique([nodeId, peerAddress])
+  @@index([nodeId])
+  @@index([peerNodeId])
+  @@map("node_peers")
+}
+
+// ============================================
+// Aggregated Views (managed separately)
+// ============================================
+
+/// Network-wide aggregated statistics (computed periodically)
+model NetworkStats {
+  id              Int      @id @default(autoincrement())
+  time            DateTime @default(now())
+
+  totalNodes      Int      @map("total_nodes")
+  activeNodes     Int      @map("active_nodes")
+  totalStorage    BigInt   @map("total_storage")
+  avgCpuPercent   Float    @map("avg_cpu_percent")
+  avgRamPercent   Float    @map("avg_ram_percent")
+  avgUptime       Int      @map("avg_uptime")
+  totalPeers      Int      @map("total_peers")
+
+  /// JSON object tracking version distribution: { "0.6.0": 15, "0.5.1": 10, ... }
+  versionDistribution Json? @map("version_distribution")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([time(sort: Desc)])
+  @@map("network_stats")
+}
+
+/// Collection job tracking
+model CollectionJob {
+  id          Int      @id @default(autoincrement())
+  startedAt   DateTime @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  status      JobStatus @default(RUNNING)
+
+  nodesPolled   Int    @default(0) @map("nodes_polled")
+  nodesSuccess  Int    @default(0) @map("nodes_success")
+  nodesFailed   Int    @default(0) @map("nodes_failed")
+
+  errorMessage  String? @map("error_message")
+
+  @@index([status])
+  @@index([startedAt(sort: Desc)])
+  @@map("collection_jobs")
+}
+
+enum JobStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}

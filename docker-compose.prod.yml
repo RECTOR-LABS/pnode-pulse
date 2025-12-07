@@ -1,0 +1,54 @@
+services:
+  app:
+    image: ghcr.io/rector-labs/pnode-pulse:latest
+    container_name: pnode-pulse-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/pnode_pulse
+      - NODE_ENV=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pnode-pulse
+
+  collector:
+    image: ghcr.io/rector-labs/pnode-pulse:latest
+    container_name: pnode-pulse-collector
+    restart: unless-stopped
+    command: ["node", "-e", "require('./scripts/start-collector.js')"]
+    environment:
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/pnode_pulse
+      - NODE_ENV=production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pnode-pulse
+
+  postgres:
+    image: timescale/timescaledb:latest-pg15
+    container_name: pnode-pulse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: pnode_pulse
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - pnode-pulse
+
+networks:
+  pnode-pulse:
+    name: pnode-pulse
+
+volumes:
+  postgres_data:

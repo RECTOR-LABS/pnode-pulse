@@ -1,0 +1,12 @@
+# Local development overrides
+# This file is automatically loaded by docker compose
+
+services:
+  postgres:
+    # Expose additional ports for debugging tools
+    ports:
+      - "5434:5432"
+
+  redis:
+    ports:
+      - "6381:6379"
