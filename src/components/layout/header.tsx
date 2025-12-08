@@ -11,6 +11,7 @@ import { ConnectWallet } from "@/components/auth";
 const navigation = [
   { name: "Overview", href: "/" },
   { name: "Nodes", href: "/nodes" },
+  { name: "Analytics", href: "/analytics" },
   { name: "Leaderboard", href: "/leaderboard" },
   { name: "Portfolio", href: "/portfolio" },
   { name: "Map", href: "/map" },
