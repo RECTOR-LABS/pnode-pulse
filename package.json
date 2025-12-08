@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "analyze": "ANALYZE=true next build",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "db:migrate": "prisma migrate dev",
@@ -46,6 +47,7 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@next/bundle-analyzer": "^16.0.7",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/nodemailer": "^7.0.4",

@@ -1,15 +1,46 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { Suspense } from "react";
 import { trpc } from "@/lib/trpc";
 import { StatCard } from "@/components/ui/stat-card";
-import { VersionChart } from "@/components/ui/version-chart";
 import { CollectionStatus } from "@/components/ui/collection-status";
 import { NetworkHealth } from "@/components/ui/network-health";
-import { NetworkGrowthChart } from "@/components/dashboard/network-growth-chart";
-import { NodeLeaderboard } from "@/components/dashboard/node-leaderboard";
-import { CapacityProjection } from "@/components/dashboard/capacity-projection";
-import { PerformanceComparison } from "@/components/dashboard/performance-comparison";
 import { formatBytes, formatUptime, formatPercent, formatNumber } from "@/lib/utils/format";
+
+// Dynamic imports for heavy chart components (code splitting)
+const VersionChart = dynamic(
+  () => import("@/components/ui/version-chart").then((mod) => mod.VersionChart),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+const NetworkGrowthChart = dynamic(
+  () => import("@/components/dashboard/network-growth-chart").then((mod) => mod.NetworkGrowthChart),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+const NodeLeaderboard = dynamic(
+  () => import("@/components/dashboard/node-leaderboard").then((mod) => mod.NodeLeaderboard),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+const CapacityProjection = dynamic(
+  () => import("@/components/dashboard/capacity-projection").then((mod) => mod.CapacityProjection),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+const PerformanceComparison = dynamic(
+  () => import("@/components/dashboard/performance-comparison").then((mod) => mod.PerformanceComparison),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+function ChartSkeleton() {
+  return (
+    <div className="h-48 bg-muted/30 rounded-lg animate-pulse flex items-center justify-center">
+      <span className="text-muted-foreground text-sm">Loading...</span>
+    </div>
+  );
+}
 
 export function NetworkOverview() {
   const { data: overview, isLoading: overviewLoading } = trpc.network.overview.useQuery(

@@ -1,10 +1,33 @@
 "use client";
 
-import { GrowthForecast } from "./growth-forecast";
-import { DegradationPanel } from "./degradation-panel";
-import { PeerHealthOverview } from "./peer-health-overview";
+import dynamic from "next/dynamic";
 import { NetworkHealthCard } from "./health-score-card";
 import { trpc } from "@/lib/trpc/client";
+
+// Dynamic imports for heavy analytics components (code splitting)
+const GrowthForecast = dynamic(
+  () => import("./growth-forecast").then((mod) => mod.GrowthForecast),
+  { loading: () => <SectionSkeleton />, ssr: false }
+);
+
+const DegradationPanel = dynamic(
+  () => import("./degradation-panel").then((mod) => mod.DegradationPanel),
+  { loading: () => <SectionSkeleton />, ssr: false }
+);
+
+const PeerHealthOverview = dynamic(
+  () => import("./peer-health-overview").then((mod) => mod.PeerHealthOverview),
+  { loading: () => <SectionSkeleton />, ssr: false }
+);
+
+function SectionSkeleton() {
+  return (
+    <div className="border border-border rounded-xl p-6 animate-pulse">
+      <div className="h-6 bg-muted rounded w-1/3 mb-4" />
+      <div className="h-32 bg-muted rounded" />
+    </div>
+  );
+}
 
 export function AnalyticsDashboard() {
   const { data: networkHealth, isLoading: healthLoading } = trpc.analytics.networkHealth.useQuery();
