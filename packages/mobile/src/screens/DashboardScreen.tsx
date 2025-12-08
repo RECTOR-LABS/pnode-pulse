@@ -16,11 +16,10 @@ export function DashboardScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  // Fetch network stats (types not shared yet between packages)
+  // Fetch network stats
   const networkStats = useQuery({
     queryKey: ["network", "getStats"],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    queryFn: () => (trpc as any).network.getStats.query(),
+    queryFn: () => trpc.network.getStats.query(),
     refetchInterval: 30000, // Refresh every 30s
   });
 

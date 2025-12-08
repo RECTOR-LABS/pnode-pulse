@@ -2,11 +2,11 @@
  * tRPC Client for Mobile
  *
  * Connects to the pNode Pulse API server.
- * Uses vanilla tRPC client since we don't have shared types yet.
  */
 
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
+import type { AppRouter } from "../../../../src/server/api/root";
 
 // API Base URL - configurable per environment
 const getBaseUrl = () => {
@@ -19,8 +19,7 @@ const getBaseUrl = () => {
   return "https://pulse.rectorspace.com";
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const trpcClient = createTRPCClient<any>({
+export const trpcClient = createTRPCClient<AppRouter>({
   links: [
     httpBatchLink({
       url: `${getBaseUrl()}/api/trpc`,

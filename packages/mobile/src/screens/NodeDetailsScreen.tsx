@@ -22,11 +22,10 @@ export function NodeDetailsScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  // Fetch node details (types not shared yet between packages)
+  // Fetch node details
   const node = useQuery({
     queryKey: ["nodes", "getById", nodeId],
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    queryFn: () => (trpc as any).nodes.getById.query({ id: nodeId }),
+    queryFn: () => trpc.nodes.getById.query({ id: nodeId }),
     refetchInterval: 30000,
   });
 

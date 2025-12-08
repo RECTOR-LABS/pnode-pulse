@@ -33,12 +33,11 @@ export function NodesScreen() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
-  // Fetch nodes (types not shared yet between packages)
+  // Fetch nodes
   const nodes = useQuery({
     queryKey: ["nodes", "list", { search: searchQuery, status: statusFilter }],
     queryFn: () =>
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (trpc as any).nodes.list.query({
+      trpc.nodes.list.query({
         search: searchQuery || undefined,
         status: statusFilter === "all" ? undefined : statusFilter,
       }),
