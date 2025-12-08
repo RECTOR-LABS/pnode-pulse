@@ -166,18 +166,69 @@ See GitHub Issues and Milestones for current work.
 - Response structure from `get-stats` is FLAT (differs from official docs)
 - `get-pods` includes `pubkey` field not documented officially
 
-## Xandeum API Roadmap (from Discord - Brad, Dec 2024)
+## Xandeum API Intelligence (Discord #apps-developers, Dec 6-8, 2024)
 
-**Current `get-pods` limitation:**
-- Returns only a **subset** of all pods, not the complete network
-- Data format is correct: `address`, `last_seen_timestamp`, `pubkey`, `version`
-- Can query any public pNode endpoint
+### Network Statistics (from community analysis)
 
-**Coming soon (v0.7 Heidelberg):**
-- "More detailed call will return much more data for each pnode connected"
-- Will include paging statistics APIs
-- No specific release date announced yet
+| Metric | Value | Source |
+|--------|-------|--------|
+| Total pNodes | ~134-138 | Ymetro (gossip + Atlas) |
+| ATH (All-Time High) | 138 | pchednode tracker |
+| Version v0.6.0 | 128 nodes (95%) | Ymetro |
+| Version v0.5.1 | 5 nodes (4%) | Ymetro |
+| Unknown version | 1 node | Ymetro |
 
-**Action items for Epic 5.4:**
-- Monitor Discord #apps-developers for v0.7 announcements
-- When released: integrate new detailed API, extend data models, update dashboard
+### API Status
+
+| Method | Status | Limitation |
+|--------|--------|------------|
+| `get-version` | ✅ Working | None |
+| `get-stats` | ✅ Working | None |
+| `get-pods` | ⚠️ Partial | Returns ~22 nodes (subset), not all 134+ |
+| **New detailed API** | 🔜 Expected Dec 9 | "Much more data for ALL pNodes" |
+
+### Data Sources Available
+
+1. **pRPC endpoints** (9 public IPs) - `get-stats`, `get-pods`, `get-version`
+2. **Atlas server** - Additional node discovery (port 5000, internal)
+3. **Gossip network** - Peer discovery via port 9001
+4. **getProgramAccounts (devnet)** - Returns registered pNodes only
+5. **seenodes.xandeum.network** - Shows registered nodes only
+
+### Registered vs Unregistered Nodes
+
+- **Registered**: On-chain, has license, appears on seenodes.xandeum.network
+- **Unregistered**: Has keypair but no license, still appears in gossip/Atlas
+- Both types can be online and serving the network
+
+### Bounty Competition Status (Dec 8, 2024)
+
+| Developer | Project | Approach |
+|-----------|---------|----------|
+| TANAY | xandeum-lattice.vercel.app | Public pRPC (Brad questioned data source) |
+| Fortune | Counting 137 nodes | getProgramAccounts + gossip |
+| Ymetro | 135 nodes counted | Gossip + Atlas combined, deduped |
+| **pNode Pulse** | Full analytics platform | pRPC + TimescaleDB + predictive analytics |
+
+### Key Quotes from Brad (Xandeum Team)
+
+> "We will be adding a detailed call that give much more info for ALL pNodes..It didn't come to me yesterday so likely now not until Monday" - Dec 6, 23:11
+
+> "This command is supposed to return all pods...but its only a small subset...but the data format will be right" - Dec 8, 00:00
+
+> "The more detailed call will return much more data for each pnode connected" - Dec 8, 00:00
+
+### Open Question (Bounty Scope)
+
+From Fortune (Dec 8):
+> "for the superteam bounty, should we focus on all pNodes ever created, or just the online/recently online ones gossip returns?"
+
+**Unanswered** - May need clarification from bounty organizers.
+
+### Action Items for Epic 5.4
+
+- [ ] Monitor Discord for new API release (expected Dec 9+)
+- [ ] Test new detailed API when available
+- [ ] Extend data models for additional fields
+- [ ] Consider Atlas integration for better node discovery
+- [ ] Consider getProgramAccounts for registered node data
