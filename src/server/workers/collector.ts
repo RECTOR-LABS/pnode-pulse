@@ -10,6 +10,7 @@
 
 import { db } from "@/lib/db";
 import { createClient, PUBLIC_PNODES, PRPCError } from "@/lib/prpc";
+import { publishNetworkUpdate, publishMetricsUpdate } from "@/lib/redis/pubsub";
 import type { PNodeStats, PodsResult, PNodeVersion } from "@/types/prpc";
 
 const COLLECTION_INTERVAL = 30 * 1000; // 30 seconds
@@ -276,6 +277,13 @@ async function computeNetworkStats() {
         versionDistribution: versionDistJson,
       },
     });
+
+    // Publish real-time update
+    await publishNetworkUpdate(
+      Number(stats.total_nodes),
+      Number(stats.active_nodes),
+      Number(stats.total_nodes) - Number(stats.active_nodes)
+    ).catch((err) => console.error("[Collector] Failed to publish network update:", err));
   }
 }
 
@@ -333,6 +341,18 @@ export async function runCollection(): Promise<{
       if (result.success && result.stats) {
         await saveMetrics(node.id, result.stats);
         await updateNodeStatus(node.id, true, result.version?.version);
+
+        // Publish real-time metrics update
+        const ramPercent = result.stats.ram_total > 0
+          ? (result.stats.ram_used / result.stats.ram_total) * 100
+          : 0;
+        await publishMetricsUpdate(
+          node.id,
+          result.stats.cpu_percent,
+          ramPercent,
+          result.stats.uptime,
+          Number(result.stats.file_size)
+        ).catch(() => {}); // Silently ignore publish errors
 
         if (result.pods) {
           await updatePeers(node.id, result.pods);
