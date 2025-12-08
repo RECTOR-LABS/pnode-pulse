@@ -107,8 +107,8 @@ export const badgesRouter = createTRPCRouter({
     .input(z.object({ token: z.string() }))
     .query(async ({ ctx, input }) => {
       const payload = await verifyToken(input.token);
-      if (!payload) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid token" });
+      if (!payload.valid || !payload.userId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: payload.error || "Invalid token" });
       }
 
       const profile = await ctx.db.operatorProfile.findUnique({
@@ -138,8 +138,8 @@ export const badgesRouter = createTRPCRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       const payload = await verifyToken(input.token);
-      if (!payload) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid token" });
+      if (!payload.valid || !payload.userId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: payload.error || "Invalid token" });
       }
 
       const profile = await ctx.db.operatorProfile.findUnique({
@@ -194,8 +194,8 @@ export const badgesRouter = createTRPCRouter({
     .input(z.object({ token: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const payload = await verifyToken(input.token);
-      if (!payload) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid token" });
+      if (!payload.valid || !payload.userId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: payload.error || "Invalid token" });
       }
 
       const profile = await ctx.db.operatorProfile.findUnique({
@@ -363,7 +363,7 @@ export const badgesRouter = createTRPCRouter({
         slug: "getting_started",
         name: "Getting Started",
         description: "Achieve 24 hours of total uptime",
-        icon: "ð",
+        icon: "ï¿½",
         tier: "COMMON" as const,
         criteria: { type: "uptime", threshold: 86400 },
         displayOrder: 2,
@@ -373,7 +373,7 @@ export const badgesRouter = createTRPCRouter({
         slug: "node_collector",
         name: "Node Collector",
         description: "Verify ownership of 5 pNodes",
-        icon: "<¯",
+        icon: "<ï¿½",
         tier: "UNCOMMON" as const,
         criteria: { type: "node_count", threshold: 5 },
         displayOrder: 10,
@@ -382,7 +382,7 @@ export const badgesRouter = createTRPCRouter({
         slug: "week_warrior",
         name: "Week Warrior",
         description: "Achieve 7 days of total uptime",
-        icon: "=Å",
+        icon: "=ï¿½",
         tier: "UNCOMMON" as const,
         criteria: { type: "uptime", threshold: 604800 },
         displayOrder: 11,
@@ -391,7 +391,7 @@ export const badgesRouter = createTRPCRouter({
         slug: "storage_starter",
         name: "Storage Starter",
         description: "Contribute 100GB of storage",
-        icon: "=¾",
+        icon: "=ï¿½",
         tier: "UNCOMMON" as const,
         criteria: { type: "storage", threshold: 107374182400 },
         displayOrder: 12,
@@ -401,7 +401,7 @@ export const badgesRouter = createTRPCRouter({
         slug: "fleet_commander",
         name: "Fleet Commander",
         description: "Verify ownership of 10 pNodes",
-        icon: "=€",
+        icon: "=ï¿½",
         tier: "RARE" as const,
         criteria: { type: "node_count", threshold: 10 },
         displayOrder: 20,
@@ -410,7 +410,7 @@ export const badgesRouter = createTRPCRouter({
         slug: "month_master",
         name: "Month Master",
         description: "Achieve 30 days of total uptime",
-        icon: "=Ó",
+        icon: "=ï¿½",
         tier: "RARE" as const,
         criteria: { type: "uptime", threshold: 2592000 },
         displayOrder: 21,
@@ -419,7 +419,7 @@ export const badgesRouter = createTRPCRouter({
         slug: "efficiency_expert",
         name: "Efficiency Expert",
         description: "Maintain below 5% avg CPU with 7+ days uptime",
-        icon: "¡",
+        icon: "ï¿½",
         tier: "RARE" as const,
         criteria: { type: "cpu_efficiency", threshold: 5, minUptime: 604800 },
         displayOrder: 22,
@@ -429,7 +429,7 @@ export const badgesRouter = createTRPCRouter({
         slug: "data_center",
         name: "Data Center",
         description: "Contribute 1TB of storage",
-        icon: "<í",
+        icon: "<ï¿½",
         tier: "EPIC" as const,
         criteria: { type: "storage", threshold: 1099511627776 },
         displayOrder: 30,
@@ -438,7 +438,7 @@ export const badgesRouter = createTRPCRouter({
         slug: "quarter_champ",
         name: "Quarter Champion",
         description: "Achieve 90 days of total uptime",
-        icon: "<Æ",
+        icon: "<ï¿½",
         tier: "EPIC" as const,
         criteria: { type: "uptime", threshold: 7776000 },
         displayOrder: 31,

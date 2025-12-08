@@ -32,8 +32,8 @@ export const profilesRouter = createTRPCRouter({
     .input(z.object({ token: z.string() }))
     .query(async ({ ctx, input }) => {
       const payload = await verifyToken(input.token);
-      if (!payload) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid token" });
+      if (!payload.valid || !payload.userId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: payload.error || "Invalid token" });
       }
 
       const profile = await ctx.db.operatorProfile.findUnique({
@@ -106,13 +106,15 @@ export const profilesRouter = createTRPCRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       const payload = await verifyToken(input.token);
-      if (!payload) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid token" });
+      if (!payload.valid || !payload.userId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: payload.error || "Invalid token" });
       }
+
+      const userId = payload.userId;
 
       // Check if profile already exists
       const existing = await ctx.db.operatorProfile.findUnique({
-        where: { userId: payload.userId },
+        where: { userId },
       });
 
       if (existing) {
@@ -137,7 +139,7 @@ export const profilesRouter = createTRPCRouter({
       // Get user's node stats
       const claims = await ctx.db.nodeClaim.findMany({
         where: {
-          userId: payload.userId,
+          userId,
           status: "VERIFIED",
         },
         select: { nodeId: true },
@@ -183,7 +185,7 @@ export const profilesRouter = createTRPCRouter({
       // Create profile
       const profile = await ctx.db.operatorProfile.create({
         data: {
-          userId: payload.userId,
+          userId,
           displayName: input.displayName,
           bio: input.bio,
           totalNodes,
@@ -203,8 +205,8 @@ export const profilesRouter = createTRPCRouter({
     .input(updateProfileInput)
     .mutation(async ({ ctx, input }) => {
       const payload = await verifyToken(input.token);
-      if (!payload) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid token" });
+      if (!payload.valid || !payload.userId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: payload.error || "Invalid token" });
       }
 
       const profile = await ctx.db.operatorProfile.findUnique({
@@ -293,8 +295,8 @@ export const profilesRouter = createTRPCRouter({
     .input(z.object({ token: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const payload = await verifyToken(input.token);
-      if (!payload) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid token" });
+      if (!payload.valid || !payload.userId) {
+        throw new TRPCError({ code: "UNAUTHORIZED", message: payload.error || "Invalid token" });
       }
 
       // Get verified node claims
