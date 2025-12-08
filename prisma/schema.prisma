@@ -144,6 +144,10 @@ model Node {
   pubkey    String?
   /// pNode software version
   version   String?
+  /// Whether RPC port is publicly accessible (from v0.7.0+ get-pods-with-stats)
+  isPublic  Boolean? @map("is_public")
+  /// RPC service port (typically 6000, from v0.7.0+ get-pods-with-stats)
+  rpcPort   Int?     @map("rpc_port")
   /// First time this node was seen
   firstSeen DateTime @default(now()) @map("first_seen")
   /// Last time we successfully polled this node
@@ -169,6 +173,7 @@ model Node {
   @@index([lastSeen(sort: Desc)])
   @@index([isActive, version])
   @@index([isActive, lastSeen(sort: Desc)])
+  @@index([isPublic])
   @@map("nodes")
 }
 
@@ -190,6 +195,10 @@ model NodeMetric {
   totalBytes      BigInt?  @map("total_bytes")
   totalPages      Int?     @map("total_pages")
   currentIndex    Int?     @map("current_index")
+  /// Total storage allocated in bytes (from v0.7.0+ get-pods-with-stats)
+  storageCommitted BigInt? @map("storage_committed")
+  /// Storage utilization percentage (from v0.7.0+ get-pods-with-stats)
+  storageUsagePercent Float? @map("storage_usage_percent")
 
   // Network metrics
   packetsReceived Int?     @map("packets_received")

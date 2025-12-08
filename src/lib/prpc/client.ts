@@ -20,6 +20,7 @@ import {
   type PNodeVersion,
   type PNodeStats,
   type PodsResult,
+  type PodsWithStatsResult,
   type PRPCClientConfig,
   PRPCError,
   PRPCErrorCode,
@@ -69,9 +70,19 @@ export class PRPCClient {
 
   /**
    * Get list of peer nodes (pods)
+   * @deprecated Use getPodsWithStats() for v0.7.0+ nodes with comprehensive stats
    */
   async getPods(): Promise<PodsResult> {
     return this.call<PodsResult>("get-pods");
+  }
+
+  /**
+   * Get list of peer nodes with comprehensive stats (v0.7.0+)
+   * Returns ALL pNodes in gossip network with storage, uptime, and public/private status.
+   * Note: Older pNodes (<v0.7.0) will appear with limited stats (null fields).
+   */
+  async getPodsWithStats(): Promise<PodsWithStatsResult> {
+    return this.call<PodsWithStatsResult>("get-pods-with-stats");
   }
 
   /**

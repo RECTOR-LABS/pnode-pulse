@@ -96,6 +96,43 @@ export interface PodsResult {
   total_count: number;
 }
 
+/**
+ * Enhanced pod with comprehensive stats (v0.7.0+)
+ * From get-pods-with-stats RPC method
+ */
+export interface PodWithStats {
+  /** Address in format "ip:port" (gossip port 9001) */
+  address: string;
+  /** Whether RPC port is publicly accessible (null if unknown) */
+  is_public: boolean | null;
+  /** Unix timestamp of last seen */
+  last_seen_timestamp: number;
+  /** Base58 public key of the node (null for older versions or private nodes) */
+  pubkey: string | null;
+  /** RPC service port (typically 6000, null if not available) */
+  rpc_port: number | null;
+  /** Total storage allocated in bytes (null if not available) */
+  storage_committed: number | null;
+  /** Storage utilization percentage (null if not available) */
+  storage_usage_percent: number | null;
+  /** Actual storage used in bytes (null if not available) */
+  storage_used: number | null;
+  /** Node uptime in seconds (null if not available) */
+  uptime: number | null;
+  /** pNode software version (may be "unknown") */
+  version: string;
+}
+
+/**
+ * Response from get-pods-with-stats RPC method (v0.7.0+)
+ */
+export interface PodsWithStatsResult {
+  /** Array of pods with comprehensive stats */
+  pods: PodWithStats[];
+  /** Total number of known peers */
+  total_count: number;
+}
+
 // ============================================
 // Client Configuration Types
 // ============================================

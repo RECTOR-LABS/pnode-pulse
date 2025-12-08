@@ -28,6 +28,8 @@ export type {
   PNodeStats,
   Pod,
   PodsResult,
+  PodWithStats,
+  PodsWithStatsResult,
   PRPCClientConfig,
   EnhancedNodeStats,
   NetworkStats,

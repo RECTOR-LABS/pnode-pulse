@@ -108,6 +108,57 @@ docker compose logs -f web     # View logs
 }
 ```
 
+#### get-pods-with-stats (v0.7.0+)
+**Available since**: December 8, 2024
+**Requirement**: pNode running v0.7.0 or later
+
+```bash
+curl -X POST http://<ip-address>:6000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{
+  "jsonrpc": "2.0",
+  "method": "get-pods-with-stats",
+  "id": 1
+}'
+```
+
+**Response Format**:
+```json
+{
+  "result": {
+    "pods": [
+      {
+        "address": "192.190.136.37:9001",
+        "is_public": true,
+        "last_seen_timestamp": 1765209387,
+        "pubkey": "Aj6AqP7xvmBNuPF5v4zNB3SYxBe3yP6rsqK6KsaKVXKM",
+        "rpc_port": 6000,
+        "storage_committed": 183000000000,
+        "storage_usage_percent": 0.000051712021857923493,
+        "storage_used": 94633,
+        "uptime": 1461,
+        "version": "0.7.0-trynet.20251208141952.3b3bb24"
+      }
+    ],
+    "total_count": 5
+  }
+}
+```
+
+**New Fields**:
+- `is_public` (boolean | null): Whether RPC port is publicly accessible
+- `rpc_port` (number | null): RPC service port (typically 6000)
+- `storage_committed` (number): Total storage allocated in bytes
+- `storage_usage_percent` (number): Storage utilization percentage
+- `storage_used` (number): Actual storage used in bytes
+- `uptime` (number): Node uptime in seconds
+
+**Important Notes**:
+- Returns data for ALL pNodes in gossip network (not just subset)
+- Nodes with `is_public: null` have private RPC ports (not publicly queryable)
+- Private nodes are still active and serving the network
+- Only v0.7.0+ nodes return full stats; older versions show minimal data
+
 ### Network Ports
 
 | Port | Service | Access |
@@ -184,8 +235,8 @@ See GitHub Issues and Milestones for current work.
 |--------|--------|------------|
 | `get-version` | ✅ Working | None |
 | `get-stats` | ✅ Working | None |
-| `get-pods` | ⚠️ Partial | Returns ~22 nodes (subset), not all 134+ |
-| **New detailed API** | 🔜 Expected Dec 9 | "Much more data for ALL pNodes" |
+| `get-pods` | ⚠️ Legacy | Returns ~22 nodes (subset), not all 134+ |
+| `get-pods-with-stats` | ✅ Live (v0.7.0+) | Requires pNode v0.7.0+, returns ALL nodes with rich stats |
 
 ### Data Sources Available
 
@@ -225,10 +276,45 @@ From Fortune (Dec 8):
 
 **Unanswered** - May need clarification from bounty organizers.
 
-### Action Items for Epic 5.4
+### v0.7.0 Release (Dec 8, 2024)
 
-- [ ] Monitor Discord for new API release (expected Dec 9+)
-- [ ] Test new detailed API when available
-- [ ] Extend data models for additional fields
-- [ ] Consider Atlas integration for better node discovery
-- [ ] Consider getProgramAccounts for registered node data
+**Gossip Protocol Enhancements**:
+- **Frequency**: Changed from every 120 seconds → every 1 second
+- **Batch Size**: 10 nodes per gossip message
+- **Propagation Time**: Full network propagation < 5 minutes (target < 2 min)
+- **Bug Fixes**: Resolved packet size issues causing outbound message failures
+
+**API Improvements**:
+- New `get-pods-with-stats` method with comprehensive node metrics
+- Returns ALL pNodes in gossip network (not just subset like `get-pods`)
+- Includes storage stats, uptime, public/private status
+
+**Migration Notes**:
+- `get-pods` is now legacy (use `get-pods-with-stats` instead)
+- Older pNodes (<v0.7.0) still appear in results with limited stats
+- Private nodes (`is_public: null`) are not queryable directly but included in results
+
+### Community Libraries
+
+**Skipp's pRPC Clients** (Released Dec 8, 2024):
+- **JS/TS**: `pnpm install xandeum-prpc` ([GitHub](https://github.com/DavidNzube101/xandeum-prpc-js))
+- **Go**: `go get github.com/DavidNzube101/xandeum-prpc-go`
+- **Rust**: `cargo add xandeum-prpc`
+- **Demo**: prpc-client-example.vercel.app
+
+**Usage Example (JS/TS)**:
+```typescript
+import { PrpcClient } from 'xandeum-prpc';
+const client = new PrpcClient('192.190.136.36');
+const pods = await client.getPods();
+console.log(pods);
+```
+
+### Implementation Status
+
+- [x] Monitor Discord for new API release
+- [x] New `get-pods-with-stats` API available (v0.7.0+)
+- [ ] Extend pRPC client to support `get-pods-with-stats`
+- [ ] Update data models for storage/uptime fields
+- [ ] Test against live v0.7.0 pNodes
+- [ ] Update analytics to classify private vs public nodes correctly

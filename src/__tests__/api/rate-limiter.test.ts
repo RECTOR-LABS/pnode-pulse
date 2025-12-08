@@ -186,7 +186,7 @@ describe('Rate Limit Headers', () => {
     const result = createRateLimitResult(false, 100, 0, 'FREE');
     const WINDOW_SIZE = 60;
 
-    const headers = {
+    const headers: Record<string, string> = {
       'X-RateLimit-Limit': result.limit.toString(),
       'X-RateLimit-Remaining': result.remaining.toString(),
       'X-RateLimit-Reset': result.reset.toString(),

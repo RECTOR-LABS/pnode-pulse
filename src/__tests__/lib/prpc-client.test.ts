@@ -148,7 +148,7 @@ describe('JSON-RPC Request Format', () => {
       id: 2,
     };
 
-    expect(request1.params).toBeUndefined();
+    expect((request1 as Record<string, unknown>).params).toBeUndefined();
     expect(request2.params).toEqual({ key: 'value' });
   });
 });
@@ -162,7 +162,7 @@ describe('JSON-RPC Response Handling', () => {
     };
 
     expect(response.result).toBeDefined();
-    expect(response.error).toBeUndefined();
+    expect((response as Record<string, unknown>).error).toBeUndefined();
   });
 
   it('should handle error response', () => {
@@ -176,7 +176,7 @@ describe('JSON-RPC Response Handling', () => {
     };
 
     expect(response.error).toBeDefined();
-    expect(response.result).toBeUndefined();
+    expect((response as Record<string, unknown>).result).toBeUndefined();
   });
 
   it('should validate result exists', () => {
@@ -185,7 +185,7 @@ describe('JSON-RPC Response Handling', () => {
       id: 1,
     };
 
-    expect(response.result).toBeUndefined();
+    expect((response as Record<string, unknown>).result).toBeUndefined();
   });
 });
 
