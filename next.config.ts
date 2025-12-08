@@ -28,34 +28,86 @@ const nextConfig: NextConfig = {
   // HTTP headers for caching
   async headers() {
     return [
+      // Static assets - aggressive caching (1 year, immutable)
       {
-        // Cache static assets aggressively
-        source: "/:path*.(ico|png|jpg|jpeg|gif|svg|woff|woff2)",
+        source: "/:path*.(ico|png|jpg|jpeg|gif|svg|woff|woff2|webp|avif)",
         headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+          { key: "CDN-Cache-Control", value: "public, max-age=31536000, immutable" },
         ],
       },
+      // Next.js static chunks - immutable (hashed filenames)
       {
-        // Cache JS/CSS with revalidation
         source: "/_next/static/:path*",
         headers: [
-          {
-            key: "Cache-Control",
-            value: "public, max-age=31536000, immutable",
-          },
+          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+          { key: "CDN-Cache-Control", value: "public, max-age=31536000, immutable" },
+        ],
+      },
+      // PWA manifest and service worker
+      {
+        source: "/manifest.json",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" },
         ],
       },
       {
-        // API routes - short cache with stale-while-revalidate
-        source: "/api/:path*",
+        source: "/sw.js",
         headers: [
-          {
-            key: "Cache-Control",
-            value: "public, s-maxage=10, stale-while-revalidate=59",
-          },
+          { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+        ],
+      },
+      // Public API v1 - edge cached with SWR
+      {
+        source: "/api/v1/network/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, s-maxage=30, stale-while-revalidate=60" },
+          { key: "CDN-Cache-Control", value: "public, max-age=30, stale-while-revalidate=60" },
+          { key: "Vercel-CDN-Cache-Control", value: "public, max-age=30, stale-while-revalidate=60" },
+        ],
+      },
+      {
+        source: "/api/v1/nodes",
+        headers: [
+          { key: "Cache-Control", value: "public, s-maxage=30, stale-while-revalidate=60" },
+          { key: "CDN-Cache-Control", value: "public, max-age=30, stale-while-revalidate=60" },
+        ],
+      },
+      {
+        source: "/api/v1/leaderboard",
+        headers: [
+          { key: "Cache-Control", value: "public, s-maxage=60, stale-while-revalidate=300" },
+          { key: "CDN-Cache-Control", value: "public, max-age=60, stale-while-revalidate=300" },
+        ],
+      },
+      // Badges - longer cache (less frequent updates)
+      {
+        source: "/api/badge/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, s-maxage=300, stale-while-revalidate=600" },
+          { key: "CDN-Cache-Control", value: "public, max-age=300, stale-while-revalidate=600" },
+        ],
+      },
+      // Embed routes - moderate cache
+      {
+        source: "/embed/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, s-maxage=60, stale-while-revalidate=300" },
+          { key: "X-Frame-Options", value: "ALLOWALL" },
+        ],
+      },
+      // Real-time API - no cache
+      {
+        source: "/api/realtime",
+        headers: [
+          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate" },
+        ],
+      },
+      // tRPC - short cache for GET requests
+      {
+        source: "/api/trpc/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, s-maxage=10, stale-while-revalidate=30" },
         ],
       },
     ];
