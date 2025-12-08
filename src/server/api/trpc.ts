@@ -10,6 +10,7 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 import { db } from "@/lib/db";
 import { verifyToken } from "@/lib/auth/verify-token";
+import { ensureJWTSecret } from "@/lib/auth/jwt-config";
 
 /**
  * Context passed to all tRPC procedures
@@ -78,6 +79,9 @@ export const loggedProcedure = t.procedure.use(loggerMiddleware);
  * Authentication middleware - verifies JWT token and adds userId to context
  */
 const authMiddleware = t.middleware(async ({ ctx, next, getRawInput }) => {
+  // Ensure JWT_SECRET is configured (runtime check)
+  ensureJWTSecret();
+
   const input = (await getRawInput()) as { token?: string };
 
   if (!input.token) {

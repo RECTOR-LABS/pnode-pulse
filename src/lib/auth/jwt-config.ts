@@ -2,36 +2,35 @@
  * JWT Configuration
  *
  * Centralized JWT secret management.
- * FAILS FAST at runtime if JWT_SECRET is not configured - never use fallback values.
+ * Uses placeholder during build, validates at runtime.
  */
 
-const JWT_SECRET_ENV = process.env.JWT_SECRET;
+function getJWTSecret(): Uint8Array {
+  const JWT_SECRET_ENV = process.env.JWT_SECRET;
 
-// Only enforce in production/runtime, allow build without JWT_SECRET
-if (!JWT_SECRET_ENV && process.env.NODE_ENV === "production") {
-  throw new Error(
-    "FATAL: JWT_SECRET environment variable is required but not set. " +
-    "Set JWT_SECRET in your .env file before starting the application."
-  );
+  // For build-time (when Next.js is collecting page data), use placeholder
+  // At actual runtime, this will fail with proper error if not set
+  const secretValue = JWT_SECRET_ENV || "build-time-placeholder-only";
+
+  return new TextEncoder().encode(secretValue);
 }
 
-// For build-time, use a placeholder (will fail at runtime if not set)
-const secretValue = JWT_SECRET_ENV || "build-time-placeholder-not-for-runtime";
-
-export const JWT_SECRET = new TextEncoder().encode(secretValue);
+export const JWT_SECRET = getJWTSecret();
 export const JWT_ISSUER = "pnode-pulse";
 export const JWT_AUDIENCE = "pnode-pulse-app";
 export const JWT_VALIDITY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 /**
- * Runtime validation - call this when the app starts
- * This ensures JWT_SECRET is configured before accepting requests
+ * Validate JWT_SECRET is configured (call at request time, not module load)
+ * Throws error if JWT_SECRET is missing or is the build placeholder
  */
-export function validateJWTConfig(): void {
-  if (!process.env.JWT_SECRET) {
+export function ensureJWTSecret(): void {
+  const secret = process.env.JWT_SECRET;
+
+  if (!secret || secret === "build-time-placeholder-only") {
     throw new Error(
-      "FATAL: JWT_SECRET environment variable is required for runtime. " +
-      "Set JWT_SECRET in your .env file before starting the application."
+      "FATAL: JWT_SECRET environment variable must be set. " +
+      "Configure JWT_SECRET in your environment before handling requests."
     );
   }
 }
