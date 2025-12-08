@@ -23,7 +23,7 @@ function calculateNextSendAt(
   hour: number,
   dayOfWeek?: number | null,
   dayOfMonth?: number | null,
-  timezone: string = "UTC"
+  _timezone: string = "UTC"
 ): Date {
   const now = new Date();
   const next = new Date(now);

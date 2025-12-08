@@ -67,9 +67,9 @@ interface ReportData {
  * Calculate uptime percentage for SLA
  */
 function calculateUptimePercentage(
-  nodeId: number,
-  startDate: Date,
-  endDate: Date
+  _nodeId: number,
+  _startDate: Date,
+  _endDate: Date
 ): Promise<number> {
   // Simplified calculation - would use uptime_events in production
   return Promise.resolve(99.5);
@@ -81,7 +81,7 @@ function calculateUptimePercentage(
 async function getReportData(
   scope: ReportScope,
   portfolioId: string | null,
-  reportType: ReportType
+  _reportType: ReportType
 ): Promise<ReportData> {
   // Get nodes based on scope
   let nodeFilter = {};
@@ -207,7 +207,7 @@ function formatBytes(bytes: bigint): string {
 /**
  * Generate HTML email content for weekly summary
  */
-function generateWeeklySummaryHtml(data: ReportData, reportName: string): string {
+function generateWeeklySummaryHtml(data: ReportData, _reportName: string): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pulse.rectorspace.com";
 
   return `
@@ -321,7 +321,7 @@ function generateWeeklySummaryHtml(data: ReportData, reportName: string): string
 /**
  * Generate HTML email content for daily digest
  */
-function generateDailyDigestHtml(data: ReportData, reportName: string): string {
+function generateDailyDigestHtml(data: ReportData, _reportName: string): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pulse.rectorspace.com";
 
   return `
@@ -391,7 +391,7 @@ function generateDailyDigestHtml(data: ReportData, reportName: string): string {
 /**
  * Generate HTML email content for monthly SLA report
  */
-function generateMonthlySlaHtml(data: ReportData, reportName: string): string {
+function generateMonthlySlaHtml(data: ReportData, _reportName: string): string {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pulse.rectorspace.com";
   const slaPercent = data.totalNodes > 0
     ? ((data.activeNodes / data.totalNodes) * 100).toFixed(2)

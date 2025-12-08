@@ -39,7 +39,6 @@ export function TimeSeriesChart({
 
   // Chart dimensions
   const padding = { top: 20, right: 20, bottom: 30, left: 50 };
-  const chartWidth = 100; // percentage
   const chartHeight = height - padding.top - padding.bottom;
 
   // Generate path

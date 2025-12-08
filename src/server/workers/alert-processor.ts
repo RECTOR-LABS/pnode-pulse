@@ -11,7 +11,6 @@
 import { db } from "@/lib/db";
 import {
   createWorker,
-  getAlertQueue,
   getNotificationQueue,
   scheduleAlertEvaluation,
   type AlertJobData,
@@ -246,7 +245,6 @@ async function processEscalations(): Promise<void> {
 
   console.log(`Found ${activeAlerts.length} active alerts with escalation policies`);
 
-  const notificationQueue = getNotificationQueue();
   let escalationsProcessed = 0;
 
   for (const alert of activeAlerts) {

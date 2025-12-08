@@ -2,19 +2,25 @@
 
 import { useEffect, useState } from "react";
 
+// Helper to get initial theme (runs only on client)
+function getInitialTheme(): boolean {
+  if (typeof window === "undefined") return false;
+  const savedTheme = localStorage.getItem("theme");
+  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return savedTheme === "dark" || (!savedTheme && prefersDark);
+}
+
 export function ThemeToggle() {
-  const [isDark, setIsDark] = useState(false);
+  const [isDark, setIsDark] = useState(getInitialTheme);
 
+  // Sync DOM class on mount and when isDark changes
   useEffect(() => {
-    // Check for saved preference or system preference
-    const savedTheme = localStorage.getItem("theme");
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-
-    if (savedTheme === "dark" || (!savedTheme && prefersDark)) {
-      setIsDark(true);
+    if (isDark) {
       document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
     }
-  }, []);
+  }, [isDark]);
 
   const toggleTheme = () => {
     const newTheme = !isDark;

@@ -5,7 +5,7 @@
  * All routers and procedures are defined using these primitives.
  */
 
-import { initTRPC, TRPCError } from "@trpc/server";
+import { initTRPC } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { db } from "@/lib/db";

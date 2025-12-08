@@ -251,7 +251,7 @@ export function ClaimNodeButton({ nodeId, nodePubkey, size = "md" }: ClaimNodeBu
                       Wallet Signature
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
-                      Sign a message with the node's keypair
+                      Sign a message with the node&apos;s keypair
                     </p>
                   </button>
                 )}
@@ -268,7 +268,7 @@ export function ClaimNodeButton({ nodeId, nodePubkey, size = "md" }: ClaimNodeBu
                     Verification File
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Place a verification file on your node's HTTP server
+                    Place a verification file on your node&apos;s HTTP server
                   </p>
                 </button>
 
@@ -285,7 +285,7 @@ export function ClaimNodeButton({ nodeId, nodePubkey, size = "md" }: ClaimNodeBu
                     <span className="text-xs bg-muted px-1.5 py-0.5 rounded">Coming Soon</span>
                   </div>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Add a TXT record to your domain's DNS
+                    Add a TXT record to your domain&apos;s DNS
                   </p>
                 </button>
               </div>
@@ -296,7 +296,7 @@ export function ClaimNodeButton({ nodeId, nodePubkey, size = "md" }: ClaimNodeBu
                 {method === "WALLET_SIGNATURE" && (
                   <>
                     <p className="text-sm text-muted-foreground">
-                      Sign this message with your wallet to prove you control the node's keypair:
+                      Sign this message with your wallet to prove you control the node&apos;s keypair:
                     </p>
                     <pre className="p-3 bg-muted rounded-lg text-xs font-mono overflow-x-auto whitespace-pre-wrap">
                       {verificationData.message}

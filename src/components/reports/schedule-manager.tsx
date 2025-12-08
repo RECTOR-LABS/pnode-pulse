@@ -75,7 +75,8 @@ const DAYS_OF_WEEK = [
 export function ScheduleManager() {
   const sessionId = useSession();
   const [showCreate, setShowCreate] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_editingId, _setEditingId] = useState<string | null>(null);
 
   const { data: reports, refetch } = trpc.reports.list.useQuery(
     { sessionId: sessionId || "" },

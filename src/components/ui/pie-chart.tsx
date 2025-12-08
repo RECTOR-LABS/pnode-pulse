@@ -38,24 +38,31 @@ export function PieChart({ data, size = 200, donut = true, showLabels = true }: 
   const innerRadius = donut ? radius * 0.6 : 0;
   const center = radius;
 
-  // Calculate pie segments
-  let startAngle = -90; // Start from top
-  const segments = data.map((item, index) => {
+  // Calculate pie segments using reduce to avoid mutable variable
+  const segments = data.reduce<Array<{
+    label: string;
+    value: number;
+    color: string;
+    percentage: number;
+    startAngle: number;
+    endAngle: number;
+  }>>((acc, item, index) => {
     const percentage = (item.value / total) * 100;
     const angle = (percentage / 100) * 360;
+    const startAngle = acc.length === 0 ? -90 : acc[acc.length - 1].endAngle;
     const endAngle = startAngle + angle;
 
-    const segment = {
-      ...item,
+    acc.push({
+      label: item.label,
+      value: item.value,
       percentage,
       startAngle,
       endAngle,
       color: item.color || DEFAULT_COLORS[index % DEFAULT_COLORS.length],
-    };
+    });
 
-    startAngle = endAngle;
-    return segment;
-  });
+    return acc;
+  }, []);
 
   // Generate SVG path for each segment
   const getPath = (startAngle: number, endAngle: number) => {
@@ -96,7 +103,7 @@ export function PieChart({ data, size = 200, donut = true, showLabels = true }: 
     <div className="flex flex-col items-center gap-4">
       {/* SVG Pie Chart */}
       <svg width={size} height={size} className="transform -rotate-90">
-        {segments.map((segment, index) => (
+        {segments.map((segment) => (
           <path
             key={segment.label}
             d={getPath(segment.startAngle + 90, segment.endAngle + 90)}

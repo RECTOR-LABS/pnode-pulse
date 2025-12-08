@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const BOOKMARKS_KEY = "pnode-pulse-bookmarks";
 
@@ -11,40 +11,39 @@ interface BookmarkState {
   clear: () => void;
 }
 
+// Helper to load bookmarks from localStorage
+function loadBookmarks(): number[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(BOOKMARKS_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.error("Failed to load bookmarks:", e);
+  }
+  return [];
+}
+
 /**
  * Hook for managing bookmarked nodes with localStorage persistence
  * Syncs across browser tabs via storage event
  */
 export function useBookmarks(): BookmarkState {
-  const [bookmarks, setBookmarks] = useState<number[]>([]);
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  // Load from localStorage on mount
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(BOOKMARKS_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setBookmarks(parsed);
-        }
-      }
-    } catch (e) {
-      console.error("Failed to load bookmarks:", e);
-    }
-    setIsInitialized(true);
-  }, []);
+  const [bookmarks, setBookmarks] = useState<number[]>(loadBookmarks);
+  const isInitialized = useRef(true);
 
   // Save to localStorage whenever bookmarks change
   useEffect(() => {
-    if (isInitialized) {
+    if (isInitialized.current) {
       try {
         localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(bookmarks));
       } catch (e) {
         console.error("Failed to save bookmarks:", e);
       }
     }
-  }, [bookmarks, isInitialized]);
+  }, [bookmarks]);
 
   // Sync across tabs
   useEffect(() => {

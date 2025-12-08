@@ -141,8 +141,8 @@ export default function SessionsPage() {
       <div className="mt-8 p-4 bg-muted/30 rounded-lg">
         <h3 className="font-medium mb-2">Security Tips</h3>
         <ul className="text-sm text-muted-foreground space-y-1">
-          <li>Revoke any sessions you don't recognize</li>
-          <li>Use "Sign Out All" if you suspect unauthorized access</li>
+          <li>Revoke any sessions you don&apos;t recognize</li>
+          <li>Use &quot;Sign Out All&quot; if you suspect unauthorized access</li>
           <li>Sessions expire automatically after 7 days of inactivity</li>
         </ul>
       </div>
