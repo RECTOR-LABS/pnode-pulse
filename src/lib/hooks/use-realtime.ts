@@ -41,12 +41,43 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
   const queryClient = useQueryClient();
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const connectRef = useRef<() => void>(() => {});
 
   const [state, setState] = useState<RealtimeState>({
     connected: false,
     lastUpdate: null,
     reconnectAttempts: 0,
   });
+
+  // Handle incoming updates - invalidate React Query caches
+  const handleUpdate = useCallback(
+    (payload: UpdatePayload) => {
+      setState((prev) => ({ ...prev, lastUpdate: Date.now() }));
+      onUpdate?.(payload);
+
+      // Invalidate relevant React Query caches
+      switch (payload.type) {
+        case "network":
+          queryClient.invalidateQueries({ queryKey: ["network"] });
+          break;
+        case "node":
+          queryClient.invalidateQueries({
+            queryKey: ["nodes", payload.nodeId],
+          });
+          break;
+        case "metrics":
+          queryClient.invalidateQueries({
+            queryKey: ["nodes", payload.nodeId, "metrics"],
+          });
+          queryClient.invalidateQueries({ queryKey: ["analytics"] });
+          break;
+        case "alert":
+          queryClient.invalidateQueries({ queryKey: ["alerts"] });
+          break;
+      }
+    },
+    [queryClient, onUpdate]
+  );
 
   const connect = useCallback(() => {
     // Don't connect if disabled or already connected
@@ -81,7 +112,7 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
       setState((prev) => {
         if (prev.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
           reconnectTimeoutRef.current = setTimeout(() => {
-            connect();
+            connectRef.current();
           }, RECONNECT_DELAY);
 
           return {
@@ -124,36 +155,12 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
       const payload = JSON.parse(event.data) as UpdatePayload;
       handleUpdate(payload);
     });
-  }, [enabled, channels, onConnectionChange]);
+  }, [enabled, channels, onConnectionChange, handleUpdate]);
 
-  const handleUpdate = useCallback(
-    (payload: UpdatePayload) => {
-      setState((prev) => ({ ...prev, lastUpdate: Date.now() }));
-      onUpdate?.(payload);
-
-      // Invalidate relevant React Query caches
-      switch (payload.type) {
-        case "network":
-          queryClient.invalidateQueries({ queryKey: ["network"] });
-          break;
-        case "node":
-          queryClient.invalidateQueries({
-            queryKey: ["nodes", payload.nodeId],
-          });
-          break;
-        case "metrics":
-          queryClient.invalidateQueries({
-            queryKey: ["nodes", payload.nodeId, "metrics"],
-          });
-          queryClient.invalidateQueries({ queryKey: ["analytics"] });
-          break;
-        case "alert":
-          queryClient.invalidateQueries({ queryKey: ["alerts"] });
-          break;
-      }
-    },
-    [queryClient, onUpdate]
-  );
+  // Keep connectRef in sync with connect function
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
@@ -171,6 +178,7 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
   }, [onConnectionChange]);
 
   // Connect on mount, disconnect on unmount
+  // When channels change, connect is recreated, triggering cleanup (disconnect) and reconnect
   useEffect(() => {
     if (enabled) {
       connect();
@@ -180,14 +188,6 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
       disconnect();
     };
   }, [enabled, connect, disconnect]);
-
-  // Reconnect when channels change
-  useEffect(() => {
-    if (enabled && eventSourceRef.current) {
-      disconnect();
-      connect();
-    }
-  }, [channels?.join(",")]);
 
   return {
     connected: state.connected,

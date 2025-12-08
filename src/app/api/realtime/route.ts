@@ -11,7 +11,7 @@ import {
   subscribe,
   closeSubscriber,
   CHANNELS,
-  type UpdatePayload,
+  type Channel,
 } from "@/lib/redis/pubsub";
 
 // Heartbeat interval (30 seconds)
@@ -32,9 +32,10 @@ export async function GET(request: NextRequest) {
 
   // Get optional channel filter from query
   const channelParam = request.nextUrl.searchParams.get("channels");
-  const requestedChannels = channelParam
-    ? channelParam.split(",").filter((c) => Object.values(CHANNELS).includes(c as any))
-    : Object.values(CHANNELS);
+  const allChannels = Object.values(CHANNELS) as Channel[];
+  const requestedChannels: Channel[] = channelParam
+    ? channelParam.split(",").filter((c): c is Channel => allChannels.includes(c as Channel))
+    : allChannels;
 
   // Create response stream
   const encoder = new TextEncoder();
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest) {
         // Subscribe to channels
         await subscribe(
           subscriber,
-          requestedChannels as any[],
+          requestedChannels,
           (channel, payload) => {
             if (!isConnected) return;
 
