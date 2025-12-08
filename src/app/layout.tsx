@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Inter, Geist_Mono } from "next/font/google";
 import { TRPCProvider } from "@/lib/trpc";
 import { BookmarkProvider } from "@/components/providers/bookmark-provider";
@@ -6,6 +7,14 @@ import { WalletContextProvider, AuthProvider } from "@/lib/auth";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  themeColor: "#8b5cf6",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+};
 
 const inter = Inter({
   variable: "--font-inter",
@@ -21,6 +30,34 @@ export const metadata: Metadata = {
   title: "pNode Pulse - Xandeum Network Explorer",
   description: "Real-time analytics platform for Xandeum's pNode network",
   keywords: ["Xandeum", "pNode", "blockchain", "storage", "analytics", "Solana"],
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "pNode Pulse",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  openGraph: {
+    type: "website",
+    siteName: "pNode Pulse",
+    title: "pNode Pulse - Xandeum Network Explorer",
+    description: "Real-time analytics platform for Xandeum's pNode network",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "pNode Pulse - Xandeum Network Explorer",
+    description: "Real-time analytics platform for Xandeum's pNode network",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/icons/icon-192x192.svg", sizes: "192x192", type: "image/svg+xml" },
+    ],
+  },
 };
 
 export default function RootLayout({
@@ -44,6 +81,25 @@ export default function RootLayout({
             </AuthProvider>
           </WalletContextProvider>
         </TRPCProvider>
+        <Script
+          id="sw-register"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js')
+                    .then(function(registration) {
+                      console.log('[PWA] Service Worker registered:', registration.scope);
+                    })
+                    .catch(function(err) {
+                      console.log('[PWA] Service Worker registration failed:', err);
+                    });
+                });
+              }
+            `,
+          }}
+        />
       </body>
     </html>
   );
