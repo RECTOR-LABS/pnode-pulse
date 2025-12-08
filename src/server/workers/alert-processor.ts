@@ -17,8 +17,9 @@ import {
   type NotificationJobData,
 } from "@/lib/queue";
 import type { AlertMetric, AlertOperator, AlertRule, Prisma } from "@prisma/client";
+import { logger } from "@/lib/logger";
 
-console.log("Starting Alert Processor...");
+logger.info('Starting alert processor');
 
 // Metric extraction from latest node metrics
 interface LatestMetric {
@@ -222,7 +223,7 @@ async function getTargetNodeIds(
  * Process escalations for unacknowledged alerts
  */
 async function processEscalations(): Promise<void> {
-  console.log(`[${new Date().toISOString()}] Processing escalations...`);
+  logger.info('Processing escalations');
 
   // Get active alerts that have escalation policies
   const activeAlerts = await db.alert.findMany({
@@ -247,11 +248,11 @@ async function processEscalations(): Promise<void> {
   });
 
   if (activeAlerts.length === 0) {
-    console.log("No alerts requiring escalation");
+    logger.debug('No alerts requiring escalation');
     return;
   }
 
-  console.log(`Found ${activeAlerts.length} active alerts with escalation policies`);
+  logger.info('Found alerts with escalation policies', { count: activeAlerts.length });
 
   let escalationsProcessed = 0;
 
@@ -297,7 +298,7 @@ async function processEscalations(): Promise<void> {
 
       // Check if it's time for this step
       if (alertAgeMinutes >= step.delayMinutes) {
-        console.log(`Escalating alert ${alert.id} to step ${step.stepOrder}`);
+        logger.info('Escalating alert', { alertId: alert.id, step: step.stepOrder });
 
         // Send notifications for this escalation step
         await sendEscalationNotifications(
@@ -329,7 +330,7 @@ async function processEscalations(): Promise<void> {
     }
   }
 
-  console.log(`Escalation processing complete. ${escalationsProcessed} escalations sent.`);
+  logger.info('Escalation processing complete', { escalationsSent: escalationsProcessed });
 }
 
 /**
@@ -381,7 +382,7 @@ async function sendEscalationNotifications(
  * Evaluate all enabled rules
  */
 async function evaluateAllRules(): Promise<void> {
-  console.log(`[${new Date().toISOString()}] Evaluating alert rules...`);
+  logger.info('Evaluating alert rules');
 
   // Get all enabled rules
   const rules = await db.alertRule.findMany({
@@ -389,17 +390,17 @@ async function evaluateAllRules(): Promise<void> {
   });
 
   if (rules.length === 0) {
-    console.log("No enabled rules to evaluate");
+    logger.debug('No enabled rules to evaluate');
     return;
   }
 
-  console.log(`Found ${rules.length} enabled rules`);
+  logger.info('Found enabled alert rules', { count: rules.length });
 
   // Get latest metrics for all nodes
   const allMetrics = await getLatestMetrics();
   const metricsMap = new Map(allMetrics.map((m) => [m.nodeId, m]));
 
-  console.log(`Got metrics for ${allMetrics.length} nodes`);
+  logger.debug('Retrieved metrics for nodes', { count: allMetrics.length });
 
   const notificationQueue = getNotificationQueue();
   let alertsTriggered = 0;
@@ -443,7 +444,7 @@ async function evaluateAllRules(): Promise<void> {
             data: { lastTriggeredAt: new Date() },
           });
 
-          console.log(`Alert triggered: ${rule.name} for node ${nodeMetric.address}`);
+          logger.info('Alert triggered', { rule: rule.name, node: nodeMetric.address });
           alertsTriggered++;
 
           // Queue notifications for each channel
@@ -474,7 +475,7 @@ async function evaluateAllRules(): Promise<void> {
     }
   }
 
-  console.log(`Evaluation complete. ${alertsTriggered} alerts triggered.`);
+  logger.info('Rule evaluation complete', { alertsTriggered });
 }
 
 /**
@@ -482,7 +483,7 @@ async function evaluateAllRules(): Promise<void> {
  */
 async function processNotification(job: { data: NotificationJobData }): Promise<void> {
   const { type, alertId, channelId, payload } = job.data;
-  console.log(`Processing ${type} notification for alert ${alertId}`);
+  logger.info('Processing notification', { type, alertId });
 
   try {
     const channel = await db.notificationChannel.findUnique({
@@ -490,7 +491,7 @@ async function processNotification(job: { data: NotificationJobData }): Promise<
     });
 
     if (!channel) {
-      console.error(`Channel ${channelId} not found`);
+      logger.error('Notification channel not found', { channelId });
       return;
     }
 
@@ -500,7 +501,7 @@ async function processNotification(job: { data: NotificationJobData }): Promise<
     });
 
     if (!alert) {
-      console.error(`Alert ${alertId} not found`);
+      logger.error('Alert not found', { alertId });
       return;
     }
 

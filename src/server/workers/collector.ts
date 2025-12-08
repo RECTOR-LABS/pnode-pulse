@@ -12,6 +12,7 @@ import { db } from "@/lib/db";
 import { createClient, PUBLIC_PNODES, PRPCError } from "@/lib/prpc";
 import { publishNetworkUpdate, publishMetricsUpdate } from "@/lib/redis/pubsub";
 import type { PNodeStats, PodsResult, PNodeVersion } from "@/types/prpc";
+import { logger } from "@/lib/logger";
 
 const COLLECTION_INTERVAL = 30 * 1000; // 30 seconds
 const NODE_TIMEOUT = 5000; // 5 seconds per node
@@ -163,7 +164,7 @@ async function discoverNodes(results: CollectionResult[]) {
 
   // Create new nodes
   if (newNodes.length > 0) {
-    console.log(`[Collector] Discovered ${newNodes.length} new nodes`);
+    logger.info('Discovered new nodes', { count: newNodes.length });
 
     for (const node of newNodes) {
       await db.node.create({
@@ -283,7 +284,7 @@ async function computeNetworkStats() {
       Number(stats.total_nodes),
       Number(stats.active_nodes),
       Number(stats.total_nodes) - Number(stats.active_nodes)
-    ).catch((err) => console.error("[Collector] Failed to publish network update:", err));
+    ).catch((err) => logger.error('Failed to publish network update', err));
   }
 }
 
@@ -297,7 +298,7 @@ export async function runCollection(): Promise<{
   discovered: number;
 }> {
   const startTime = Date.now();
-  console.log("[Collector] Starting collection cycle...");
+  logger.info('Starting collection cycle');
 
   // Create job record
   const job = await db.collectionJob.create({
@@ -322,7 +323,7 @@ export async function runCollection(): Promise<{
     }
 
     const addresses = Array.from(allAddresses);
-    console.log(`[Collector] Collecting from ${addresses.length} nodes...`);
+    logger.info('Collecting from nodes', { count: addresses.length });
 
     // Collect from all nodes in parallel
     const results = await Promise.all(addresses.map(collectFromNode));
@@ -362,7 +363,7 @@ export async function runCollection(): Promise<{
       } else {
         await updateNodeStatus(node.id, false);
         failedCount++;
-        console.log(`[Collector] Failed: ${result.address} - ${result.error}`);
+        logger.warn('Collection failed for node', { address: result.address, error: result.error });
       }
     }
 
@@ -388,9 +389,13 @@ export async function runCollection(): Promise<{
     });
 
     const duration = Date.now() - startTime;
-    console.log(
-      `[Collector] Completed in ${duration}ms: ${successCount}/${addresses.length} success, ${discovered} new nodes discovered`
-    );
+    logger.info('Collection cycle completed', {
+      durationMs: duration,
+      total: addresses.length,
+      success: successCount,
+      failed: failedCount,
+      discovered
+    });
 
     return {
       total: addresses.length,
@@ -399,7 +404,7 @@ export async function runCollection(): Promise<{
       discovered,
     };
   } catch (error) {
-    console.error("[Collector] Error:", error);
+    logger.error('Collection cycle failed', error instanceof Error ? error : new Error(String(error)));
 
     await db.collectionJob.update({
       where: { id: job.id },
@@ -418,19 +423,19 @@ export async function runCollection(): Promise<{
  * Start the collector worker
  */
 export function startCollector() {
-  console.log("[Collector] Starting worker...");
+  logger.info('Starting collector worker', { intervalMs: COLLECTION_INTERVAL });
 
   // Run immediately
-  runCollection().catch(console.error);
+  runCollection().catch((err) => logger.error('Collection failed', err));
 
   // Then run on interval
   const interval = setInterval(() => {
-    runCollection().catch(console.error);
+    runCollection().catch((err) => logger.error('Collection failed', err));
   }, COLLECTION_INTERVAL);
 
   // Return cleanup function
   return () => {
-    console.log("[Collector] Stopping worker...");
+    logger.info('Stopping collector worker');
     clearInterval(interval);
   };
 }

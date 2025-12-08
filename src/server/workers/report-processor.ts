@@ -19,8 +19,9 @@ import {
 } from "@/lib/queue";
 import nodemailer from "nodemailer";
 import type { ReportType, ReportScope } from "@prisma/client";
+import { logger } from "@/lib/logger";
 
-console.log("Starting Report Processor...");
+logger.info('Starting report processor');
 
 // Email transporter
 let emailTransporter: nodemailer.Transporter | null = null;
