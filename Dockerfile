@@ -4,8 +4,9 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 # Install dependencies
+# Note: --ignore-scripts skips native compilation (usb package not needed in server)
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # Copy source
 COPY . .
