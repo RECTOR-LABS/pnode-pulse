@@ -12,3 +12,5 @@ export * from "./pattern-detector";
 export * from "./resource-tuner";
 export * from "./capacity-forecaster";
 export * from "./peer-optimizer";
+export * from "./degradation-predictor";
+export * from "./growth-modeler";
