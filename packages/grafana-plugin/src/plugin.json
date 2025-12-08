@@ -1,0 +1,55 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "datasource",
+  "name": "pNode Pulse",
+  "id": "pnode-pulse-datasource",
+  "metrics": true,
+  "alerting": true,
+  "annotations": false,
+  "streaming": false,
+  "backend": false,
+  "info": {
+    "description": "Data source for monitoring Xandeum pNode network via pNode Pulse API",
+    "author": {
+      "name": "RECTOR-LABS",
+      "url": "https://github.com/RECTOR-LABS"
+    },
+    "keywords": ["pnode", "xandeum", "blockchain", "monitoring"],
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "links": [
+      {
+        "name": "pNode Pulse",
+        "url": "https://pulse.rectorspace.com"
+      },
+      {
+        "name": "API Documentation",
+        "url": "https://pulse.rectorspace.com/api/v1/docs"
+      },
+      {
+        "name": "GitHub",
+        "url": "https://github.com/RECTOR-LABS/pnode-pulse"
+      }
+    ],
+    "version": "1.0.0",
+    "updated": "2024-12-07"
+  },
+  "routes": [
+    {
+      "path": "api",
+      "url": "{{ .JsonData.url }}",
+      "headers": [
+        {
+          "name": "X-API-Key",
+          "content": "{{ .SecureJsonData.apiKey }}"
+        }
+      ]
+    }
+  ],
+  "dependencies": {
+    "grafanaDependency": ">=10.0.0",
+    "plugins": []
+  }
+}

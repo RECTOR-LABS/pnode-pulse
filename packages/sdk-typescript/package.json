@@ -1,0 +1,52 @@
+{
+  "name": "@pnode-pulse/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for pNode Pulse API",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "pnode",
+    "pulse",
+    "xandeum",
+    "blockchain",
+    "monitoring",
+    "sdk"
+  ],
+  "author": "RECTOR-LABS",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RECTOR-LABS/pnode-pulse.git",
+    "directory": "packages/sdk-typescript"
+  },
+  "homepage": "https://pulse.rectorspace.com",
+  "bugs": {
+    "url": "https://github.com/RECTOR-LABS/pnode-pulse/issues"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

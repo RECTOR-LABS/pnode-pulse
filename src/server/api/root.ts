@@ -7,6 +7,16 @@
 import { createTRPCRouter } from "./trpc";
 import { nodesRouter } from "./routers/nodes";
 import { networkRouter } from "./routers/network";
+import { alertsRouter } from "./routers/alerts";
+import { portfolioRouter } from "./routers/portfolio";
+import { comparisonRouter } from "./routers/comparison";
+import { exportRouter } from "./routers/export";
+import { reportsRouter } from "./routers/reports";
+import { authRouter } from "./routers/auth";
+import { claimsRouter } from "./routers/claims";
+import { apiKeysRouter } from "./routers/apiKeys";
+import { profilesRouter } from "./routers/profiles";
+import { badgesRouter } from "./routers/badges";
 
 /**
  * Main application router
@@ -16,6 +26,16 @@ import { networkRouter } from "./routers/network";
 export const appRouter = createTRPCRouter({
   nodes: nodesRouter,
   network: networkRouter,
+  alerts: alertsRouter,
+  portfolio: portfolioRouter,
+  comparison: comparisonRouter,
+  export: exportRouter,
+  reports: reportsRouter,
+  auth: authRouter,
+  claims: claimsRouter,
+  apiKeys: apiKeysRouter,
+  profiles: profilesRouter,
+  badges: badgesRouter,
 });
 
 /**

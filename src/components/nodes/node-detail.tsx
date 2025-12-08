@@ -15,6 +15,7 @@ import {
   formatAddress,
 } from "@/lib/utils/format";
 import { BookmarkButton } from "@/components/ui/bookmark-button";
+import { ClaimNodeButton } from "@/components/claims/claim-node-button";
 
 interface NodeDetailProps {
   nodeId: number;
@@ -108,6 +109,7 @@ export function NodeDetail({ nodeId }: NodeDetailProps) {
                 </svg>
               </button>
               <BookmarkButton nodeId={nodeId} size="lg" />
+              <ClaimNodeButton nodeId={nodeId} nodePubkey={node.pubkey} size="lg" />
             </div>
 
             {node.pubkey && (

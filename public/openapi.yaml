@@ -1,0 +1,705 @@
+openapi: 3.0.3
+info:
+  title: pNode Pulse API
+  description: |
+    Public REST API for accessing pNode network data.
+
+    ## Authentication
+
+    Most endpoints are public and rate-limited. For higher limits, use an API key:
+
+    ```
+    Authorization: Bearer pk_your_api_key
+    ```
+
+    ## Rate Limits
+
+    | Tier | Requests/min | Requests/day |
+    |------|--------------|--------------|
+    | Anonymous | 30 | 1,000 |
+    | Free API Key | 60 | 10,000 |
+    | Premium | 300 | 100,000 |
+
+    Rate limit headers are included in all responses:
+    - `X-RateLimit-Limit`: Max requests per window
+    - `X-RateLimit-Remaining`: Remaining requests
+    - `X-RateLimit-Reset`: Unix timestamp when limit resets
+
+  version: 1.0.0
+  contact:
+    name: pNode Pulse Support
+    url: https://pulse.rectorspace.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://pulse.rectorspace.com/api/v1
+    description: Production
+  - url: http://localhost:3000/api/v1
+    description: Development
+
+tags:
+  - name: Network
+    description: Network-wide statistics and trends
+  - name: Nodes
+    description: Individual node data and metrics
+  - name: Leaderboard
+    description: Node performance rankings
+  - name: Badges
+    description: Embeddable status badges
+
+paths:
+  /network:
+    get:
+      tags:
+        - Network
+      summary: Get network overview
+      description: Returns current network-wide statistics including node counts, version distribution, and aggregate metrics.
+      operationId: getNetworkOverview
+      responses:
+        '200':
+          description: Network overview data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkOverview'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /network/stats:
+    get:
+      tags:
+        - Network
+      summary: Get aggregate metrics
+      description: Returns detailed aggregate metrics across all nodes including percentiles.
+      operationId: getNetworkStats
+      responses:
+        '200':
+          description: Aggregate network metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkStats'
+
+  /network/trends:
+    get:
+      tags:
+        - Network
+      summary: Get network trends
+      description: Returns historical trend data for network metrics.
+      operationId: getNetworkTrends
+      parameters:
+        - name: range
+          in: query
+          description: Time range for trend data
+          schema:
+            type: string
+            enum: [24h, 7d, 30d, 90d]
+            default: 7d
+        - name: metric
+          in: query
+          description: Metric to retrieve
+          schema:
+            type: string
+            enum: [nodes, storage, cpu, ram]
+            default: nodes
+      responses:
+        '200':
+          description: Trend data points
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrendData'
+
+  /nodes:
+    get:
+      tags:
+        - Nodes
+      summary: List all nodes
+      description: Returns a paginated list of all pNodes with optional filtering.
+      operationId: listNodes
+      parameters:
+        - name: status
+          in: query
+          description: Filter by node status
+          schema:
+            type: string
+            enum: [all, active, inactive]
+            default: all
+        - name: version
+          in: query
+          description: Filter by software version
+          schema:
+            type: string
+        - name: search
+          in: query
+          description: Search by IP address or public key
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Number of results per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          description: Number of results to skip
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: orderBy
+          in: query
+          description: Field to sort by
+          schema:
+            type: string
+            enum: [lastSeen, firstSeen, address, version, isActive]
+            default: lastSeen
+        - name: order
+          in: query
+          description: Sort direction
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: Paginated list of nodes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeList'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /nodes/{nodeId}:
+    get:
+      tags:
+        - Nodes
+      summary: Get node details
+      description: Returns detailed information about a specific node.
+      operationId: getNode
+      parameters:
+        - name: nodeId
+          in: path
+          required: true
+          description: Node ID or IP address
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Node details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NodeDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /nodes/{nodeId}/metrics:
+    get:
+      tags:
+        - Nodes
+      summary: Get node metrics history
+      description: Returns historical metrics for a specific node.
+      operationId: getNodeMetrics
+      parameters:
+        - name: nodeId
+          in: path
+          required: true
+          description: Node ID
+          schema:
+            type: integer
+        - name: range
+          in: query
+          description: Time range
+          schema:
+            type: string
+            enum: [1h, 24h, 7d, 30d]
+            default: 24h
+        - name: aggregation
+          in: query
+          description: Data aggregation level
+          schema:
+            type: string
+            enum: [raw, hourly, daily]
+            default: hourly
+      responses:
+        '200':
+          description: Metrics history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricsHistory'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /nodes/{nodeId}/peers:
+    get:
+      tags:
+        - Nodes
+      summary: Get node peers
+      description: Returns the list of peers for a specific node.
+      operationId: getNodePeers
+      parameters:
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Peer list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PeerList'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /leaderboard:
+    get:
+      tags:
+        - Leaderboard
+      summary: Get node leaderboard
+      description: Returns top or bottom performing nodes by specified metric.
+      operationId: getLeaderboard
+      parameters:
+        - name: metric
+          in: query
+          description: Metric to rank by
+          schema:
+            type: string
+            enum: [uptime, cpu, ram, storage]
+            default: uptime
+        - name: order
+          in: query
+          description: Ranking order
+          schema:
+            type: string
+            enum: [top, bottom]
+            default: top
+        - name: limit
+          in: query
+          description: Number of results
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+        - name: period
+          in: query
+          description: Time period for metrics
+          schema:
+            type: string
+            enum: [24h, 7d, 30d, all]
+            default: 7d
+      responses:
+        '200':
+          description: Leaderboard rankings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Leaderboard'
+
+  /badge/network.svg:
+    get:
+      tags:
+        - Badges
+      summary: Network status badge
+      description: Returns an SVG badge showing network health status.
+      operationId: getNetworkBadge
+      parameters:
+        - name: style
+          in: query
+          schema:
+            type: string
+            enum: [flat, plastic, flat-square]
+            default: flat
+      responses:
+        '200':
+          description: SVG badge
+          content:
+            image/svg+xml:
+              schema:
+                type: string
+
+  /badge/nodes.svg:
+    get:
+      tags:
+        - Badges
+      summary: Node count badge
+      description: Returns an SVG badge showing active node count.
+      operationId: getNodesBadge
+      parameters:
+        - name: style
+          in: query
+          schema:
+            type: string
+            enum: [flat, plastic, flat-square]
+            default: flat
+      responses:
+        '200':
+          description: SVG badge
+          content:
+            image/svg+xml:
+              schema:
+                type: string
+
+  /badge/storage.svg:
+    get:
+      tags:
+        - Badges
+      summary: Storage badge
+      description: Returns an SVG badge showing total network storage.
+      operationId: getStorageBadge
+      parameters:
+        - name: style
+          in: query
+          schema:
+            type: string
+            enum: [flat, plastic, flat-square]
+            default: flat
+      responses:
+        '200':
+          description: SVG badge
+          content:
+            image/svg+xml:
+              schema:
+                type: string
+
+components:
+  schemas:
+    NetworkOverview:
+      type: object
+      properties:
+        nodes:
+          type: object
+          properties:
+            total:
+              type: integer
+              example: 27
+            active:
+              type: integer
+              example: 25
+            inactive:
+              type: integer
+              example: 2
+        versions:
+          type: array
+          items:
+            type: object
+            properties:
+              version:
+                type: string
+                example: "0.6.0"
+              count:
+                type: integer
+                example: 15
+        metrics:
+          type: object
+          properties:
+            totalStorageBytes:
+              type: integer
+              format: int64
+              example: 15066000000000
+            avgCpuPercent:
+              type: number
+              format: float
+              example: 12.5
+            avgRamPercent:
+              type: number
+              format: float
+              example: 45.2
+            avgUptimeSeconds:
+              type: integer
+              example: 864000
+            timestamp:
+              type: string
+              format: date-time
+
+    NetworkStats:
+      type: object
+      properties:
+        cpu:
+          $ref: '#/components/schemas/MetricStats'
+        ram:
+          $ref: '#/components/schemas/MetricStats'
+        storage:
+          type: object
+          properties:
+            total:
+              type: integer
+              format: int64
+            avg:
+              type: integer
+              format: int64
+        uptime:
+          type: object
+          properties:
+            avgSeconds:
+              type: integer
+        nodeCount:
+          type: integer
+
+    MetricStats:
+      type: object
+      properties:
+        avg:
+          type: number
+        min:
+          type: number
+        max:
+          type: number
+        p50:
+          type: number
+        p90:
+          type: number
+        p99:
+          type: number
+
+    TrendData:
+      type: object
+      properties:
+        range:
+          type: string
+        metric:
+          type: string
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              time:
+                type: string
+                format: date-time
+              value:
+                type: number
+
+    NodeList:
+      type: object
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Node'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        hasMore:
+          type: boolean
+
+    Node:
+      type: object
+      properties:
+        id:
+          type: integer
+        address:
+          type: string
+          example: "192.190.136.36:9001"
+        pubkey:
+          type: string
+          nullable: true
+        version:
+          type: string
+          example: "0.6.0"
+        isActive:
+          type: boolean
+        lastSeen:
+          type: string
+          format: date-time
+        firstSeen:
+          type: string
+          format: date-time
+
+    NodeDetail:
+      allOf:
+        - $ref: '#/components/schemas/Node'
+        - type: object
+          properties:
+            metrics:
+              $ref: '#/components/schemas/LatestMetrics'
+            peerCount:
+              type: integer
+            metricsCount:
+              type: integer
+
+    LatestMetrics:
+      type: object
+      nullable: true
+      properties:
+        cpuPercent:
+          type: number
+        ramUsedBytes:
+          type: integer
+          format: int64
+        ramTotalBytes:
+          type: integer
+          format: int64
+        ramPercent:
+          type: number
+        storageBytes:
+          type: integer
+          format: int64
+        uptimeSeconds:
+          type: integer
+        packetsReceived:
+          type: integer
+        packetsSent:
+          type: integer
+        timestamp:
+          type: string
+          format: date-time
+
+    MetricsHistory:
+      type: object
+      properties:
+        nodeId:
+          type: integer
+        range:
+          type: string
+        aggregation:
+          type: string
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              time:
+                type: string
+                format: date-time
+              cpuPercent:
+                type: number
+              ramPercent:
+                type: number
+              storageBytes:
+                type: integer
+                format: int64
+              uptimeSeconds:
+                type: integer
+
+    PeerList:
+      type: object
+      properties:
+        nodeId:
+          type: integer
+        peers:
+          type: array
+          items:
+            type: object
+            properties:
+              address:
+                type: string
+              version:
+                type: string
+              lastSeenAt:
+                type: string
+                format: date-time
+              isActive:
+                type: boolean
+
+    Leaderboard:
+      type: object
+      properties:
+        metric:
+          type: string
+        period:
+          type: string
+        order:
+          type: string
+        rankings:
+          type: array
+          items:
+            type: object
+            properties:
+              rank:
+                type: integer
+              nodeId:
+                type: integer
+              address:
+                type: string
+              version:
+                type: string
+              value:
+                type: number
+              change:
+                type: integer
+                description: Rank change from previous period
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: NOT_FOUND
+              message: Node not found
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          schema:
+            type: integer
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: RATE_LIMIT_EXCEEDED
+              message: Too many requests. Please try again later.
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error:
+              code: INTERNAL_ERROR
+              message: An unexpected error occurred
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: API Key
+      description: Optional API key for higher rate limits
+
+security:
+  - {}
+  - ApiKeyAuth: []

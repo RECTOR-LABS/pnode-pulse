@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import { TRPCProvider } from "@/lib/trpc";
 import { BookmarkProvider } from "@/components/providers/bookmark-provider";
+import { WalletContextProvider, AuthProvider } from "@/lib/auth";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import "./globals.css";
@@ -33,11 +34,15 @@ export default function RootLayout({
         className={`${inter.variable} ${geistMono.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}
       >
         <TRPCProvider>
-          <BookmarkProvider>
-            <Header />
-            <div className="flex-1">{children}</div>
-            <Footer />
-          </BookmarkProvider>
+          <WalletContextProvider>
+            <AuthProvider>
+              <BookmarkProvider>
+                <Header />
+                <div className="flex-1">{children}</div>
+                <Footer />
+              </BookmarkProvider>
+            </AuthProvider>
+          </WalletContextProvider>
         </TRPCProvider>
       </body>
     </html>
