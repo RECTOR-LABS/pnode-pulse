@@ -165,6 +165,10 @@ model Node {
   @@index([address])
   @@index([pubkey])
   @@index([isActive])
+  @@index([version])
+  @@index([lastSeen(sort: Desc)])
+  @@index([isActive, version])
+  @@index([isActive, lastSeen(sort: Desc)])
   @@map("nodes")
 }
 
