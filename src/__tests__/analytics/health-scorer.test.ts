@@ -13,6 +13,7 @@ import {
   HEALTH_THRESHOLDS,
   type NodeMetrics,
   type NetworkStats,
+  type HealthScore,
 } from '@/lib/analytics/health-scorer';
 
 describe('Health Score Weights', () => {
@@ -381,13 +382,13 @@ describe('calculateNodeHealth() - Outlier Detection', () => {
 
 describe('calculateNetworkHealth()', () => {
   it('should calculate network-wide health summary', () => {
-    const nodeScores = [
+    const nodeScores: HealthScore[] = [
       { overall: 95, grade: 'A' as const, components: { uptime: 100, cpu: 90, ram: 95, connectivity: 100, version: 100 }, details: {}, outliers: {} },
       { overall: 85, grade: 'B' as const, components: { uptime: 80, cpu: 85, ram: 90, connectivity: 85, version: 90 }, details: {}, outliers: {} },
       { overall: 75, grade: 'C' as const, components: { uptime: 70, cpu: 75, ram: 80, connectivity: 75, version: 80 }, details: {}, outliers: {} },
       { overall: 65, grade: 'D' as const, components: { uptime: 60, cpu: 65, ram: 70, connectivity: 65, version: 70 }, details: {}, outliers: {} },
       { overall: 55, grade: 'F' as const, components: { uptime: 50, cpu: 55, ram: 60, connectivity: 55, version: 60 }, details: {}, outliers: {} },
-    ] as any;
+    ];
 
     const networkHealth = calculateNetworkHealth(nodeScores);
 
@@ -410,12 +411,12 @@ describe('calculateNetworkHealth()', () => {
   });
 
   it('should calculate healthy percentage correctly', () => {
-    const nodeScores = [
+    const nodeScores: HealthScore[] = [
       { overall: 95, grade: 'A' as const, components: {}, details: {}, outliers: {} },
       { overall: 85, grade: 'B' as const, components: {}, details: {}, outliers: {} },
       { overall: 75, grade: 'C' as const, components: {}, details: {}, outliers: {} },
       { overall: 85, grade: 'B' as const, components: {}, details: {}, outliers: {} },
-    ] as any;
+    ];
 
     const networkHealth = calculateNetworkHealth(nodeScores);
 
@@ -423,11 +424,11 @@ describe('calculateNetworkHealth()', () => {
   });
 
   it('should handle all failing nodes', () => {
-    const nodeScores = [
+    const nodeScores: HealthScore[] = [
       { overall: 55, grade: 'F' as const, components: {}, details: {}, outliers: {} },
       { overall: 45, grade: 'F' as const, components: {}, details: {}, outliers: {} },
       { overall: 50, grade: 'F' as const, components: {}, details: {}, outliers: {} },
-    ] as any;
+    ];
 
     const networkHealth = calculateNetworkHealth(nodeScores);
 
