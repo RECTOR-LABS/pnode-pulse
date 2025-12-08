@@ -6,7 +6,7 @@
 
 **Repository**: [RECTOR-LABS/pnode-pulse](https://github.com/RECTOR-LABS/pnode-pulse)
 **License**: MIT (Open Core)
-**Phase**: Foundation (Phase 1)
+**Phase**: Analytics Engine (Phase 5 - 90% complete)
 
 ## Tech Stack
 
@@ -165,5 +165,19 @@ See GitHub Issues and Milestones for current work.
 
 - Response structure from `get-stats` is FLAT (differs from official docs)
 - `get-pods` includes `pubkey` field not documented officially
-- Xandeum team is adding detailed API call for ALL pNodes (coming soon)
-- v0.7 Heidelberg will add paging statistics APIs
+
+## Xandeum API Roadmap (from Discord - Brad, Dec 2024)
+
+**Current `get-pods` limitation:**
+- Returns only a **subset** of all pods, not the complete network
+- Data format is correct: `address`, `last_seen_timestamp`, `pubkey`, `version`
+- Can query any public pNode endpoint
+
+**Coming soon (v0.7 Heidelberg):**
+- "More detailed call will return much more data for each pnode connected"
+- Will include paging statistics APIs
+- No specific release date announced yet
+
+**Action items for Epic 5.4:**
+- Monitor Discord #apps-developers for v0.7 announcements
+- When released: integrate new detailed API, extend data models, update dashboard
