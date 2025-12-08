@@ -10,13 +10,7 @@ import { createTRPCRouter, publicProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 import { createHash, randomBytes } from "crypto";
 import { jwtVerify } from "jose";
-
-// JWT secret (must match auth router)
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "pnode-pulse-jwt-secret-change-in-production"
-);
-const JWT_ISSUER = "pnode-pulse";
-const JWT_AUDIENCE = "pnode-pulse-app";
+import { JWT_SECRET, JWT_ISSUER, JWT_AUDIENCE } from "@/lib/auth/jwt-config";
 
 // API key configuration
 const KEY_PREFIX = "pk_live_";

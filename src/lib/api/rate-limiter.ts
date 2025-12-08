@@ -23,6 +23,88 @@ export { RATE_LIMITS, type RateLimitTier, type RateLimitHeaders, type RateLimitR
 const RATE_LIMIT_PREFIX = "rl:";
 const WINDOW_SIZE = 60; // 1 minute in seconds
 
+// In-memory fallback for when Redis is unavailable
+interface InMemoryLimit {
+  count: number;
+  resetAt: number;
+}
+const inMemoryLimits = new Map<string, InMemoryLimit>();
+
+/**
+ * Clean up expired in-memory rate limit entries
+ */
+function cleanupInMemoryLimits(): void {
+  const now = Date.now();
+  for (const [key, value] of inMemoryLimits.entries()) {
+    if (value.resetAt < now) {
+      inMemoryLimits.delete(key);
+    }
+  }
+}
+
+/**
+ * Check rate limit using in-memory fallback
+ * Used when Redis is unavailable to maintain rate limiting
+ */
+function checkInMemoryRateLimit(
+  identifier: string,
+  limit: number,
+  tier: RateLimitTier,
+  apiKeyId: string | undefined
+): RateLimitResult {
+  const now = Date.now();
+  const nowSeconds = Math.floor(now / 1000);
+
+  // Cleanup periodically (1% chance per request)
+  if (Math.random() < 0.01) {
+    cleanupInMemoryLimits();
+  }
+
+  const entry = inMemoryLimits.get(identifier);
+
+  // No entry or expired - create new
+  if (!entry || entry.resetAt < now) {
+    inMemoryLimits.set(identifier, {
+      count: 1,
+      resetAt: now + WINDOW_SIZE * 1000,
+    });
+
+    return {
+      allowed: true,
+      limit,
+      remaining: limit - 1,
+      reset: nowSeconds + WINDOW_SIZE,
+      tier,
+      apiKeyId,
+    };
+  }
+
+  // Check if limit exceeded
+  if (entry.count >= limit) {
+    return {
+      allowed: false,
+      limit,
+      remaining: 0,
+      reset: Math.floor(entry.resetAt / 1000),
+      tier,
+      apiKeyId,
+    };
+  }
+
+  // Increment count
+  entry.count++;
+  const remaining = Math.max(0, limit - entry.count);
+
+  return {
+    allowed: true,
+    limit,
+    remaining,
+    reset: Math.floor(entry.resetAt / 1000),
+    tier,
+    apiKeyId,
+  };
+}
+
 /**
  * Hash an API key for lookup
  */
@@ -107,16 +189,9 @@ export async function checkRateLimit(request: NextRequest): Promise<RateLimitRes
   const redisAvailable = await isRedisAvailable();
 
   if (!redisAvailable) {
-    // Fallback: allow requests but log warning
-    console.warn("[RateLimit] Redis unavailable, allowing request");
-    return {
-      allowed: true,
-      limit,
-      remaining: limit,
-      reset: now + WINDOW_SIZE,
-      tier,
-      apiKeyId,
-    };
+    // Fallback: use in-memory rate limiting (fail-safe, not fail-open)
+    console.warn("[RateLimit] Redis unavailable, using in-memory fallback");
+    return checkInMemoryRateLimit(identifier, limit, tier, apiKeyId);
   }
 
   const redis = getRedis();

@@ -12,18 +12,10 @@ import { sign } from "tweetnacl";
 import bs58 from "bs58";
 import { SignJWT, jwtVerify } from "jose";
 import { createHash, randomBytes } from "crypto";
-
-// JWT secret (should be in env)
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "pnode-pulse-jwt-secret-change-in-production"
-);
-const JWT_ISSUER = "pnode-pulse";
-const JWT_AUDIENCE = "pnode-pulse-app";
+import { JWT_SECRET, JWT_ISSUER, JWT_AUDIENCE, JWT_VALIDITY_MS } from "@/lib/auth/jwt-config";
 
 // Challenge validity period (5 minutes)
 const CHALLENGE_VALIDITY_MS = 5 * 60 * 1000;
-// JWT validity period (7 days)
-const JWT_VALIDITY_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Generate a secure random nonce

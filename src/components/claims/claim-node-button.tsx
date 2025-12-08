@@ -26,7 +26,7 @@ interface VerificationData {
 }
 
 export function ClaimNodeButton({ nodeId, nodePubkey, size = "md" }: ClaimNodeButtonProps) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, token, isAuthenticated } = useAuth();
   const { signMessage } = useWallet();
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState<"select" | "verify" | "success">("select");
@@ -52,14 +52,13 @@ export function ClaimNodeButton({ nodeId, nodePubkey, size = "md" }: ClaimNodeBu
   };
 
   const handleInitiate = async (selectedMethod: VerificationMethod) => {
-    if (!user) return;
+    if (!token) return;
     setError(null);
     setMethod(selectedMethod);
 
     try {
       const result = await initiateMutation.mutateAsync({
-        userId: user.id,
-        walletAddress: user.walletAddress,
+        token,
         nodeId,
         verificationMethod: selectedMethod,
       });
@@ -73,7 +72,7 @@ export function ClaimNodeButton({ nodeId, nodePubkey, size = "md" }: ClaimNodeBu
   };
 
   const handleVerify = async () => {
-    if (!user || !claimId || !verificationData) return;
+    if (!token || !claimId || !verificationData) return;
     setError(null);
     setIsVerifying(true);
 
@@ -87,8 +86,8 @@ export function ClaimNodeButton({ nodeId, nodePubkey, size = "md" }: ClaimNodeBu
       }
 
       await verifyMutation.mutateAsync({
+        token,
         claimId,
-        userId: user.id,
         signature,
       });
 
@@ -102,7 +101,7 @@ export function ClaimNodeButton({ nodeId, nodePubkey, size = "md" }: ClaimNodeBu
   };
 
   const handleRelease = async () => {
-    if (!user || !claimStatus?.claim) return;
+    if (!token || !claimStatus?.claim) return;
 
     if (!confirm("Are you sure you want to release this claim? You will need to verify again to reclaim.")) {
       return;
@@ -110,8 +109,8 @@ export function ClaimNodeButton({ nodeId, nodePubkey, size = "md" }: ClaimNodeBu
 
     try {
       await releaseMutation.mutateAsync({
+        token,
         claimId: claimStatus.claim.id,
-        userId: user.id,
       });
       refetchStatus();
       setIsOpen(false);

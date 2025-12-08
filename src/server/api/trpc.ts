@@ -5,10 +5,11 @@
  * All routers and procedures are defined using these primitives.
  */
 
-import { initTRPC } from "@trpc/server";
+import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { db } from "@/lib/db";
+import { verifyToken } from "@/lib/auth/verify-token";
 
 /**
  * Context passed to all tRPC procedures
@@ -72,3 +73,40 @@ const loggerMiddleware = t.middleware(async ({ path, type, next }) => {
  * Logged procedure - includes timing logs in development
  */
 export const loggedProcedure = t.procedure.use(loggerMiddleware);
+
+/**
+ * Authentication middleware - verifies JWT token and adds userId to context
+ */
+const authMiddleware = t.middleware(async ({ ctx, next, getRawInput }) => {
+  const input = (await getRawInput()) as { token?: string };
+
+  if (!input.token) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Authentication token required",
+    });
+  }
+
+  const payload = await verifyToken(input.token);
+
+  if (!payload.valid || !payload.userId) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Invalid or expired token",
+    });
+  }
+
+  return next({
+    ctx: {
+      ...ctx,
+      userId: payload.userId,
+      walletAddress: payload.walletAddress,
+    },
+  });
+});
+
+/**
+ * Protected procedure - requires valid JWT token
+ * Adds userId and walletAddress to context
+ */
+export const protectedProcedure = t.procedure.use(authMiddleware);

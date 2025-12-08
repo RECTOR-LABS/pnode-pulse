@@ -7,10 +7,7 @@
 
 import { jwtVerify } from "jose";
 import { db } from "@/lib/db";
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "your-secret-key-change-in-production"
-);
+import { JWT_SECRET } from "./jwt-config";
 
 export interface TokenPayload {
   userId: string;

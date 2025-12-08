@@ -9,7 +9,7 @@
  */
 
 import { z } from "zod";
-import { createTRPCRouter, publicProcedure } from "../trpc";
+import { createTRPCRouter, publicProcedure, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 import { sign } from "tweetnacl";
 import { randomBytes } from "crypto";
@@ -67,11 +67,11 @@ export const claimsRouter = createTRPCRouter({
   /**
    * Get all claims for the current user
    */
-  list: publicProcedure
-    .input(z.object({ userId: z.string() }))
-    .query(async ({ ctx, input }) => {
+  list: protectedProcedure
+    .input(z.object({ token: z.string() }))
+    .query(async ({ ctx }) => {
       const claims = await ctx.db.nodeClaim.findMany({
-        where: { userId: input.userId },
+        where: { userId: ctx.userId },
         orderBy: { createdAt: "desc" },
       });
 
@@ -124,11 +124,10 @@ export const claimsRouter = createTRPCRouter({
   /**
    * Initiate a claim for a node
    */
-  initiate: publicProcedure
+  initiate: protectedProcedure
     .input(
       z.object({
-        userId: z.string(),
-        walletAddress: z.string(),
+        token: z.string(),
         nodeId: z.number(),
         verificationMethod: z.enum(["WALLET_SIGNATURE", "VERIFICATION_FILE", "DNS_TXT"]),
       })
@@ -175,7 +174,7 @@ export const claimsRouter = createTRPCRouter({
 
       // Add method-specific data
       if (input.verificationMethod === "WALLET_SIGNATURE") {
-        verificationData.message = generateClaimMessage(node.address, input.walletAddress, token);
+        verificationData.message = generateClaimMessage(node.address, ctx.walletAddress!, token);
         verificationData.nodePubkey = node.pubkey;
       } else if (input.verificationMethod === "VERIFICATION_FILE") {
         verificationData.expectedPath = `/.pnode-pulse-verify`;
@@ -191,14 +190,14 @@ export const claimsRouter = createTRPCRouter({
       const claim = await ctx.db.nodeClaim.upsert({
         where: { nodeId: input.nodeId },
         create: {
-          userId: input.userId,
+          userId: ctx.userId,
           nodeId: input.nodeId,
           verificationMethod: input.verificationMethod,
           status: "PENDING",
           verificationData: verificationData as Prisma.InputJsonValue,
         },
         update: {
-          userId: input.userId,
+          userId: ctx.userId,
           verificationMethod: input.verificationMethod,
           status: "PENDING",
           verificationData: verificationData as Prisma.InputJsonValue,
@@ -215,11 +214,11 @@ export const claimsRouter = createTRPCRouter({
   /**
    * Verify a pending claim
    */
-  verify: publicProcedure
+  verify: protectedProcedure
     .input(
       z.object({
+        token: z.string(),
         claimId: z.string(),
-        userId: z.string(),
         signature: z.string().optional(), // For WALLET_SIGNATURE method
       })
     )
@@ -235,7 +234,7 @@ export const claimsRouter = createTRPCRouter({
         });
       }
 
-      if (claim.userId !== input.userId) {
+      if (claim.userId !== ctx.userId) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Not your claim",
@@ -355,11 +354,11 @@ export const claimsRouter = createTRPCRouter({
   /**
    * Update display name for a claimed node
    */
-  updateDisplayName: publicProcedure
+  updateDisplayName: protectedProcedure
     .input(
       z.object({
+        token: z.string(),
         claimId: z.string(),
-        userId: z.string(),
         displayName: z.string().min(1).max(50).nullable(),
       })
     )
@@ -367,7 +366,7 @@ export const claimsRouter = createTRPCRouter({
       const claim = await ctx.db.nodeClaim.findFirst({
         where: {
           id: input.claimId,
-          userId: input.userId,
+          userId: ctx.userId,
           status: "VERIFIED",
         },
       });
@@ -390,18 +389,18 @@ export const claimsRouter = createTRPCRouter({
   /**
    * Release a claim (unclaim a node)
    */
-  release: publicProcedure
+  release: protectedProcedure
     .input(
       z.object({
+        token: z.string(),
         claimId: z.string(),
-        userId: z.string(),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const claim = await ctx.db.nodeClaim.findFirst({
         where: {
           id: input.claimId,
-          userId: input.userId,
+          userId: ctx.userId,
         },
       });
 

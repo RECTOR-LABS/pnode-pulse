@@ -12,8 +12,8 @@ export default function MyNodesPage() {
   const [displayName, setDisplayName] = useState("");
 
   const { data: claims, isLoading, refetch } = trpc.claims.list.useQuery(
-    { userId: user?.id || "" },
-    { enabled: !!user?.id }
+    { token: token || "" },
+    { enabled: !!token }
   );
 
   const updateMutation = trpc.claims.updateDisplayName.useMutation({
@@ -47,20 +47,20 @@ export default function MyNodesPage() {
   };
 
   const saveDisplayName = (claimId: string) => {
-    if (!user) return;
+    if (!token) return;
     updateMutation.mutate({
+      token,
       claimId,
-      userId: user.id,
       displayName: displayName || null,
     });
   };
 
   const handleRelease = (claimId: string) => {
-    if (!user) return;
+    if (!token) return;
     if (!confirm("Are you sure you want to release this claim? You will need to verify again to reclaim.")) {
       return;
     }
-    releaseMutation.mutate({ claimId, userId: user.id });
+    releaseMutation.mutate({ token, claimId });
   };
 
   return (
