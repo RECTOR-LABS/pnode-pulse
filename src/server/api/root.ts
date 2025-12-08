@@ -17,6 +17,7 @@ import { claimsRouter } from "./routers/claims";
 import { apiKeysRouter } from "./routers/apiKeys";
 import { profilesRouter } from "./routers/profiles";
 import { badgesRouter } from "./routers/badges";
+import { analyticsRouter } from "./routers/analytics";
 
 /**
  * Main application router
@@ -36,6 +37,7 @@ export const appRouter = createTRPCRouter({
   apiKeys: apiKeysRouter,
   profiles: profilesRouter,
   badges: badgesRouter,
+  analytics: analyticsRouter,
 });
 
 /**
