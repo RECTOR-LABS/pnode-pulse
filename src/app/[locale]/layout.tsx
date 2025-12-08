@@ -102,23 +102,8 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
           </TRPCProvider>
         </NextIntlClientProvider>
         <Script
-          id="sw-register"
+          src="/register-sw.js"
           strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js')
-                    .then(function(registration) {
-                      console.log('[PWA] Service Worker registered:', registration.scope);
-                    })
-                    .catch(function(err) {
-                      console.log('[PWA] Service Worker registration failed:', err);
-                    });
-                });
-              }
-            `,
-          }}
         />
       </body>
     </html>
