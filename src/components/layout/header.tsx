@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { FavoritesDropdown } from "@/components/ui/favorites-dropdown";
 import { ExportDialog } from "@/components/export";
@@ -24,6 +25,19 @@ export function Header() {
   const pathname = usePathname();
   const [showExport, setShowExport] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useFocusTrap(mobileMenuOpen);
+
+  // Handle Escape key to close mobile menu
+  const handleEscape = useCallback((event: KeyboardEvent) => {
+    if (event.key === "Escape" && mobileMenuOpen) {
+      setMobileMenuOpen(false);
+    }
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [handleEscape]);
 
   return (
     <>
@@ -48,6 +62,8 @@ export function Header() {
 
       {/* Mobile menu drawer */}
       <div
+        ref={mobileMenuRef}
+        id="mobile-menu"
         role="dialog"
         aria-modal="true"
         aria-label="Mobile navigation menu"
