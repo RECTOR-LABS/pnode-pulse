@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { trpc } from "@/lib/trpc/client";
 import { formatDistanceToNow } from "date-fns";
-import { RATE_LIMITS } from "@/lib/api/rate-limiter";
+import { RATE_LIMITS } from "@/lib/api/constants";
 
 export default function ApiKeysPage() {
   const { token, isAuthenticated } = useAuth();

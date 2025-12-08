@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+
+// Disable prerendering since this page needs search params
+export const dynamic = "force-dynamic";
 
 interface NetworkData {
   nodes: {
@@ -41,7 +44,7 @@ function formatUptime(seconds: number): string {
   return `${hours}h`;
 }
 
-export default function EmbedNetworkPage() {
+function EmbedNetworkContent() {
   const searchParams = useSearchParams();
   const [data, setData] = useState<NetworkData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -199,5 +202,13 @@ export default function EmbedNetworkPage() {
         </a>
       </div>
     </div>
+  );
+}
+
+export default function EmbedNetworkPage() {
+  return (
+    <Suspense fallback={<div className="animate-pulse p-4">Loading...</div>}>
+      <EmbedNetworkContent />
+    </Suspense>
   );
 }

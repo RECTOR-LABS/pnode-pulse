@@ -9,29 +9,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRedis, isRedisAvailable } from "@/lib/redis";
 import { db } from "@/lib/db";
 import { createHash } from "crypto";
+import {
+  RATE_LIMITS,
+  type RateLimitTier,
+  type RateLimitHeaders,
+  type RateLimitResult,
+} from "./constants";
 
-// Rate limits by tier (requests per minute)
-export const RATE_LIMITS = {
-  ANONYMOUS: 30,
-  FREE: 100,
-  PRO: 1000,
-  ENTERPRISE: 10000,
-} as const;
-
-export type RateLimitTier = keyof typeof RATE_LIMITS;
-
-// Headers to include in rate-limited responses
-export type RateLimitHeaders = Record<string, string>;
-
-// Rate limit result
-export interface RateLimitResult {
-  allowed: boolean;
-  limit: number;
-  remaining: number;
-  reset: number; // Unix timestamp
-  tier: RateLimitTier;
-  apiKeyId?: string;
-}
+// Re-export for convenience (server-side usage)
+export { RATE_LIMITS, type RateLimitTier, type RateLimitHeaders, type RateLimitResult };
 
 // Redis key prefixes
 const RATE_LIMIT_PREFIX = "rl:";
