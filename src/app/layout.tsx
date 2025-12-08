@@ -75,7 +75,9 @@ export default function RootLayout({
             <AuthProvider>
               <BookmarkProvider>
                 <Header />
-                <div className="flex-1">{children}</div>
+                <main id="main-content" className="flex-1" role="main">
+                  {children}
+                </main>
                 <Footer />
               </BookmarkProvider>
             </AuthProvider>
