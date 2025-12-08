@@ -9,6 +9,7 @@ import { FavoritesDropdown } from "@/components/ui/favorites-dropdown";
 import { ExportDialog } from "@/components/export";
 import { ConnectWallet } from "@/components/auth";
 import { RealtimeIndicator } from "@/components/ui/realtime-indicator";
+import { LanguageSelector } from "@/components/ui/language-selector";
 
 const navigation = [
   { name: "Overview", href: "/" },
@@ -198,6 +199,7 @@ export function Header() {
               </button>
               <FavoritesDropdown />
               <RealtimeIndicator />
+              <LanguageSelector showLabel={false} />
               <ThemeToggle />
               <div className="hidden lg:block border-l border-border pl-2 ml-1">
                 <ConnectWallet />

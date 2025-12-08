@@ -1,0 +1,120 @@
+{
+  "common": {
+    "loading": "加载中...",
+    "error": "错误",
+    "retry": "重试",
+    "save": "保存",
+    "cancel": "取消",
+    "close": "关闭",
+    "search": "搜索",
+    "filter": "筛选",
+    "sort": "排序",
+    "refresh": "刷新",
+    "viewAll": "查看全部",
+    "learnMore": "了解更多",
+    "noData": "暂无数据"
+  },
+  "nav": {
+    "home": "首页",
+    "dashboard": "仪表板",
+    "nodes": "节点",
+    "map": "网络地图",
+    "analytics": "数据分析",
+    "alerts": "警报",
+    "portfolio": "投资组合",
+    "reports": "报告",
+    "settings": "设置",
+    "leaderboard": "排行榜",
+    "skipToContent": "跳转到主要内容",
+    "mainMenu": "主菜单"
+  },
+  "dashboard": {
+    "title": "网络概览",
+    "subtitle": "pNode网络实时统计",
+    "totalNodes": "节点总数",
+    "activeNodes": "活跃节点",
+    "networkHealth": "网络健康",
+    "totalStorage": "总存储量",
+    "avgUptime": "平均运行时间",
+    "lastUpdated": "最后更新"
+  },
+  "nodes": {
+    "title": "pNode浏览器",
+    "subtitle": "浏览和监控pNode网络参与者",
+    "nodeDetails": "节点详情",
+    "status": "状态",
+    "version": "版本",
+    "uptime": "运行时间",
+    "storage": "存储",
+    "cpu": "CPU",
+    "memory": "内存",
+    "online": "在线",
+    "offline": "离线",
+    "degraded": "降级",
+    "lastSeen": "最后在线",
+    "location": "位置",
+    "performance": "性能"
+  },
+  "analytics": {
+    "title": "数据分析面板",
+    "subtitle": "网络性能和趋势",
+    "growthForecast": "增长预测",
+    "capacityProjection": "容量预测",
+    "performanceTrends": "性能趋势",
+    "healthScore": "健康评分",
+    "timeRange": {
+      "1h": "1小时",
+      "24h": "24小时",
+      "7d": "7天",
+      "30d": "30天"
+    }
+  },
+  "alerts": {
+    "title": "警报",
+    "subtitle": "监控网络事件和通知",
+    "noAlerts": "目前没有警报",
+    "critical": "严重",
+    "warning": "警告",
+    "info": "信息",
+    "acknowledge": "确认",
+    "dismiss": "忽略"
+  },
+  "settings": {
+    "title": "设置",
+    "subtitle": "管理您的偏好",
+    "language": "语言",
+    "theme": "主题",
+    "notifications": "通知",
+    "timezone": "时区",
+    "apiKeys": "API密钥",
+    "sessions": "会话",
+    "nodeSettings": "节点设置",
+    "selectLanguage": "选择您的首选语言"
+  },
+  "auth": {
+    "connectWallet": "连接钱包",
+    "disconnect": "断开连接",
+    "connected": "已连接",
+    "signIn": "登录",
+    "signOut": "登出"
+  },
+  "footer": {
+    "poweredBy": "由Xandeum网络提供支持",
+    "documentation": "文档",
+    "github": "GitHub",
+    "discord": "Discord",
+    "twitter": "Twitter"
+  },
+  "realtime": {
+    "live": "实时",
+    "reconnecting": "重新连接中...",
+    "offline": "离线",
+    "lastUpdate": "最后更新"
+  },
+  "errors": {
+    "networkError": "网络错误，请重试。",
+    "notFound": "页面未找到",
+    "serverError": "服务器错误，请稍后重试。",
+    "unauthorized": "请连接您的钱包以继续。"
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "common": {
+    "loading": "Загрузка...",
+    "error": "Ошибка",
+    "retry": "Повторить",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "close": "Закрыть",
+    "search": "Поиск",
+    "filter": "Фильтр",
+    "sort": "Сортировка",
+    "refresh": "Обновить",
+    "viewAll": "Смотреть все",
+    "learnMore": "Подробнее",
+    "noData": "Нет данных"
+  },
+  "nav": {
+    "home": "Главная",
+    "dashboard": "Панель",
+    "nodes": "Узлы",
+    "map": "Карта сети",
+    "analytics": "Аналитика",
+    "alerts": "Оповещения",
+    "portfolio": "Портфель",
+    "reports": "Отчёты",
+    "settings": "Настройки",
+    "leaderboard": "Рейтинг",
+    "skipToContent": "Перейти к основному содержимому",
+    "mainMenu": "Главное меню"
+  },
+  "dashboard": {
+    "title": "Обзор сети",
+    "subtitle": "Статистика сети pNode в реальном времени",
+    "totalNodes": "Всего узлов",
+    "activeNodes": "Активные узлы",
+    "networkHealth": "Состояние сети",
+    "totalStorage": "Общее хранилище",
+    "avgUptime": "Среднее время работы",
+    "lastUpdated": "Последнее обновление"
+  },
+  "nodes": {
+    "title": "Обозреватель pNode",
+    "subtitle": "Просмотр и мониторинг участников сети pNode",
+    "nodeDetails": "Детали узла",
+    "status": "Статус",
+    "version": "Версия",
+    "uptime": "Время работы",
+    "storage": "Хранилище",
+    "cpu": "ЦП",
+    "memory": "Память",
+    "online": "Онлайн",
+    "offline": "Офлайн",
+    "degraded": "Деградация",
+    "lastSeen": "Последняя активность",
+    "location": "Расположение",
+    "performance": "Производительность"
+  },
+  "analytics": {
+    "title": "Панель аналитики",
+    "subtitle": "Производительность и тренды сети",
+    "growthForecast": "Прогноз роста",
+    "capacityProjection": "Проекция ёмкости",
+    "performanceTrends": "Тренды производительности",
+    "healthScore": "Оценка здоровья",
+    "timeRange": {
+      "1h": "1 час",
+      "24h": "24 часа",
+      "7d": "7 дней",
+      "30d": "30 дней"
+    }
+  },
+  "alerts": {
+    "title": "Оповещения",
+    "subtitle": "Мониторинг событий и уведомлений сети",
+    "noAlerts": "Нет оповещений в данный момент",
+    "critical": "Критический",
+    "warning": "Предупреждение",
+    "info": "Информация",
+    "acknowledge": "Подтвердить",
+    "dismiss": "Отклонить"
+  },
+  "settings": {
+    "title": "Настройки",
+    "subtitle": "Управление предпочтениями",
+    "language": "Язык",
+    "theme": "Тема",
+    "notifications": "Уведомления",
+    "timezone": "Часовой пояс",
+    "apiKeys": "API ключи",
+    "sessions": "Сессии",
+    "nodeSettings": "Настройки узлов",
+    "selectLanguage": "Выберите предпочтительный язык"
+  },
+  "auth": {
+    "connectWallet": "Подключить кошелёк",
+    "disconnect": "Отключить",
+    "connected": "Подключено",
+    "signIn": "Войти",
+    "signOut": "Выйти"
+  },
+  "footer": {
+    "poweredBy": "При поддержке Xandeum Network",
+    "documentation": "Документация",
+    "github": "GitHub",
+    "discord": "Discord",
+    "twitter": "Twitter"
+  },
+  "realtime": {
+    "live": "Прямой эфир",
+    "reconnecting": "Переподключение...",
+    "offline": "Офлайн",
+    "lastUpdate": "Последнее обновление"
+  },
+  "errors": {
+    "networkError": "Ошибка сети. Попробуйте ещё раз.",
+    "notFound": "Страница не найдена",
+    "serverError": "Ошибка сервера. Попробуйте позже.",
+    "unauthorized": "Подключите кошелёк для продолжения."
+  }
+}

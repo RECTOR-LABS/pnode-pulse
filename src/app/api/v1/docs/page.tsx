@@ -471,7 +471,7 @@ export default function ApiDocsPage() {
               <div className="text-sm text-muted-foreground">Download YAML specification</div>
             </div>
           </a>
-          <a
+          <Link
             href="/settings/api-keys"
             className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg hover:bg-muted transition-colors"
           >
@@ -482,7 +482,7 @@ export default function ApiDocsPage() {
               <div className="font-medium">Get API Key</div>
               <div className="text-sm text-muted-foreground">Create keys for higher rate limits</div>
             </div>
-          </a>
+          </Link>
         </div>
       </section>
     </div>

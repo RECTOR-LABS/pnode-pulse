@@ -1,0 +1,120 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "refresh": "Refresh",
+    "viewAll": "View All",
+    "learnMore": "Learn More",
+    "noData": "No data available"
+  },
+  "nav": {
+    "home": "Home",
+    "dashboard": "Dashboard",
+    "nodes": "Nodes",
+    "map": "Network Map",
+    "analytics": "Analytics",
+    "alerts": "Alerts",
+    "portfolio": "Portfolio",
+    "reports": "Reports",
+    "settings": "Settings",
+    "leaderboard": "Leaderboard",
+    "skipToContent": "Skip to main content",
+    "mainMenu": "Main menu"
+  },
+  "dashboard": {
+    "title": "Network Overview",
+    "subtitle": "Real-time pNode network statistics",
+    "totalNodes": "Total Nodes",
+    "activeNodes": "Active Nodes",
+    "networkHealth": "Network Health",
+    "totalStorage": "Total Storage",
+    "avgUptime": "Average Uptime",
+    "lastUpdated": "Last Updated"
+  },
+  "nodes": {
+    "title": "pNode Explorer",
+    "subtitle": "Browse and monitor pNode network participants",
+    "nodeDetails": "Node Details",
+    "status": "Status",
+    "version": "Version",
+    "uptime": "Uptime",
+    "storage": "Storage",
+    "cpu": "CPU",
+    "memory": "Memory",
+    "online": "Online",
+    "offline": "Offline",
+    "degraded": "Degraded",
+    "lastSeen": "Last Seen",
+    "location": "Location",
+    "performance": "Performance"
+  },
+  "analytics": {
+    "title": "Analytics Dashboard",
+    "subtitle": "Network performance and trends",
+    "growthForecast": "Growth Forecast",
+    "capacityProjection": "Capacity Projection",
+    "performanceTrends": "Performance Trends",
+    "healthScore": "Health Score",
+    "timeRange": {
+      "1h": "1 Hour",
+      "24h": "24 Hours",
+      "7d": "7 Days",
+      "30d": "30 Days"
+    }
+  },
+  "alerts": {
+    "title": "Alerts",
+    "subtitle": "Monitor network events and notifications",
+    "noAlerts": "No alerts at this time",
+    "critical": "Critical",
+    "warning": "Warning",
+    "info": "Info",
+    "acknowledge": "Acknowledge",
+    "dismiss": "Dismiss"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Manage your preferences",
+    "language": "Language",
+    "theme": "Theme",
+    "notifications": "Notifications",
+    "timezone": "Timezone",
+    "apiKeys": "API Keys",
+    "sessions": "Sessions",
+    "nodeSettings": "Node Settings",
+    "selectLanguage": "Select your preferred language"
+  },
+  "auth": {
+    "connectWallet": "Connect Wallet",
+    "disconnect": "Disconnect",
+    "connected": "Connected",
+    "signIn": "Sign In",
+    "signOut": "Sign Out"
+  },
+  "footer": {
+    "poweredBy": "Powered by Xandeum Network",
+    "documentation": "Documentation",
+    "github": "GitHub",
+    "discord": "Discord",
+    "twitter": "Twitter"
+  },
+  "realtime": {
+    "live": "Live",
+    "reconnecting": "Reconnecting...",
+    "offline": "Offline",
+    "lastUpdate": "Last update"
+  },
+  "errors": {
+    "networkError": "Network error. Please try again.",
+    "notFound": "Page not found",
+    "serverError": "Server error. Please try again later.",
+    "unauthorized": "Please connect your wallet to continue."
+  }
+}

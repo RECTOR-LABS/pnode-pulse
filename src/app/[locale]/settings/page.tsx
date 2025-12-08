@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useAuth } from "@/lib/auth";
 import { trpc } from "@/lib/trpc/client";
 
@@ -145,7 +146,7 @@ export default function SettingsPage() {
 
       {/* Quick Links */}
       <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <a
+        <Link
           href="/settings/api-keys"
           className="p-4 border border-border rounded-xl hover:bg-muted/50 transition-colors"
         >
@@ -158,8 +159,8 @@ export default function SettingsPage() {
               <div className="text-sm text-muted-foreground">Manage API access</div>
             </div>
           </div>
-        </a>
-        <a
+        </Link>
+        <Link
           href="/settings/sessions"
           className="p-4 border border-border rounded-xl hover:bg-muted/50 transition-colors"
         >
@@ -172,8 +173,8 @@ export default function SettingsPage() {
               <div className="text-sm text-muted-foreground">Active sessions</div>
             </div>
           </div>
-        </a>
-        <a
+        </Link>
+        <Link
           href="/settings/nodes"
           className="p-4 border border-border rounded-xl hover:bg-muted/50 transition-colors"
         >
@@ -186,7 +187,7 @@ export default function SettingsPage() {
               <div className="text-sm text-muted-foreground">Your owned nodes</div>
             </div>
           </div>
-        </a>
+        </Link>
       </div>
 
       <div className="space-y-8">
