@@ -65,7 +65,15 @@ async function getLatestMetrics(): Promise<LatestMetric[]> {
       lm.packets_sent
     FROM nodes n
     LEFT JOIN LATERAL (
-      SELECT * FROM node_metrics nm
+      SELECT
+        nm.cpu_percent,
+        nm.ram_used,
+        nm.ram_total,
+        nm.file_size,
+        nm.uptime,
+        nm.packets_received,
+        nm.packets_sent
+      FROM node_metrics nm
       WHERE nm.node_id = n.id
       ORDER BY nm.time DESC
       LIMIT 1

@@ -1419,7 +1419,13 @@ export const analyticsRouter = createTRPCRouter({
           WHERE time >= ${startTime}
           ORDER BY date_trunc('day', time), time DESC
         )
-        SELECT * FROM daily_snapshots ORDER BY bucket ASC
+        SELECT
+          bucket,
+          total_nodes,
+          active_nodes,
+          total_storage
+        FROM daily_snapshots
+        ORDER BY bucket ASC
       `;
 
       // If raw query doesn't work well, fallback to simpler approach

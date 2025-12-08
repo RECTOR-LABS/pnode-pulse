@@ -127,7 +127,15 @@ export async function GET(request: NextRequest) {
         GROUP BY n.id, n.address, n.version
         HAVING COUNT(*) > 0
       )
-      SELECT *
+      SELECT
+        node_id,
+        address,
+        version,
+        metric_value,
+        uptime,
+        cpu,
+        ram,
+        storage
       FROM node_metrics
       ORDER BY metric_value ${sortDirection} NULLS LAST
       LIMIT ${limit}
