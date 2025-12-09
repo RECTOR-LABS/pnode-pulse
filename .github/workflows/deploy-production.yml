@@ -1,8 +1,9 @@
 name: Deploy Production (Blue/Green)
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:  # Manual trigger only
+  # push:
+  #   branches: [main]
 
 env:
   REGISTRY: ghcr.io
