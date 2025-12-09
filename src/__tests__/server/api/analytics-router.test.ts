@@ -6,6 +6,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { db } from "@/lib/db";
+import type { Node, NodeMetric, NetworkStats } from "@prisma/client";
 
 // Mock database
 vi.mock("@/lib/db", () => ({
@@ -36,7 +37,7 @@ describe("Analytics Router - Storage Stats", () => {
       { id: 1 },
       { id: 2 },
       { id: 3 },
-    ] as any);
+    ] as Partial<Node>[]);
 
     // Mock latest metrics with storage data
     vi.mocked(db.nodeMetric.findMany).mockResolvedValueOnce([
@@ -55,7 +56,7 @@ describe("Analytics Router - Storage Stats", () => {
         storageCommitted: null, // Legacy node
         storageUsagePercent: null,
       },
-    ] as any);
+    ] as Partial<NodeMetric>[]);
 
     const result = {
       totalCommitted: 3000000000,
@@ -90,7 +91,7 @@ describe("Analytics Router - Storage Stats", () => {
     vi.mocked(db.node.findMany).mockResolvedValueOnce([
       { id: 1 },
       { id: 2 },
-    ] as any);
+    ] as Partial<Node>[]);
 
     vi.mocked(db.nodeMetric.findMany).mockResolvedValueOnce([
       {
@@ -103,7 +104,7 @@ describe("Analytics Router - Storage Stats", () => {
         storageCommitted: BigInt(100),
         storageUsagePercent: 75.0,
       },
-    ] as any);
+    ] as Partial<NodeMetric>[]);
 
     const avgUsage = (25.0 + 75.0) / 2;
     expect(avgUsage).toBe(50.0);
@@ -179,7 +180,7 @@ describe("Analytics Router - Version Distribution", () => {
       { version: "0.7.0", _count: { id: 50 } },
       { version: "0.6.0", _count: { id: 30 } },
       { version: "0.5.1", _count: { id: 10 } },
-    ] as any);
+    ] as Array<{ version: string; _count: { id: number } }>);
 
     const result = [
       { version: "0.7.0", count: 50, isV070Plus: true },
@@ -230,7 +231,7 @@ describe("Analytics Router - Network Overview", () => {
         "0.6.0": 50,
         "0.5.1": 10,
       },
-    } as any);
+    } as Partial<NetworkStats>);
 
     const result = {
       totalNodes: 150,

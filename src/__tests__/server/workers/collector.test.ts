@@ -8,6 +8,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { db } from "@/lib/db";
 import { createClient } from "@/lib/prpc";
 
+type MockPRPCClient = ReturnType<typeof createClient>;
+
 // Mock dependencies
 vi.mock("@/lib/db");
 vi.mock("@/lib/prpc");
@@ -53,7 +55,7 @@ describe("Collector Worker - Node Collection", () => {
       }),
     };
 
-    vi.mocked(createClient).mockReturnValue(mockClient as any);
+    vi.mocked(createClient).mockReturnValue(mockClient as MockPRPCClient);
 
     // Simulate collection
     const result = await mockClient.getPodsWithStats();
@@ -70,7 +72,7 @@ describe("Collector Worker - Node Collection", () => {
       getPodsWithStats: vi.fn().mockRejectedValue(new Error("Request timed out")),
     };
 
-    vi.mocked(createClient).mockReturnValue(mockClient as any);
+    vi.mocked(createClient).mockReturnValue(mockClient as MockPRPCClient);
 
     // Collection should fail but not crash
     await expect(mockClient.getVersion()).rejects.toThrow("Request timed out");

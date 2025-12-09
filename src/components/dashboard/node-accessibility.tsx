@@ -107,7 +107,7 @@ export function NodeAccessibility() {
         {/* Info Note */}
         <div className="text-xs text-muted-foreground pt-2 border-t">
           <strong>Note:</strong> Private nodes are still active and serving the network.
-          They don't answer public RPC queries to save resources.
+          They don&apos;t answer public RPC queries to save resources.
         </div>
       </CardContent>
     </Card>
