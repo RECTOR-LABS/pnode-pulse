@@ -6,8 +6,8 @@
  */
 
 import { NextRequest } from "next/server";
-import {
-  createSubscriber,
+import { logger } from "@/lib/logger";
+import {  createSubscriber,
   subscribe,
   closeSubscriber,
   CHANNELS,
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
           }
         );
       } catch (error) {
-        console.error("[SSE] Setup error:", error);
+        logger.error("[SSE] Setup error:", error instanceof Error ? error : new Error(String(error)));
         controller.enqueue(
           encoder.encode(`event: error\ndata: ${JSON.stringify({ error: "Connection failed" })}\n\n`)
         );

@@ -7,6 +7,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { CollectionStatus } from "@/components/ui/collection-status";
 import { NetworkHealth } from "@/components/ui/network-health";
 import { formatBytes, formatUptime, formatPercent, formatNumber } from "@/lib/utils/format";
+import { NODE_REFETCH_INTERVAL_MS } from "@/lib/constants/limits";
 
 // Dynamic imports for heavy chart components (code splitting)
 const VersionChart = dynamic(
@@ -45,12 +46,12 @@ function ChartSkeleton() {
 export function NetworkOverview() {
   const { data: overview, isLoading: overviewLoading } = trpc.network.overview.useQuery(
     undefined,
-    { refetchInterval: 30000 } // Refresh every 30s
+    { refetchInterval: NODE_REFETCH_INTERVAL_MS }
   );
 
   const { data: collectionStatus } = trpc.network.collectionStatus.useQuery(
     undefined,
-    { refetchInterval: 30000 }
+    { refetchInterval: NODE_REFETCH_INTERVAL_MS }
   );
 
   if (overviewLoading) {

@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { isRedisAvailable } from "@/lib/redis";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,7 @@ export async function GET() {
     await db.$queryRaw`SELECT 1`;
     dbHealthy = true;
   } catch (error) {
-    console.error("[Health] Database check failed:", error);
+    logger.error("Health check: Database connectivity failed", error instanceof Error ? error : new Error(String(error)));
   }
 
   // Check Redis connectivity

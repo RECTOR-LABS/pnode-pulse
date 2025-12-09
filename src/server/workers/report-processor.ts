@@ -554,7 +554,7 @@ function calculateNextSendAt(
  * Check for due reports and queue them
  */
 async function checkScheduledReports(): Promise<void> {
-  console.log(`[${new Date().toISOString()}] Checking for scheduled reports...`);
+  logger.info(`[${new Date().toISOString()}] Checking for scheduled reports...`);
 
   const now = new Date();
 
@@ -566,11 +566,11 @@ async function checkScheduledReports(): Promise<void> {
   });
 
   if (dueReports.length === 0) {
-    console.log("No reports due at this time");
+    logger.info("No reports due at this time");
     return;
   }
 
-  console.log(`Found ${dueReports.length} report(s) due for sending`);
+  logger.info(`Found ${dueReports.length} report(s) due for sending`);
 
   const queue = getReportQueue();
 
@@ -592,7 +592,7 @@ async function checkScheduledReports(): Promise<void> {
       sessionId: report.sessionId || undefined,
     });
 
-    console.log(`Queued report: ${report.name}`);
+    logger.info(`Queued report: ${report.name}`);
   }
 }
 
@@ -600,7 +600,7 @@ async function checkScheduledReports(): Promise<void> {
  * Generate and send a report
  */
 async function generateAndSendReport(reportId: string): Promise<void> {
-  console.log(`[${new Date().toISOString()}] Generating report: ${reportId}`);
+  logger.info(`[${new Date().toISOString()}] Generating report: ${reportId}`);
 
   const report = await db.scheduledReport.findUnique({
     where: { id: reportId },
@@ -608,13 +608,13 @@ async function generateAndSendReport(reportId: string): Promise<void> {
   });
 
   if (!report) {
-    console.error(`Report ${reportId} not found`);
+    logger.error(`Report ${reportId} not found`);
     return;
   }
 
   const recipients = report.recipients as string[];
   if (recipients.length === 0) {
-    console.error(`Report ${reportId} has no recipients`);
+    logger.error(`Report ${reportId} has no recipients`);
     return;
   }
 
@@ -658,7 +658,7 @@ async function generateAndSendReport(reportId: string): Promise<void> {
       html,
     });
 
-    console.log(`Report sent to ${recipients.length} recipient(s)`);
+    logger.info(`Report sent to ${recipients.length} recipient(s)`);
 
     // Update delivery status
     if (delivery) {
@@ -684,9 +684,9 @@ async function generateAndSendReport(reportId: string): Promise<void> {
       },
     });
 
-    console.log(`Next send scheduled for: ${nextSendAt.toISOString()}`);
+    logger.info(`Next send scheduled for: ${nextSendAt.toISOString()}`);
   } catch (error) {
-    console.error(`Error generating report:`, error);
+    logger.error(`Error generating report:`, error instanceof Error ? error : new Error(String(error)));
 
     // Update delivery with error
     if (delivery) {
@@ -721,11 +721,11 @@ async function main(): Promise<void> {
 
     // Schedule repeating check jobs
     await scheduleReportChecks();
-    console.log("Report checks scheduled every 60 seconds");
+    logger.info("Report checks scheduled every 60 seconds");
 
     // Handle graceful shutdown
     const shutdown = async () => {
-      console.log("Shutting down report processor...");
+      logger.info("Shutting down report processor...");
       await reportWorker.close();
       await db.$disconnect();
       process.exit(0);
@@ -734,12 +734,12 @@ async function main(): Promise<void> {
     process.on("SIGINT", shutdown);
     process.on("SIGTERM", shutdown);
 
-    console.log("Report processor is running. Press Ctrl+C to stop.");
+    logger.info("Report processor is running. Press Ctrl+C to stop.");
 
     // Keep the process running
     await new Promise(() => {});
   } catch (error) {
-    console.error("Fatal error in report processor:", error);
+    logger.error("Fatal error in report processor:", error instanceof Error ? error : new Error(String(error)));
     process.exit(1);
   }
 }

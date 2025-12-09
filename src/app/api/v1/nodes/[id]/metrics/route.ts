@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
-import {
-  checkRateLimit,
+import { logger } from "@/lib/logger";
+import {  checkRateLimit,
   createRateLimitHeaders,
   rateLimitExceededResponse,
   trackApiUsage,
@@ -11,6 +12,12 @@ export const dynamic = "force-dynamic";
 
 type TimeRange = "1h" | "24h" | "7d" | "30d";
 type Aggregation = "raw" | "hourly" | "daily";
+
+// Query parameter validation schema
+const QueryParamsSchema = z.object({
+  range: z.enum(["1h", "24h", "7d", "30d"]).default("24h"),
+  aggregation: z.enum(["raw", "hourly", "daily"]).default("hourly"),
+});
 
 const RANGE_HOURS: Record<TimeRange, number> = {
   "1h": 1,
@@ -55,25 +62,26 @@ export async function GET(
       );
     }
 
-    const range = (searchParams.get("range") || "24h") as TimeRange;
-    const aggregation = (searchParams.get("aggregation") || "hourly") as Aggregation;
+    // Validate query parameters (validates BEFORE casting)
+    const queryResult = QueryParamsSchema.safeParse({
+      range: searchParams.get("range"),
+      aggregation: searchParams.get("aggregation"),
+    });
 
-    const validRanges: TimeRange[] = ["1h", "24h", "7d", "30d"];
-    const validAggregations: Aggregation[] = ["raw", "hourly", "daily"];
-
-    if (!validRanges.includes(range)) {
+    if (!queryResult.success) {
       return NextResponse.json(
-        { error: { code: "BAD_REQUEST", message: "Invalid range parameter" } },
+        {
+          error: {
+            code: "BAD_REQUEST",
+            message: "Invalid query parameters",
+            details: queryResult.error.flatten(),
+          },
+        },
         { status: 400 }
       );
     }
 
-    if (!validAggregations.includes(aggregation)) {
-      return NextResponse.json(
-        { error: { code: "BAD_REQUEST", message: "Invalid aggregation parameter" } },
-        { status: 400 }
-      );
-    }
+    const { range, aggregation } = queryResult.data;
 
     const hours = RANGE_HOURS[range];
     const fromTime = new Date(Date.now() - hours * 60 * 60 * 1000);
@@ -201,7 +209,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("API Error:", error);
+    logger.error("API Error:", error instanceof Error ? error : new Error(String(error)));
 
     const responseTime = Date.now() - startTime;
     trackApiUsage(rateLimitResult.apiKeyId, "/api/v1/nodes/:id/metrics", "GET", responseTime, true);

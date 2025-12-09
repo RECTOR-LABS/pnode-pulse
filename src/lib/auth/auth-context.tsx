@@ -12,6 +12,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { trpc } from "@/lib/trpc/client";
 import { useSession } from "@/lib/hooks/use-session";
 import bs58 from "bs58";
+import { logger } from "@/lib/logger";
 
 interface User {
   id: string;
@@ -117,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           });
         } catch {
           // Ignore migration errors - non-critical
-          console.warn("Failed to migrate session alerts to user");
+          logger.warn("Failed to migrate session alerts to user");
         }
       }
 

@@ -17,6 +17,7 @@ import type {
   TelegramConfig,
 } from "./types";
 import { ALERT_METRICS, ALERT_OPERATORS } from "./types";
+import { logger } from "@/lib/logger";
 
 // Email transporter (singleton)
 let emailTransporter: nodemailer.Transporter | null = null;
@@ -400,7 +401,7 @@ export async function sendVerificationEmail(
 
     return true;
   } catch (error) {
-    console.error("Failed to send verification email:", error);
+    logger.error("Failed to send verification email:", error instanceof Error ? error : new Error(String(error)));
     return false;
   }
 }

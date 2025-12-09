@@ -1,39 +1,129 @@
 name: pnode-pulse
 
 services:
+  # PostgreSQL + TimescaleDB
   postgres:
-    image: timescale/timescaledb:latest-pg15
+    image: timescale/timescaledb:latest-pg16
     container_name: pnode-pulse-postgres
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-pnodepulse}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}
-      POSTGRES_DB: ${POSTGRES_DB:-pnodepulse}
+    restart: unless-stopped
     ports:
-      - "${POSTGRES_PORT:-5434}:5432"
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: pnodepulse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: pnodepulse
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - pnode-pulse-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-pnodepulse}"]
+      test: ["CMD-SHELL", "pg_isready -U pnodepulse"]
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
 
+  # Redis Cache
   redis:
     image: redis:7-alpine
     container_name: pnode-pulse-redis
+    restart: unless-stopped
     ports:
-      - "${REDIS_PORT:-6381}:6379"
+      - "6381:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - pnode-pulse-net
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
-      timeout: 5s
+      timeout: 3s
       retries: 5
+
+  # Staging (dev branch)
+  staging:
+    image: ghcr.io/rector-labs/pnode-pulse:dev
+    container_name: pnode-pulse-web-staging
     restart: unless-stopped
+    ports:
+      - "7002:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://pnodepulse:${POSTGRES_PASSWORD}@postgres:5432/pnodepulse
+      REDIS_URL: redis://redis:6379
+      NEXT_PUBLIC_APP_URL: https://staging.pulse.rectorspace.com
+    networks:
+      - pnode-pulse-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Production Blue
+  blue:
+    image: ghcr.io/rector-labs/pnode-pulse:latest
+    container_name: pnode-pulse-web-blue
+    restart: unless-stopped
+    ports:
+      - "7000:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://pnodepulse:${POSTGRES_PASSWORD}@postgres:5432/pnodepulse
+      REDIS_URL: redis://redis:6379
+      NEXT_PUBLIC_APP_URL: https://pulse.rectorspace.com
+    networks:
+      - pnode-pulse-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Production Green
+  green:
+    image: ghcr.io/rector-labs/pnode-pulse:latest
+    container_name: pnode-pulse-web-green
+    restart: unless-stopped
+    ports:
+      - "7001:3000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://pnodepulse:${POSTGRES_PASSWORD}@postgres:5432/pnodepulse
+      REDIS_URL: redis://redis:6379
+      NEXT_PUBLIC_APP_URL: https://pulse.rectorspace.com
+    networks:
+      - pnode-pulse-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - green
 
 volumes:
   postgres_data:
+    name: pnode-pulse-postgres-data
   redis_data:
+    name: pnode-pulse-redis-data
+
+networks:
+  pnode-pulse-net:
+    driver: bridge
+    name: pnode-pulse-network

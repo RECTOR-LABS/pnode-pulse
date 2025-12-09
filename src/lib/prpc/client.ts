@@ -5,7 +5,7 @@
  * ```ts
  * const client = new PRPCClient({ baseUrl: "http://192.190.136.36:6000" });
  * const stats = await client.getStats();
- * console.log(stats.cpu_percent);
+ * logger.info(stats.cpu_percent);
  * ```
  *
  * Note: Uses undici's request() instead of fetch() because port 6000 is blocked
@@ -13,7 +13,7 @@
  */
 
 import { request } from "undici";
-
+import { logger } from "@/lib/logger";
 import {
   type JsonRpcRequest,
   type JsonRpcResponse,
@@ -230,9 +230,10 @@ export function createClient(ip: string, options?: Partial<PRPCClientConfig>): P
 }
 
 /**
- * List of known public pNode endpoints
+ * Default seed pNode endpoints (fallback when env not configured)
+ * Source: CLAUDE.md - Public pNodes (Port 6000 Open)
  */
-export const PUBLIC_PNODES = [
+const DEFAULT_SEED_NODES = [
   "173.212.203.145",
   "173.212.220.65",
   "161.97.97.41",
@@ -244,4 +245,28 @@ export const PUBLIC_PNODES = [
   "207.244.255.1",
 ] as const;
 
-export type PublicPNodeIP = typeof PUBLIC_PNODES[number];
+/**
+ * Get seed pNode IPs from environment or fallback to defaults
+ * Configurable via PRPC_SEED_NODES environment variable (comma-separated)
+ */
+function getSeedNodes(): string[] {
+  const envNodes = process.env.PRPC_SEED_NODES;
+
+  if (envNodes) {
+    const nodes = envNodes.split(',').map((ip) => ip.trim()).filter(Boolean);
+    if (nodes.length > 0) {
+      return nodes;
+    }
+  }
+
+  // Fallback to default seed nodes
+  return [...DEFAULT_SEED_NODES];
+}
+
+/**
+ * List of known public pNode endpoints
+ * Configurable via PRPC_SEED_NODES environment variable
+ */
+export const PUBLIC_PNODES = getSeedNodes();
+
+export type PublicPNodeIP = string;

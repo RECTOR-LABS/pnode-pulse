@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useSession } from "@/lib/hooks/use-session";
+import { logger } from "@/lib/logger";
 
 type ExportType = "current" | "historical" | "alerts";
 type Aggregation = "raw" | "hourly" | "daily";
@@ -84,7 +85,7 @@ export function ExportDialog({ isOpen, onClose }: ExportDialogProps) {
 
       onClose();
     } catch (error) {
-      console.error("Export failed:", error);
+      logger.error("Export failed", error instanceof Error ? error : new Error(String(error)));
     } finally {
       setIsExporting(false);
     }

@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRedis, isRedisAvailable } from "@/lib/redis";
 import { db } from "@/lib/db";
 import { createHash } from "crypto";
+import { logger } from "@/lib/logger";
 import {
   RATE_LIMITS,
   type RateLimitTier,
@@ -190,7 +191,7 @@ export async function checkRateLimit(request: NextRequest): Promise<RateLimitRes
 
   if (!redisAvailable) {
     // Fallback: use in-memory rate limiting (fail-safe, not fail-open)
-    console.warn("[RateLimit] Redis unavailable, using in-memory fallback");
+    logger.warn("[RateLimit] Redis unavailable, using in-memory fallback");
     return checkInMemoryRateLimit(identifier, limit, tier, apiKeyId);
   }
 
@@ -329,7 +330,7 @@ export async function trackApiUsage(
       },
     });
   } catch (error) {
-    console.error("[ApiUsage] Failed to track usage:", error);
+    logger.error("[ApiUsage] Failed to track usage:", error instanceof Error ? error : new Error(String(error)));
   }
 }
 

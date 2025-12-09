@@ -11,7 +11,7 @@
 import { db } from "@/lib/db";
 import { createClient, PUBLIC_PNODES, PRPCError } from "@/lib/prpc";
 import { publishNetworkUpdate, publishMetricsUpdate } from "@/lib/redis/pubsub";
-import type { PNodeStats, PodsResult, PNodeVersion } from "@/types/prpc";
+import type { PNodeStats, PodsWithStatsResult, PNodeVersion } from "@/types/prpc";
 import { logger } from "@/lib/logger";
 
 const COLLECTION_INTERVAL = 30 * 1000; // 30 seconds
@@ -23,7 +23,7 @@ interface CollectionResult {
   success: boolean;
   version?: PNodeVersion;
   stats?: PNodeStats;
-  pods?: PodsResult;
+  pods?: PodsWithStatsResult;
   error?: string;
 }
 
@@ -39,7 +39,7 @@ async function collectFromNode(address: string): Promise<CollectionResult> {
     const [version, stats, pods] = await Promise.all([
       client.getVersion(),
       client.getStats(),
-      client.getPods(),
+      client.getPodsWithStats(), // v0.7.0+: Returns ALL pods with rich stats
     ]);
 
     return {
@@ -67,17 +67,25 @@ async function collectFromNode(address: string): Promise<CollectionResult> {
 /**
  * Get or create a node in the database
  */
-async function getOrCreateNode(address: string, pubkey?: string | null, version?: string) {
+async function getOrCreateNode(
+  address: string,
+  pubkey?: string | null,
+  version?: string,
+  isPublic?: boolean | null,
+  rpcPort?: number | null
+) {
   const existing = await db.node.findUnique({ where: { address } });
 
   if (existing) {
     // Update if we have new info
-    if (version || pubkey) {
+    if (version || pubkey || isPublic !== undefined || rpcPort !== undefined) {
       return db.node.update({
         where: { id: existing.id },
         data: {
           version: version ?? existing.version,
           pubkey: pubkey ?? existing.pubkey,
+          isPublic: isPublic !== undefined ? isPublic : existing.isPublic,
+          rpcPort: rpcPort !== undefined ? rpcPort : existing.rpcPort,
         },
       });
     }
@@ -90,6 +98,8 @@ async function getOrCreateNode(address: string, pubkey?: string | null, version?
       address,
       pubkey,
       version,
+      isPublic,
+      rpcPort,
       gossipAddress: address.replace(`:${PRPC_PORT}`, ":9001"),
     },
   });
@@ -98,7 +108,12 @@ async function getOrCreateNode(address: string, pubkey?: string | null, version?
 /**
  * Save metrics for a node
  */
-async function saveMetrics(nodeId: number, stats: PNodeStats) {
+async function saveMetrics(
+  nodeId: number,
+  stats: PNodeStats,
+  storageCommitted?: bigint | null,
+  storageUsagePercent?: number | null
+) {
   await db.nodeMetric.create({
     data: {
       nodeId,
@@ -113,6 +128,9 @@ async function saveMetrics(nodeId: number, stats: PNodeStats) {
       packetsReceived: stats.packets_received,
       packetsSent: stats.packets_sent,
       activeStreams: stats.active_streams,
+      // v0.7.0+ fields from get-pods-with-stats
+      storageCommitted: storageCommitted !== undefined ? storageCommitted : null,
+      storageUsagePercent: storageUsagePercent !== undefined ? storageUsagePercent : null,
     },
   });
 }
@@ -142,7 +160,13 @@ async function discoverNodes(results: CollectionResult[]) {
   existingNodes.forEach((n) => knownAddresses.add(n.address));
 
   // Find new nodes from pods responses
-  const newNodes: Array<{ address: string; pubkey: string | null; version: string }> = [];
+  const newNodes: Array<{
+    address: string;
+    pubkey: string | null;
+    version: string;
+    isPublic: boolean | null;
+    rpcPort: number | null;
+  }> = [];
 
   for (const result of results) {
     if (!result.success || !result.pods) continue;
@@ -157,6 +181,8 @@ async function discoverNodes(results: CollectionResult[]) {
           address: rpcAddress,
           pubkey: pod.pubkey,
           version: pod.version,
+          isPublic: pod.is_public,
+          rpcPort: pod.rpc_port,
         });
       }
     }
@@ -172,6 +198,8 @@ async function discoverNodes(results: CollectionResult[]) {
           address: node.address,
           pubkey: node.pubkey,
           version: node.version,
+          isPublic: node.isPublic,
+          rpcPort: node.rpcPort,
           gossipAddress: node.address.replace(`:${PRPC_PORT}`, ":9001"),
           isActive: false, // Will be tested on next collection
         },
@@ -183,7 +211,7 @@ async function discoverNodes(results: CollectionResult[]) {
 /**
  * Update peer relationships
  */
-async function updatePeers(nodeId: number, pods: PodsResult) {
+async function updatePeers(nodeId: number, pods: PodsWithStatsResult) {
   for (const pod of pods.pods) {
     const peerAddress = pod.address.replace(":9001", `:${PRPC_PORT}`);
 
@@ -333,14 +361,39 @@ export async function runCollection(): Promise<{
 
     // Process results
     for (const result of results) {
+      // Extract this node's own stats from pods result (v0.7.0+)
+      let isPublic: boolean | null = null;
+      let rpcPort: number | null = null;
+      let storageCommitted: bigint | null = null;
+      let storageUsagePercent: number | null = null;
+
+      if (result.pods) {
+        // Find this node in the pods list by matching address
+        const selfPod = result.pods.pods.find((p) => {
+          const podRpcAddr = p.address.replace(":9001", `:${PRPC_PORT}`);
+          return podRpcAddr === result.address;
+        });
+
+        if (selfPod) {
+          isPublic = selfPod.is_public;
+          rpcPort = selfPod.rpc_port;
+          if (selfPod.storage_committed !== null) {
+            storageCommitted = BigInt(selfPod.storage_committed);
+          }
+          storageUsagePercent = selfPod.storage_usage_percent;
+        }
+      }
+
       const node = await getOrCreateNode(
         result.address,
         undefined,
-        result.version?.version
+        result.version?.version,
+        isPublic,
+        rpcPort
       );
 
       if (result.success && result.stats) {
-        await saveMetrics(node.id, result.stats);
+        await saveMetrics(node.id, result.stats, storageCommitted, storageUsagePercent);
         await updateNodeStatus(node.id, true, result.version?.version);
 
         // Publish real-time metrics update
@@ -389,12 +442,24 @@ export async function runCollection(): Promise<{
     });
 
     const duration = Date.now() - startTime;
+
+    // Count v0.7.0+ nodes with rich stats
+    const nodesWithStorageStats = results.filter((r) =>
+      r.success && r.pods?.pods.some((p) => p.storage_committed !== null)
+    ).length;
+
+    const v070Nodes = results.filter((r) =>
+      r.success && r.version?.version.startsWith('0.7')
+    ).length;
+
     logger.info('Collection cycle completed', {
       durationMs: duration,
       total: addresses.length,
       success: successCount,
       failed: failedCount,
-      discovered
+      discovered,
+      v070Nodes,
+      nodesWithStorageStats,
     });
 
     return {
@@ -425,17 +490,44 @@ export async function runCollection(): Promise<{
 export function startCollector() {
   logger.info('Starting collector worker', { intervalMs: COLLECTION_INTERVAL });
 
+  let currentCollection: Promise<void> | null = null;
+  let isShuttingDown = false;
+
   // Run immediately
-  runCollection().catch((err) => logger.error('Collection failed', err));
+  currentCollection = runCollection()
+    .then(() => {})
+    .catch((err) => logger.error('Collection failed', err))
+    .finally(() => { currentCollection = null; });
 
   // Then run on interval
   const interval = setInterval(() => {
-    runCollection().catch((err) => logger.error('Collection failed', err));
+    // Skip if already running or shutting down
+    if (currentCollection || isShuttingDown) {
+      logger.debug('Skipping collection (already running or shutting down)');
+      return;
+    }
+
+    currentCollection = runCollection()
+      .then(() => {})
+      .catch((err) => logger.error('Collection failed', err))
+      .finally(() => { currentCollection = null; });
   }, COLLECTION_INTERVAL);
 
-  // Return cleanup function
-  return () => {
+  // Return cleanup function with verification
+  return async () => {
     logger.info('Stopping collector worker');
+    isShuttingDown = true;
+
+    // Clear interval
     clearInterval(interval);
+    logger.debug('Interval cleared');
+
+    // Wait for any in-flight collection to complete
+    if (currentCollection) {
+      logger.info('Waiting for in-flight collection to complete');
+      await currentCollection;
+    }
+
+    logger.info('Collector cleanup complete');
   };
 }

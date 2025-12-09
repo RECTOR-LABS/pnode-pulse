@@ -182,6 +182,143 @@ curl -X POST http://<ip-address>:6000/rpc \
 | PostgreSQL | 5434 |
 | Redis | 6381 |
 
+### Push-to-Deploy Workflow
+
+**Automated deployment** triggers on every push to main/dev branches:
+
+| Branch | Environment | Port | URL |
+|--------|-------------|------|-----|
+| `dev` | Staging | 7002 | staging.pulse.rectorspace.com |
+| `main` | Production (Blue/Green) | 7000/7001 | pulse.rectorspace.com |
+
+#### Deployment Flow
+
+**Staging (dev branch)**:
+1. Push to `dev` branch
+2. GitHub Actions builds Docker image
+3. Pushes image to GHCR with `:dev` tag
+4. SSH to VPS, pulls new image
+5. Restarts `staging` container on port 7002
+6. Immediate deployment (no downtime concerns)
+
+**Production (main branch)**:
+1. Push to `main` branch
+2. GitHub Actions builds Docker image
+3. Pushes image to GHCR with `:latest` tag
+4. SSH to VPS, pulls new image
+5. Runs blue/green deployment script:
+   - Detects active environment (blue/green)
+   - Starts inactive environment with new image
+   - Waits for healthcheck to pass
+   - Manual/automated switch to new environment
+   - Stops old environment
+6. Zero-downtime deployment
+
+#### Required GitHub Secrets
+
+Configure these in repository settings (Settings → Secrets and variables → Actions):
+
+| Secret | Value | Description |
+|--------|-------|-------------|
+| `VPS_SSH_KEY` | Private SSH key | SSH key for pnodepulse@176.222.53.185 |
+| `POSTGRES_PASSWORD` | Database password | PostgreSQL password for production |
+
+#### Deployment Commands
+
+```bash
+# Manual staging deployment
+ssh pnodepulse
+cd ~/pnode-pulse
+docker compose pull staging
+docker compose up -d staging
+
+# Manual blue/green deployment
+ssh pnodepulse
+cd ~/pnode-pulse
+bash scripts/blue-green-deploy.sh
+
+# Check deployment status
+docker compose ps
+docker compose logs -f blue green staging
+
+# Rollback (if needed)
+# Simply switch back to previous environment
+docker compose up -d blue  # or green
+```
+
+#### Health Checks
+
+All services have health endpoints for monitoring:
+
+| Endpoint | URL | Checks |
+|----------|-----|--------|
+| Staging | http://localhost:7002/api/health | DB, Redis, uptime |
+| Blue | http://localhost:7000/api/health | DB, Redis, uptime |
+| Green | http://localhost:7001/api/health | DB, Redis, uptime |
+
+Health check response:
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-12-09T10:00:00.000Z",
+  "checks": {
+    "database": true,
+    "redis": true
+  },
+  "version": "1.0.0",
+  "uptime": 3600
+}
+```
+
+#### Nginx Configuration
+
+Configure reverse proxy to route traffic:
+
+```nginx
+# Staging
+server {
+  server_name staging.pulse.rectorspace.com;
+  location / {
+    proxy_pass http://localhost:7002;
+  }
+}
+
+# Production (point to active blue/green port)
+server {
+  server_name pulse.rectorspace.com;
+  location / {
+    proxy_pass http://localhost:7000;  # or 7001 for green
+  }
+}
+```
+
+#### First-Time Setup
+
+On VPS as `pnodepulse` user:
+
+```bash
+# Clone repository
+git clone https://github.com/RECTOR-LABS/pnode-pulse.git
+cd pnode-pulse
+
+# Create .env file
+cat > .env << EOF
+POSTGRES_PASSWORD=your_secure_password_here
+EOF
+
+# Start infrastructure services
+docker compose up -d postgres redis
+
+# Wait for services to be healthy
+docker compose ps
+
+# Run database migrations
+docker compose exec postgres psql -U pnodepulse -d pnodepulse -f /path/to/migration.sql
+
+# Start initial deployment (blue)
+docker compose up -d blue
+```
+
 ## Project Structure
 
 ```
@@ -312,9 +449,57 @@ console.log(pods);
 
 ### Implementation Status
 
+**Phase 1: v0.7.0 Heidelberg Integration** ✅ COMPLETE
 - [x] Monitor Discord for new API release
 - [x] New `get-pods-with-stats` API available (v0.7.0+)
-- [ ] Extend pRPC client to support `get-pods-with-stats`
-- [ ] Update data models for storage/uptime fields
-- [ ] Test against live v0.7.0 pNodes
-- [ ] Update analytics to classify private vs public nodes correctly
+- [x] Extend pRPC client to support `get-pods-with-stats`
+- [x] Update data models for storage/uptime fields (migration created)
+- [x] Update collector worker to use new API
+- [x] Create tRPC endpoints for storage stats and node accessibility
+- [x] Create dashboard widgets (StorageOverview, NodeAccessibility)
+- [x] Test against live v0.7.0 pNodes
+- [x] Update analytics to classify private vs public nodes correctly
+
+**Deployment Infrastructure** ✅ COMPLETE
+- [x] GitHub Actions workflow for staging (dev branch)
+- [x] GitHub Actions workflow for production (main branch with blue/green)
+- [x] Docker Compose configuration with multi-environment support
+- [x] Blue/green deployment script with zero-downtime
+- [x] Health check endpoints for all services
+- [x] VPS setup complete (user, ports, SSH config)
+
+**Phase 4: Quick Tech Debt Wins** ✅ COMPLETE (2025-12-09)
+- [x] Environment-aware configuration (Redis, mobile client)
+- [x] Centralized constants in `src/lib/constants/limits.ts`
+- [x] Graceful shutdown with promise tracking
+- [x] Zod validation for API parameters
+- [x] Configurable pNode seed IPs via environment
+- [x] Fixed ESLint violations and type errors
+
+**Phase 5: Database & v0.7.0 Schema** ✅ COMPLETE (2025-12-09)
+- [x] Schema updated with v0.7.0 fields (nodes.isPublic, nodes.rpcPort, node_metrics.storageCommitted, node_metrics.storageUsagePercent)
+- [x] Migration created: `20251209060207_add_v070_fields`
+- [x] Rollback procedure documented
+- [x] All fields nullable for backward compatibility
+- [x] Index on `nodes.is_public` for efficient filtering
+- [x] Collector worker using new fields
+- [x] Storage analytics router using new metrics
+- [x] CHANGELOG.md created with migration details
+
+**Phase 6: Infrastructure & Operations** ✅ COMPLETE (2025-12-09)
+- [x] Docker networking: Explicit network definitions for all services
+- [x] Database backup strategy: Automated scripts with rollback procedures
+- [x] Deployment runbook: Comprehensive operations guide (500+ lines)
+- [x] APM setup guide: Sentry integration documentation
+
+**Phase 7: Legal & Compliance** ✅ COMPLETE (2025-12-09)
+- [x] Privacy policy: GDPR/CCPA compliant documentation
+
+**Next Steps**:
+- [ ] Setup GitHub secrets (VPS_SSH_KEY, POSTGRES_PASSWORD)
+- [ ] Configure nginx reverse proxy for staging/production domains
+- [ ] Initial deployment to VPS
+- [ ] Apply migration to production database
+- [ ] Setup Sentry account and configure APM
+- [ ] Implement privacy policy page in Next.js app
+- [ ] Run first automated deployment test

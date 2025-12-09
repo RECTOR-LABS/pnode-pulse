@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { UpdatePayload } from "@/lib/redis/pubsub";
+import { logger } from "@/lib/logger";
 
 interface UseRealtimeOptions {
   /** Channels to subscribe to */
@@ -126,7 +127,7 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
 
     // Handle connection confirmation
     eventSource.addEventListener("connected", (event) => {
-      console.log("[Realtime] Connected:", JSON.parse(event.data));
+      logger.info("[Realtime] Connected:", JSON.parse(event.data));
     });
 
     // Handle network updates

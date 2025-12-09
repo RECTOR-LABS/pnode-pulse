@@ -18,6 +18,7 @@
 
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -274,7 +275,7 @@ export async function GET() {
       },
     });
   } catch (error) {
-    console.error("Metrics error:", error);
+    logger.error("Metrics error:", error instanceof Error ? error : new Error(String(error)));
     return new NextResponse("# Error generating metrics", {
       status: 500,
       headers: { "Content-Type": "text/plain" },

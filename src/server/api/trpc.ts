@@ -11,6 +11,7 @@ import { ZodError } from "zod";
 import { db } from "@/lib/db";
 import { verifyToken } from "@/lib/auth/verify-token";
 import { ensureJWTSecret } from "@/lib/auth/jwt-config";
+import { logger } from "@/lib/logger";
 
 /**
  * Context passed to all tRPC procedures
@@ -64,7 +65,7 @@ const loggerMiddleware = t.middleware(async ({ path, type, next }) => {
   const duration = Date.now() - start;
 
   if (process.env.NODE_ENV === "development") {
-    console.log(`[tRPC] ${type} ${path} - ${duration}ms`);
+    logger.info(`[tRPC] ${type} ${path} - ${duration}ms`);
   }
 
   return result;

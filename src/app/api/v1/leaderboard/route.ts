@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import {
-  checkRateLimit,
+import { logger } from "@/lib/logger";
+import {  checkRateLimit,
   createRateLimitHeaders,
   rateLimitExceededResponse,
   trackApiUsage,
@@ -174,7 +174,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("API Error:", error);
+    logger.error("API Error:", error instanceof Error ? error : new Error(String(error)));
 
     const responseTime = Date.now() - startTime;
     trackApiUsage(rateLimitResult.apiKeyId, "/api/v1/leaderboard", "GET", responseTime, true);

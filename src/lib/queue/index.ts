@@ -8,10 +8,33 @@
  */
 
 import { Queue, Worker, Job } from "bullmq";
+import {
+  ALERT_EVALUATION_INTERVAL_MS,
+  ALERT_ESCALATION_INTERVAL_MS,
+  QUEUE_COMPLETED_JOB_RETENTION,
+  QUEUE_FAILED_JOB_RETENTION,
+  DEFAULT_WORKER_CONCURRENCY,
+} from "@/lib/constants/limits";
 
 // Redis connection config (uses existing Redis container)
+function getRedisHost(): string {
+  const host = process.env.REDIS_HOST;
+
+  // Development: allow localhost fallback
+  if (!host && process.env.NODE_ENV === "development") {
+    return "localhost";
+  }
+
+  // Production/Test: require explicit configuration
+  if (!host) {
+    throw new Error("REDIS_HOST environment variable is required in production");
+  }
+
+  return host;
+}
+
 const REDIS_CONFIG = {
-  host: process.env.REDIS_HOST || "localhost",
+  host: getRedisHost(),
   port: parseInt(process.env.REDIS_PORT || "6381"),
   maxRetriesPerRequest: null,
 };
@@ -70,8 +93,8 @@ export function getAlertQueue(): Queue<AlertJobData> {
           type: "exponential",
           delay: 1000,
         },
-        removeOnComplete: 100,
-        removeOnFail: 500,
+        removeOnComplete: QUEUE_COMPLETED_JOB_RETENTION,
+        removeOnFail: QUEUE_FAILED_JOB_RETENTION,
       },
     });
   }
@@ -126,7 +149,7 @@ export function getReportQueue(): Queue<ReportJobData> {
 export function createWorker<T>(
   queueName: string,
   processor: (job: Job<T>) => Promise<void>,
-  concurrency = 5
+  concurrency = DEFAULT_WORKER_CONCURRENCY
 ): Worker<T> {
   return new Worker(queueName, processor, {
     connection: REDIS_CONFIG,
@@ -148,24 +171,24 @@ export async function scheduleAlertEvaluation(): Promise<void> {
     }
   }
 
-  // Add rule evaluation job (every 30 seconds)
+  // Add rule evaluation job
   await queue.add(
     "evaluate_rules",
     { type: "evaluate_rules" },
     {
       repeat: {
-        every: 30000, // 30 seconds
+        every: ALERT_EVALUATION_INTERVAL_MS,
       },
     }
   );
 
-  // Add escalation processing job (every 60 seconds)
+  // Add escalation processing job
   await queue.add(
     "process_escalations",
     { type: "process_escalations" },
     {
       repeat: {
-        every: 60000, // 1 minute
+        every: ALERT_ESCALATION_INTERVAL_MS,
       },
     }
   );

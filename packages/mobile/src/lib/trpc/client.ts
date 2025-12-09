@@ -10,13 +10,20 @@ import type { AppRouter } from "../../../../src/server/api/root";
 
 // API Base URL - configurable per environment
 const getBaseUrl = () => {
-  // For development, use local network IP or ngrok
-  // For production, use the actual API URL
+  // Development: use environment variable (required for React Native)
+  // Note: localhost doesn't work in React Native - must be local IP or ngrok
   if (__DEV__) {
-    // Replace with your local machine's IP when testing on device
-    return "http://localhost:3000";
+    const devUrl = process.env.EXPO_PUBLIC_API_URL || process.env.API_URL;
+    if (!devUrl) {
+      throw new Error(
+        "Development API URL required. Set EXPO_PUBLIC_API_URL=http://<your-local-ip>:3000 in .env"
+      );
+    }
+    return devUrl;
   }
-  return "https://pulse.rectorspace.com";
+
+  // Production: use environment variable with fallback
+  return process.env.EXPO_PUBLIC_API_URL || "https://pulse.rectorspace.com";
 };
 
 export const trpcClient = createTRPCClient<AppRouter>({

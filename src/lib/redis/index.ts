@@ -6,10 +6,27 @@
  */
 
 import Redis from "ioredis";
+import { logger } from "@/lib/logger";
 
 // Redis connection config (matches queue config)
+function getRedisHost(): string {
+  const host = process.env.REDIS_HOST;
+
+  // Development: allow localhost fallback
+  if (!host && process.env.NODE_ENV === "development") {
+    return "localhost";
+  }
+
+  // Production/Test: require explicit configuration
+  if (!host) {
+    throw new Error("REDIS_HOST environment variable is required in production");
+  }
+
+  return host;
+}
+
 const REDIS_CONFIG = {
-  host: process.env.REDIS_HOST || "localhost",
+  host: getRedisHost(),
   port: parseInt(process.env.REDIS_PORT || "6381"),
   maxRetriesPerRequest: 3,
   retryStrategy: (times: number) => {
@@ -29,11 +46,11 @@ export function getRedis(): Redis {
     redisClient = new Redis(REDIS_CONFIG);
 
     redisClient.on("error", (err) => {
-      console.error("[Redis] Connection error:", err.message);
+      logger.error("[Redis] Connection error:", err);
     });
 
     redisClient.on("connect", () => {
-      console.log("[Redis] Connected successfully");
+      logger.info("[Redis] Connected successfully");
     });
   }
   return redisClient;

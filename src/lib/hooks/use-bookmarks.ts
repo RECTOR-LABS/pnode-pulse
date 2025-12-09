@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { logger } from "@/lib/logger";
 
 const BOOKMARKS_KEY = "pnode-pulse-bookmarks";
 
@@ -21,7 +22,7 @@ function loadBookmarks(): number[] {
       if (Array.isArray(parsed)) return parsed;
     }
   } catch (e) {
-    console.error("Failed to load bookmarks:", e);
+    logger.error("Failed to load bookmarks:", e instanceof Error ? e : new Error(String(e)));
   }
   return [];
 }
@@ -40,7 +41,7 @@ export function useBookmarks(): BookmarkState {
       try {
         localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(bookmarks));
       } catch (e) {
-        console.error("Failed to save bookmarks:", e);
+        logger.error("Failed to save bookmarks:", e instanceof Error ? e : new Error(String(e)));
       }
     }
   }, [bookmarks]);
@@ -55,7 +56,7 @@ export function useBookmarks(): BookmarkState {
             setBookmarks(parsed);
           }
         } catch (e) {
-          console.error("Failed to sync bookmarks:", e);
+          logger.error("Failed to sync bookmarks:", e instanceof Error ? e : new Error(String(e)));
         }
       }
     };

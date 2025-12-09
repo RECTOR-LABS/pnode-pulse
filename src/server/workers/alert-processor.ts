@@ -537,12 +537,12 @@ async function processNotification(job: { data: NotificationJobData }): Promise<
     });
 
     if (result.success) {
-      console.log(`${type} notification sent successfully`);
+      logger.info(`${type} notification sent successfully`);
     } else {
-      console.error(`Failed to send ${type} notification: ${result.error}`);
+      logger.error(`Failed to send ${type} notification: ${result.error}`);
     }
   } catch (error) {
-    console.error(`Error processing notification:`, error);
+    logger.error(`Error processing notification:`, error instanceof Error ? error : new Error(String(error)));
     throw error; // Re-throw to trigger retry
   }
 }
@@ -572,12 +572,12 @@ async function main(): Promise<void> {
 
     // Schedule repeating evaluation and escalation jobs
     await scheduleAlertEvaluation();
-    console.log("Alert evaluation scheduled every 30 seconds");
-    console.log("Escalation processing scheduled every 60 seconds");
+    logger.info("Alert evaluation scheduled every 30 seconds");
+    logger.info("Escalation processing scheduled every 60 seconds");
 
     // Handle graceful shutdown
     const shutdown = async () => {
-      console.log("Shutting down alert processor...");
+      logger.info("Shutting down alert processor...");
       await alertWorker.close();
       await notificationWorker.close();
       await db.$disconnect();
@@ -587,12 +587,12 @@ async function main(): Promise<void> {
     process.on("SIGINT", shutdown);
     process.on("SIGTERM", shutdown);
 
-    console.log("Alert processor is running. Press Ctrl+C to stop.");
+    logger.info("Alert processor is running. Press Ctrl+C to stop.");
 
     // Keep the process running
     await new Promise(() => {});
   } catch (error) {
-    console.error("Fatal error in alert processor:", error);
+    logger.error("Fatal error in alert processor:", error instanceof Error ? error : new Error(String(error)));
     process.exit(1);
   }
 }

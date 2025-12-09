@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 60;
@@ -212,7 +213,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error("Badge Error:", error);
+    logger.error("Badge Error:", error instanceof Error ? error : new Error(String(error)));
 
     // Return error badge
     const errorBadge = generateBadge(

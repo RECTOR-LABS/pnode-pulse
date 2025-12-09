@@ -6,6 +6,7 @@
  */
 
 import Redis from "ioredis";
+import { logger } from "@/lib/logger";
 
 // Channels for different update types
 export const CHANNELS = {
@@ -64,8 +65,24 @@ export interface AlertUpdate {
 export type UpdatePayload = NetworkUpdate | NodeUpdate | MetricsUpdate | AlertUpdate;
 
 // Redis connection config
+function getRedisHost(): string {
+  const host = process.env.REDIS_HOST;
+
+  // Development: allow localhost fallback
+  if (!host && process.env.NODE_ENV === "development") {
+    return "localhost";
+  }
+
+  // Production/Test: require explicit configuration
+  if (!host) {
+    throw new Error("REDIS_HOST environment variable is required in production");
+  }
+
+  return host;
+}
+
 const REDIS_CONFIG = {
-  host: process.env.REDIS_HOST || "localhost",
+  host: getRedisHost(),
   port: parseInt(process.env.REDIS_PORT || "6381"),
   maxRetriesPerRequest: null, // Required for pub/sub
   retryStrategy: (times: number) => {
@@ -84,7 +101,7 @@ export function getPublisher(): Redis {
   if (!publisher) {
     publisher = new Redis(REDIS_CONFIG);
     publisher.on("error", (err) => {
-      console.error("[Redis Publisher] Error:", err.message);
+      logger.error("[Redis Publisher] Error:", err);
     });
   }
   return publisher;
@@ -101,7 +118,7 @@ export async function publishUpdate(
     const pub = getPublisher();
     await pub.publish(channel, JSON.stringify(payload));
   } catch (error) {
-    console.error(`[Redis Pub/Sub] Failed to publish to ${channel}:`, error);
+    logger.error(`[Redis Pub/Sub] Failed to publish to ${channel}:`, error instanceof Error ? error : new Error(String(error)));
   }
 }
 
@@ -113,7 +130,7 @@ export function createSubscriber(): Redis {
   const subscriber = new Redis(REDIS_CONFIG);
 
   subscriber.on("error", (err) => {
-    console.error("[Redis Subscriber] Error:", err.message);
+    logger.error("[Redis Subscriber] Error:", err);
   });
 
   return subscriber;
@@ -133,7 +150,7 @@ export async function subscribe(
       const payload = JSON.parse(message) as UpdatePayload;
       onMessage(channel, payload);
     } catch (error) {
-      console.error("[Redis Subscriber] Failed to parse message:", error);
+      logger.error("[Redis Subscriber] Failed to parse message:", error instanceof Error ? error : new Error(String(error)));
     }
   });
 

@@ -17,17 +17,15 @@ console.log("");
 // Handle graceful shutdown
 const cleanup = startCollector();
 
-process.on("SIGINT", () => {
-  console.log("\nReceived SIGINT, shutting down...");
-  cleanup();
+async function shutdown(signal: string) {
+  console.log(`\nReceived ${signal}, shutting down...`);
+  await cleanup();
+  console.log("Shutdown complete");
   process.exit(0);
-});
+}
 
-process.on("SIGTERM", () => {
-  console.log("\nReceived SIGTERM, shutting down...");
-  cleanup();
-  process.exit(0);
-});
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 // Keep process alive
 console.log("Collector running. Press Ctrl+C to stop.");
