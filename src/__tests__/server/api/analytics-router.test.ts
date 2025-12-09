@@ -37,7 +37,7 @@ describe("Analytics Router - Storage Stats", () => {
       { id: 1 },
       { id: 2 },
       { id: 3 },
-    ] as Partial<Node>[]);
+    ] as unknown as Node[]);
 
     // Mock latest metrics with storage data
     vi.mocked(db.nodeMetric.findMany).mockResolvedValueOnce([
@@ -56,7 +56,7 @@ describe("Analytics Router - Storage Stats", () => {
         storageCommitted: null, // Legacy node
         storageUsagePercent: null,
       },
-    ] as Partial<NodeMetric>[]);
+    ] as unknown as NodeMetric[]);
 
     const result = {
       totalCommitted: 3000000000,
@@ -91,7 +91,7 @@ describe("Analytics Router - Storage Stats", () => {
     vi.mocked(db.node.findMany).mockResolvedValueOnce([
       { id: 1 },
       { id: 2 },
-    ] as Partial<Node>[]);
+    ] as unknown as Node[]);
 
     vi.mocked(db.nodeMetric.findMany).mockResolvedValueOnce([
       {
@@ -104,7 +104,7 @@ describe("Analytics Router - Storage Stats", () => {
         storageCommitted: BigInt(100),
         storageUsagePercent: 75.0,
       },
-    ] as Partial<NodeMetric>[]);
+    ] as unknown as NodeMetric[]);
 
     const avgUsage = (25.0 + 75.0) / 2;
     expect(avgUsage).toBe(50.0);
@@ -180,7 +180,7 @@ describe("Analytics Router - Version Distribution", () => {
       { version: "0.7.0", _count: { id: 50 } },
       { version: "0.6.0", _count: { id: 30 } },
       { version: "0.5.1", _count: { id: 10 } },
-    ] as Array<{ version: string; _count: { id: number } }>);
+    ] as ReturnType<typeof db.node.groupBy> extends Promise<infer T> ? T : never);
 
     const result = [
       { version: "0.7.0", count: 50, isV070Plus: true },
@@ -231,7 +231,7 @@ describe("Analytics Router - Network Overview", () => {
         "0.6.0": 50,
         "0.5.1": 10,
       },
-    } as Partial<NetworkStats>);
+    } as unknown as NetworkStats);
 
     const result = {
       totalNodes: 150,
