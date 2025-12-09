@@ -33,11 +33,13 @@ function getRedisHost(): string {
   return host;
 }
 
-const REDIS_CONFIG = {
-  host: getRedisHost(),
-  port: parseInt(process.env.REDIS_PORT || "6381"),
-  maxRetriesPerRequest: null,
-};
+function getRedisConfig() {
+  return {
+    host: getRedisHost(),
+    port: parseInt(process.env.REDIS_PORT || "6381"),
+    maxRetriesPerRequest: null,
+  };
+}
 
 // Queue names
 export const QUEUE_NAMES = {
@@ -86,7 +88,7 @@ let reportQueue: Queue<ReportJobData> | null = null;
 export function getAlertQueue(): Queue<AlertJobData> {
   if (!alertQueue) {
     alertQueue = new Queue(QUEUE_NAMES.ALERTS, {
-      connection: REDIS_CONFIG,
+      connection: getRedisConfig(),
       defaultJobOptions: {
         attempts: 3,
         backoff: {
@@ -107,7 +109,7 @@ export function getAlertQueue(): Queue<AlertJobData> {
 export function getNotificationQueue(): Queue<NotificationJobData> {
   if (!notificationQueue) {
     notificationQueue = new Queue(QUEUE_NAMES.NOTIFICATIONS, {
-      connection: REDIS_CONFIG,
+      connection: getRedisConfig(),
       defaultJobOptions: {
         attempts: 5,
         backoff: {
@@ -128,7 +130,7 @@ export function getNotificationQueue(): Queue<NotificationJobData> {
 export function getReportQueue(): Queue<ReportJobData> {
   if (!reportQueue) {
     reportQueue = new Queue(QUEUE_NAMES.REPORTS, {
-      connection: REDIS_CONFIG,
+      connection: getRedisConfig(),
       defaultJobOptions: {
         attempts: 3,
         backoff: {
@@ -152,7 +154,7 @@ export function createWorker<T>(
   concurrency = DEFAULT_WORKER_CONCURRENCY
 ): Worker<T> {
   return new Worker(queueName, processor, {
-    connection: REDIS_CONFIG,
+    connection: getRedisConfig(),
     concurrency,
   });
 }

@@ -81,15 +81,17 @@ function getRedisHost(): string {
   return host;
 }
 
-const REDIS_CONFIG = {
-  host: getRedisHost(),
-  port: parseInt(process.env.REDIS_PORT || "6381"),
-  maxRetriesPerRequest: null, // Required for pub/sub
-  retryStrategy: (times: number) => {
-    if (times > 10) return null;
-    return Math.min(times * 100, 3000);
-  },
-};
+function getRedisConfig() {
+  return {
+    host: getRedisHost(),
+    port: parseInt(process.env.REDIS_PORT || "6381"),
+    maxRetriesPerRequest: null, // Required for pub/sub
+    retryStrategy: (times: number) => {
+      if (times > 10) return null;
+      return Math.min(times * 100, 3000);
+    },
+  };
+}
 
 // Publisher singleton
 let publisher: Redis | null = null;
@@ -99,7 +101,7 @@ let publisher: Redis | null = null;
  */
 export function getPublisher(): Redis {
   if (!publisher) {
-    publisher = new Redis(REDIS_CONFIG);
+    publisher = new Redis(getRedisConfig());
     publisher.on("error", (err) => {
       logger.error("[Redis Publisher] Error:", err);
     });
@@ -127,7 +129,7 @@ export async function publishUpdate(
  * Each SSE connection needs its own subscriber
  */
 export function createSubscriber(): Redis {
-  const subscriber = new Redis(REDIS_CONFIG);
+  const subscriber = new Redis(getRedisConfig());
 
   subscriber.on("error", (err) => {
     logger.error("[Redis Subscriber] Error:", err);

@@ -25,15 +25,17 @@ function getRedisHost(): string {
   return host;
 }
 
-const REDIS_CONFIG = {
-  host: getRedisHost(),
-  port: parseInt(process.env.REDIS_PORT || "6381"),
-  maxRetriesPerRequest: 3,
-  retryStrategy: (times: number) => {
-    if (times > 3) return null; // Stop retrying
-    return Math.min(times * 100, 3000);
-  },
-};
+function getRedisConfig() {
+  return {
+    host: getRedisHost(),
+    port: parseInt(process.env.REDIS_PORT || "6381"),
+    maxRetriesPerRequest: 3,
+    retryStrategy: (times: number) => {
+      if (times > 3) return null; // Stop retrying
+      return Math.min(times * 100, 3000);
+    },
+  };
+}
 
 // Singleton instance
 let redisClient: Redis | null = null;
@@ -43,7 +45,7 @@ let redisClient: Redis | null = null;
  */
 export function getRedis(): Redis {
   if (!redisClient) {
-    redisClient = new Redis(REDIS_CONFIG);
+    redisClient = new Redis(getRedisConfig());
 
     redisClient.on("error", (err) => {
       logger.error("[Redis] Connection error:", err);
