@@ -16,8 +16,8 @@ export function CommitInfo() {
   });
 
   useEffect(() => {
-    // Fetch build metadata from static JSON file (generated during Docker build)
-    fetch('/build-info.json')
+    // Fetch build metadata from API route
+    fetch('/api/build-metadata')
       .then((res) => res.json())
       .then((data: BuildInfo) => setBuildInfo(data))
       .catch(() => {

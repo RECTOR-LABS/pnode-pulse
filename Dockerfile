@@ -29,11 +29,6 @@ ARG DATABASE_URL
 ENV DATABASE_URL=${DATABASE_URL}
 RUN npm run build
 
-# Write build metadata to JSON file AFTER build (to avoid being overwritten)
-RUN echo "{\"commit\":\"${NEXT_PUBLIC_COMMIT_SHA}\",\"branch\":\"${NEXT_PUBLIC_BRANCH_NAME}\",\"buildTime\":\"${NEXT_PUBLIC_BUILD_TIME}\"}" > public/build-info.json && \
-    cat public/build-info.json && \
-    echo "Build info written to public/build-info.json"
-
 # Production stage
 FROM node:20-alpine AS runner
 
