@@ -12,7 +12,7 @@ export function CommitInfo() {
   const [buildInfo, setBuildInfo] = useState<BuildInfo | null>(null);
 
   useEffect(() => {
-    fetch('/api/build-info')
+    fetch('/api/git-info')
       .then((res) => res.json())
       .then((data) => setBuildInfo(data))
       .catch(() => {
