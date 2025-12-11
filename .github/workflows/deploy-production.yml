@@ -1,9 +1,9 @@
 name: Deploy Production (Blue/Green)
 
 on:
-  workflow_dispatch:  # Manual trigger only
-  # push:
-  #   branches: [main]
+  workflow_dispatch:  # Manual trigger available
+  push:
+    branches: [main]  # Auto-deploy on main push
 
 env:
   REGISTRY: ghcr.io
@@ -44,6 +44,10 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            NEXT_PUBLIC_COMMIT_SHA=${{ github.sha }}
+            NEXT_PUBLIC_BRANCH_NAME=${{ github.ref_name }}
+            NEXT_PUBLIC_BUILD_TIME=${{ github.event.head_commit.timestamp }}
 
       - name: Deploy to VPS (Blue/Green Production)
         uses: appleboy/ssh-action@v1.0.0
