@@ -35,6 +35,16 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# Re-declare build args to pass them to runtime
+ARG NEXT_PUBLIC_COMMIT_SHA
+ARG NEXT_PUBLIC_BRANCH_NAME
+ARG NEXT_PUBLIC_BUILD_TIME
+
+# Set runtime environment variables
+ENV NEXT_PUBLIC_COMMIT_SHA=${NEXT_PUBLIC_COMMIT_SHA}
+ENV NEXT_PUBLIC_BRANCH_NAME=${NEXT_PUBLIC_BRANCH_NAME}
+ENV NEXT_PUBLIC_BUILD_TIME=${NEXT_PUBLIC_BUILD_TIME}
+
 # Create non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
