@@ -27,10 +27,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set build timestamp
-        id: timestamp
-        run: echo "BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
-
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -48,10 +44,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args: |
-            NEXT_PUBLIC_COMMIT_SHA=${{ github.sha }}
-            NEXT_PUBLIC_BRANCH_NAME=${{ github.ref_name }}
-            NEXT_PUBLIC_BUILD_TIME=${{ steps.timestamp.outputs.BUILD_TIME }}
 
       - name: Deploy to VPS (Blue/Green Production)
         uses: appleboy/ssh-action@v1.0.0
@@ -68,15 +60,7 @@ jobs:
 
             # Pull latest image from GHCR
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-
-            # Update .env with build metadata (remove old entries first)
-            sed -i '/^NEXT_PUBLIC_COMMIT_SHA=/d' .env
-            sed -i '/^NEXT_PUBLIC_BRANCH_NAME=/d' .env
-            sed -i '/^NEXT_PUBLIC_BUILD_TIME=/d' .env
-            echo "NEXT_PUBLIC_COMMIT_SHA=${{ github.sha }}" >> .env
-            echo "NEXT_PUBLIC_BRANCH_NAME=${{ github.ref_name }}" >> .env
-            echo "NEXT_PUBLIC_BUILD_TIME=${{ steps.timestamp.outputs.BUILD_TIME }}" >> .env
+            docker pull ghcr.io/rector-labs/pnode-pulse:latest
 
             # Run blue/green deployment script
             bash scripts/blue-green-deploy.sh
