@@ -1,12 +1,43 @@
 # CLAUDE.md - pNode Pulse
 
+## 🚨 CRITICAL: Superteam Bounty Deadline
+
+**Competition**: Build Analytics Platform for Xandeum pNodes
+**Prize Pool**: $5,000 USDC ($2,500 first / $1,500 second / $1,000 third)
+**Submission Deadline**: **December 26, 2025 @ 07:59 UTC** (15 days remaining)
+**Winner Announcement**: January 9, 2026
+
+**Bounty Page**: https://earn.superteam.fun/listing/build-analytics-platform-for-xandeum-pnodes/
+
+### Required Deliverables
+- ✅ Retrieve all pNodes via pRPC (`get-pods-with-stats`)
+- ✅ Display pNode information clearly
+- ❌ **Live website** (pulse.rectorspace.com) - NOT DEPLOYED YET
+- ❌ Documentation (deployment + usage)
+
+### Judging Criteria (Priority Order)
+1. **Functionality** - pRPC retrieval working
+2. **Clarity** - Information understandable
+3. **User Experience** - Intuitive platform
+4. **Innovation** (Optional) - Additional features = competitive edge
+
+### Our Competitive Advantages
+- ✨ TimescaleDB time-series analytics
+- ✨ v0.7.0 "Heidelberg" storage stats integration
+- ✨ Real-time network health monitoring
+- ✨ Historical tracking + predictive analytics
+
+**Action Plan**: See [Issue #170](https://github.com/RECTOR-LABS/pnode-pulse/issues/170)
+
+---
+
 ## Project Overview
 
 **pNode Pulse** - Real-time analytics platform for Xandeum's pNode network.
 
 **Repository**: [RECTOR-LABS/pnode-pulse](https://github.com/RECTOR-LABS/pnode-pulse)
 **License**: MIT (Open Core)
-**Phase**: Analytics Engine (Phase 5 - 90% complete)
+**Phase**: Pre-Launch (Code 90% complete, Deployment 0%)
 
 ## Tech Stack
 
@@ -413,7 +444,12 @@ From Fortune (Dec 8):
 
 **Unanswered** - May need clarification from bounty organizers.
 
-### v0.7.0 Release (Dec 8, 2024)
+### v0.7.0 "Heidelberg" Release (Dec 8-10, 2024)
+
+**Official Release**: December 10, 2025 (Announcement by Blockchain Bernie)
+**Codename**: "Heidelberg"
+**Docs**: https://xandeum.network/docs
+**Mainnet Timeline**: Alpha on Mainnet by year end (Dec 2025)
 
 **Gossip Protocol Enhancements**:
 - **Frequency**: Changed from every 120 seconds → every 1 second
@@ -431,13 +467,82 @@ From Fortune (Dec 8):
 - Older pNodes (<v0.7.0) still appear in results with limited stats
 - Private nodes (`is_public: null`) are not queryable directly but included in results
 
+**Rollout Issues (Dec 9)**:
+- Bug discovered after 70 nodes upgraded
+- Network instability during transition period
+- Fixed same day with new patch release
+- Expect mixed responses during transition (some nodes return all null fields)
+
+### Latest Intelligence (Dec 9-11, 2025)
+
+**Network Composition** (Brown, Dec 10-11):
+- **Total pNodes**: ~100 discovered via get-pods-with-stats
+- **Public (RPC accessible)**: 16-17 nodes
+- **Private**: ~83-84 nodes
+- Only public nodes can be queried directly via pRPC
+
+**Port 6000 Accessibility** (Skipp + Ymetro):
+- Gossip network shows ~16 registered pods currently
+- **Very few** nodes have port 6000 publicly accessible
+- Most nodes have private RPC ports (`is_public: null`)
+- We rely on public nodes' `get-pods-with-stats` for network-wide data (federation)
+
+**Terminology Clarification** (Brad, Dec 10):
+> "The pNode is the Storage Provider Node/Server. Pod is a software that runs on the pNode."
+
+- **pNode** = Hardware/server (storage provider)
+- **Pod** = Software application running on the pNode
+
+**Critical pRPC Best Practices** (Brad, Dec 10):
+
+1. **Multi-Endpoint Strategy**:
+   > "program a function that uses multiple endpoints and run a version where the syntax matches your expectation"
+
+   - Don't rely on single endpoint
+   - Query multiple public nodes for redundancy
+   - Our collector already implements this ✅
+
+2. **No Uptime Guarantees**:
+   > "None of them come with any guarantee of uptime or version"
+
+   - Any endpoint can go down anytime
+   - Collector must handle failures gracefully ✅
+   - Version checking required before trusting response
+
+3. **Public/Private Tagging**: ✅ Approved
+   - Brad didn't object to tagging nodes as public/private
+   - Our `isPublic` field is valid
+
+**Database Strategy Guidance** (Brad, Dec 9):
+> "as long as you have a prune function somewhere not a problem...and likely correlate it to pubkey which should stay the same if the IP changes."
+
+> "maybe you have a desire to have a function that shows old nodes that are no longer active...like a graveyard or so lol"
+
+**Key Insights**:
+- **Use `pubkey` as primary identifier** (IPs can change)
+- Store historical data with pruning function
+- "Node Graveyard" feature suggested for inactive nodes
+
+**Documentation Update** (redcali, Dec 11):
+- ❌ **Old (dead)**: https://pnodes.xandeum.network/
+- ✅ **New**: https://docs.xandeum.network/xandeum-pnode-setup-guide
+
+**Action Items**:
+- [Issue #164](https://github.com/RECTOR-LABS/pnode-pulse/issues/164) - Use pubkey for correlation
+- [Issue #165](https://github.com/RECTOR-LABS/pnode-pulse/issues/165) - Implement pruning strategy
+- [Issue #166](https://github.com/RECTOR-LABS/pnode-pulse/issues/166) - Verify null handling
+- [Issue #167](https://github.com/RECTOR-LABS/pnode-pulse/issues/167) - Node Graveyard feature
+- [Issue #168](https://github.com/RECTOR-LABS/pnode-pulse/issues/168) - Review official docs
+- [Issue #169](https://github.com/RECTOR-LABS/pnode-pulse/issues/169) - IP change tracking
+
 ### Community Libraries
 
-**Skipp's pRPC Clients** (Released Dec 8, 2024):
+**Skipp's pRPC Clients** (Released Dec 8, 2024, Updated Dec 11):
 - **JS/TS**: `pnpm install xandeum-prpc` ([GitHub](https://github.com/DavidNzube101/xandeum-prpc-js))
 - **Go**: `go get github.com/DavidNzube101/xandeum-prpc-go`
 - **Rust**: `cargo add xandeum-prpc`
 - **Demo**: prpc-client-example.vercel.app
+- **Update**: Now supports `get-pods-with-stats` method
 
 **Usage Example (JS/TS)**:
 ```typescript
@@ -495,11 +600,19 @@ console.log(pods);
 **Phase 7: Legal & Compliance** ✅ COMPLETE (2025-12-09)
 - [x] Privacy policy: GDPR/CCPA compliant documentation
 
-**Next Steps**:
-- [ ] Setup GitHub secrets (VPS_SSH_KEY, POSTGRES_PASSWORD)
-- [ ] Configure nginx reverse proxy for staging/production domains
-- [ ] Initial deployment to VPS
-- [ ] Apply migration to production database
-- [ ] Setup Sentry account and configure APM
-- [ ] Implement privacy policy page in Next.js app
-- [ ] Run first automated deployment test
+**URGENT: Bounty Submission Track** (Deadline: Dec 26, 2025):
+- [ ] **Dec 11-12**: Setup GitHub secrets + Deploy to VPS
+- [ ] **Dec 13**: Go live at pulse.rectorspace.com
+- [ ] **Dec 14-20**: Frontend polish + UX improvements
+- [ ] **Dec 21-23**: Documentation + testing
+- [ ] **Dec 24-25**: Final submission preparation
+- [ ] **Dec 26**: Submit before 07:59 UTC deadline
+
+**Post-Launch Improvements** (Technical Debt - Defer to after bounty):
+- [ ] Implement pubkey-based correlation (#164)
+- [ ] Add pruning strategy (#165)
+- [ ] Verify null handling (#166)
+- [ ] Review official Xandeum docs (#168)
+- [ ] Setup Sentry APM
+- [ ] Node Graveyard feature (#167)
+- [ ] IP change tracking (#169)
