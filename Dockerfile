@@ -19,10 +19,8 @@ ARG NEXT_PUBLIC_COMMIT_SHA
 ARG NEXT_PUBLIC_BRANCH_NAME
 ARG NEXT_PUBLIC_BUILD_TIME
 
-# Set as ENV variables so they're available during build
-ENV NEXT_PUBLIC_COMMIT_SHA=${NEXT_PUBLIC_COMMIT_SHA}
-ENV NEXT_PUBLIC_BRANCH_NAME=${NEXT_PUBLIC_BRANCH_NAME}
-ENV NEXT_PUBLIC_BUILD_TIME=${NEXT_PUBLIC_BUILD_TIME}
+# Generate build metadata JSON file
+RUN mkdir -p public && echo "{\"commitSha\":\"${NEXT_PUBLIC_COMMIT_SHA}\",\"branchName\":\"${NEXT_PUBLIC_BRANCH_NAME}\",\"buildTime\":\"${NEXT_PUBLIC_BUILD_TIME}\"}" > public/build-info.json
 
 # Build Next.js
 ARG DATABASE_URL
