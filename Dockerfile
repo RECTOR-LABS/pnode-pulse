@@ -19,8 +19,8 @@ ARG NEXT_PUBLIC_COMMIT_SHA
 ARG NEXT_PUBLIC_BRANCH_NAME
 ARG NEXT_PUBLIC_BUILD_TIME
 
-# Generate build metadata JSON file
-RUN mkdir -p public && echo "{\"commitSha\":\"${NEXT_PUBLIC_COMMIT_SHA}\",\"branchName\":\"${NEXT_PUBLIC_BRANCH_NAME}\",\"buildTime\":\"${NEXT_PUBLIC_BUILD_TIME}\"}" > public/build-info.json
+# Generate build metadata TypeScript file
+RUN mkdir -p src/lib && printf "export const BUILD_INFO = {\n  commitSha: '${NEXT_PUBLIC_COMMIT_SHA}',\n  branchName: '${NEXT_PUBLIC_BRANCH_NAME}',\n  buildTime: '${NEXT_PUBLIC_BUILD_TIME}',\n} as const;\n" > src/lib/build-info.ts
 
 # Build Next.js
 ARG DATABASE_URL
