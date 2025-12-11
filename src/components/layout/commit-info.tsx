@@ -1,3 +1,5 @@
+'use client';
+
 export function CommitInfo() {
   // Read build metadata from NEXT_PUBLIC_ env vars (embedded at build time)
   const commit = process.env.NEXT_PUBLIC_COMMIT_SHA || 'unknown';
