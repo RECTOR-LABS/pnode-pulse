@@ -25,7 +25,9 @@ ENV NEXT_PUBLIC_BRANCH_NAME=${NEXT_PUBLIC_BRANCH_NAME}
 ENV NEXT_PUBLIC_BUILD_TIME=${NEXT_PUBLIC_BUILD_TIME}
 
 # Write build metadata to JSON file for direct consumption
-RUN echo "{\"commit\":\"${NEXT_PUBLIC_COMMIT_SHA}\",\"branch\":\"${NEXT_PUBLIC_BRANCH_NAME}\",\"buildTime\":\"${NEXT_PUBLIC_BUILD_TIME}\"}" > public/build-info.json
+RUN echo "{\"commit\":\"${NEXT_PUBLIC_COMMIT_SHA}\",\"branch\":\"${NEXT_PUBLIC_BRANCH_NAME}\",\"buildTime\":\"${NEXT_PUBLIC_BUILD_TIME}\"}" > public/build-info.json && \
+    cat public/build-info.json && \
+    echo "Build info written successfully"
 
 # Build Next.js
 ARG DATABASE_URL
