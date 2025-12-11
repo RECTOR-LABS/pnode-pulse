@@ -104,7 +104,12 @@ export async function runPrune(): Promise<PruneResult> {
     timestamp: now,
   };
 
-  logger.info("Pruning cycle complete", result);
+  logger.info("Pruning cycle complete", {
+    markedInactive: result.markedInactive,
+    markedArchived: result.markedArchived,
+    reactivated: result.reactivated,
+    timestamp: result.timestamp.toISOString(),
+  });
 
   return result;
 }

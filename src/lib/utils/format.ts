@@ -1,14 +1,21 @@
 /**
  * Formatting utilities
+ *
+ * All formatters handle null/undefined gracefully for v0.7.0 transition nodes
+ * that may return incomplete data.
  */
 
 /**
  * Format bytes to human readable string
+ * Returns "N/A" for null/undefined values
  */
-export function formatBytes(bytes: number | bigint): string {
+export function formatBytes(bytes: number | bigint | null | undefined): string {
+  if (bytes === null || bytes === undefined) return "N/A";
+
   const num = typeof bytes === "bigint" ? Number(bytes) : bytes;
 
   if (num === 0) return "0 B";
+  if (!isFinite(num) || num < 0) return "N/A";
 
   const units = ["B", "KB", "MB", "GB", "TB", "PB"];
   const k = 1024;
@@ -19,9 +26,13 @@ export function formatBytes(bytes: number | bigint): string {
 
 /**
  * Format uptime in seconds to human readable string
+ * Returns "N/A" for null/undefined values
  */
-export function formatUptime(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
+export function formatUptime(seconds: number | null | undefined): string {
+  if (seconds === null || seconds === undefined) return "N/A";
+  if (!isFinite(seconds) || seconds < 0) return "N/A";
+
+  if (seconds < 60) return `${Math.round(seconds)}s`;
 
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
@@ -40,22 +51,34 @@ export function formatUptime(seconds: number): string {
 
 /**
  * Format percentage with fixed decimals
+ * Returns "N/A" for null/undefined values
  */
-export function formatPercent(value: number, decimals = 1): string {
+export function formatPercent(value: number | null | undefined, decimals = 1): string {
+  if (value === null || value === undefined) return "N/A";
+  if (!isFinite(value)) return "N/A";
+
   return `${value.toFixed(decimals)}%`;
 }
 
 /**
  * Format number with commas
+ * Returns "N/A" for null/undefined values
  */
-export function formatNumber(value: number): string {
+export function formatNumber(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "N/A";
+  if (!isFinite(value)) return "N/A";
+
   return new Intl.NumberFormat().format(value);
 }
 
 /**
  * Format relative time
+ * Returns "N/A" for null/undefined/invalid dates
  */
-export function formatRelativeTime(date: Date): string {
+export function formatRelativeTime(date: Date | null | undefined): string {
+  if (date === null || date === undefined) return "N/A";
+  if (!(date instanceof Date) || isNaN(date.getTime())) return "N/A";
+
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffSecs = Math.floor(diffMs / 1000);
@@ -68,8 +91,19 @@ export function formatRelativeTime(date: Date): string {
 
 /**
  * Format IP address (truncate for display)
+ * Returns "Unknown" for null/undefined values
  */
-export function formatAddress(address: string): string {
+export function formatAddress(address: string | null | undefined): string {
+  if (address === null || address === undefined || address === "") return "Unknown";
   if (!address.includes(":")) return address;
   return address.split(":")[0];
+}
+
+/**
+ * Format version string
+ * Returns "Unknown" for null/undefined values
+ */
+export function formatVersion(version: string | null | undefined): string {
+  if (version === null || version === undefined || version === "") return "Unknown";
+  return version.startsWith("v") ? version : `v${version}`;
 }
