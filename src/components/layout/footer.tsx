@@ -3,9 +3,7 @@ export function Footer() {
     <footer className="border-t border-border mt-auto">
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
-          <div>
-            pNode Pulse - Xandeum Network Explorer
-          </div>
+          <div>pNode Pulse - Xandeum Network Explorer</div>
           <div className="flex items-center gap-4">
             <a
               href="https://www.xandeum.network"

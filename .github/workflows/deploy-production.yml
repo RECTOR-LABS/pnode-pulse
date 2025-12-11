@@ -1,9 +1,9 @@
 name: Deploy Production (Blue/Green)
 
 on:
-  workflow_dispatch:  # Manual trigger only
-  # push:
-  #   branches: [main]
+  workflow_dispatch:  # Manual trigger available
+  push:
+    branches: [main]  # Auto-deploy on main push
 
 env:
   REGISTRY: ghcr.io
@@ -60,7 +60,7 @@ jobs:
 
             # Pull latest image from GHCR
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            docker pull ghcr.io/rector-labs/pnode-pulse:latest
 
             # Run blue/green deployment script
             bash scripts/blue-green-deploy.sh
