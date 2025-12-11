@@ -1,3 +1,6 @@
+// Force this component to be dynamically rendered to read runtime env vars
+export const dynamic = 'force-dynamic';
+
 export function Footer() {
   const commitSha = process.env.NEXT_PUBLIC_COMMIT_SHA || 'unknown';
   const branchName = process.env.NEXT_PUBLIC_BRANCH_NAME || 'unknown';
