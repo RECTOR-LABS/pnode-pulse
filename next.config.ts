@@ -12,13 +12,6 @@ const nextConfig: NextConfig = {
   // Enable standalone output for Docker deployment
   output: "standalone",
 
-  // Explicitly expose build metadata to client
-  env: {
-    NEXT_PUBLIC_COMMIT_SHA: process.env.NEXT_PUBLIC_COMMIT_SHA || 'unknown',
-    NEXT_PUBLIC_BRANCH_NAME: process.env.NEXT_PUBLIC_BRANCH_NAME || 'unknown',
-    NEXT_PUBLIC_BUILD_TIME: process.env.NEXT_PUBLIC_BUILD_TIME || 'unknown',
-  },
-
   // Optimize images
   images: {
     formats: ["image/avif", "image/webp"],
