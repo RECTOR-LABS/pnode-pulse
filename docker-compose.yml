@@ -52,9 +52,6 @@ services:
       DATABASE_URL: postgresql://pnodepulse:${POSTGRES_PASSWORD}@postgres:5432/pnodepulse
       REDIS_URL: redis://redis:6379
       NEXT_PUBLIC_APP_URL: https://staging.pulse.rectorspace.com
-      NEXT_PUBLIC_COMMIT_SHA: ${NEXT_PUBLIC_COMMIT_SHA:-unknown}
-      NEXT_PUBLIC_BRANCH_NAME: ${NEXT_PUBLIC_BRANCH_NAME:-unknown}
-      NEXT_PUBLIC_BUILD_TIME: ${NEXT_PUBLIC_BUILD_TIME:-unknown}
     networks:
       - pnode-pulse-net
     depends_on:
@@ -80,9 +77,6 @@ services:
       DATABASE_URL: postgresql://pnodepulse:${POSTGRES_PASSWORD}@postgres:5432/pnodepulse
       REDIS_URL: redis://redis:6379
       NEXT_PUBLIC_APP_URL: https://pulse.rectorspace.com
-      NEXT_PUBLIC_COMMIT_SHA: ${NEXT_PUBLIC_COMMIT_SHA:-unknown}
-      NEXT_PUBLIC_BRANCH_NAME: ${NEXT_PUBLIC_BRANCH_NAME:-unknown}
-      NEXT_PUBLIC_BUILD_TIME: ${NEXT_PUBLIC_BUILD_TIME:-unknown}
     networks:
       - pnode-pulse-net
     depends_on:
@@ -108,9 +102,6 @@ services:
       DATABASE_URL: postgresql://pnodepulse:${POSTGRES_PASSWORD}@postgres:5432/pnodepulse
       REDIS_URL: redis://redis:6379
       NEXT_PUBLIC_APP_URL: https://pulse.rectorspace.com
-      NEXT_PUBLIC_COMMIT_SHA: ${NEXT_PUBLIC_COMMIT_SHA:-unknown}
-      NEXT_PUBLIC_BRANCH_NAME: ${NEXT_PUBLIC_BRANCH_NAME:-unknown}
-      NEXT_PUBLIC_BUILD_TIME: ${NEXT_PUBLIC_BUILD_TIME:-unknown}
     networks:
       - pnode-pulse-net
     depends_on:
