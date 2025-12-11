@@ -14,21 +14,10 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build args for commit info
-ARG NEXT_PUBLIC_COMMIT_SHA
-ARG NEXT_PUBLIC_BRANCH_NAME
-ARG NEXT_PUBLIC_BUILD_TIME
-
-# Generate build metadata TypeScript file BEFORE build
-RUN mkdir -p src/lib && printf "export const BUILD_INFO = {\n  commitSha: '${NEXT_PUBLIC_COMMIT_SHA}',\n  branchName: '${NEXT_PUBLIC_BRANCH_NAME}',\n  buildTime: '${NEXT_PUBLIC_BUILD_TIME}',\n} as const;\n" > src/lib/build-info.ts
-
 # Build Next.js
 ARG DATABASE_URL
 ENV DATABASE_URL=${DATABASE_URL}
 RUN npm run build
-
-# Regenerate build-info.ts in standalone output (Next.js may not include src/ in standalone)
-RUN mkdir -p .next/standalone/src/lib && printf "export const BUILD_INFO = {\n  commitSha: '${NEXT_PUBLIC_COMMIT_SHA}',\n  branchName: '${NEXT_PUBLIC_BRANCH_NAME}',\n  buildTime: '${NEXT_PUBLIC_BUILD_TIME}',\n} as const;\n" > .next/standalone/src/lib/build-info.ts
 
 # Production stage
 FROM node:20-alpine AS runner
