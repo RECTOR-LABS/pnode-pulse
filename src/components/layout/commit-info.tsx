@@ -3,17 +3,13 @@
 import { useEffect, useState } from 'react';
 
 interface BuildInfo {
-  commitSha: string;
-  branchName: string;
-  buildTime: string;
+  commit: string;
+  branch: string;
+  timestamp: string;
 }
 
 export function CommitInfo() {
-  const [buildInfo, setBuildInfo] = useState<BuildInfo>({
-    commitSha: 'loading',
-    branchName: 'loading',
-    buildTime: 'loading',
-  });
+  const [buildInfo, setBuildInfo] = useState<BuildInfo | null>(null);
 
   useEffect(() => {
     fetch('/api/build-info')
@@ -21,16 +17,24 @@ export function CommitInfo() {
       .then((data) => setBuildInfo(data))
       .catch(() => {
         setBuildInfo({
-          commitSha: 'error',
-          branchName: 'error',
-          buildTime: 'error',
+          commit: 'unknown',
+          branch: 'unknown',
+          timestamp: new Date().toISOString(),
         });
       });
   }, []);
 
+  if (!buildInfo) {
+    return (
+      <div className="text-xs opacity-70">
+        loading...
+      </div>
+    );
+  }
+
   return (
     <div className="text-xs opacity-70">
-      {buildInfo.branchName}@{buildInfo.commitSha.slice(0, 7)} • Built {buildInfo.buildTime}
+      {buildInfo.branch}@{buildInfo.commit.slice(0, 7)} • Built {buildInfo.timestamp}
     </div>
   );
 }
