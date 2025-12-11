@@ -1,40 +1,12 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-
-interface BuildInfo {
-  commit: string;
-  branch: string;
-  timestamp: string;
-}
-
 export function CommitInfo() {
-  const [buildInfo, setBuildInfo] = useState<BuildInfo | null>(null);
-
-  useEffect(() => {
-    fetch('/api/git-info')
-      .then((res) => res.json())
-      .then((data) => setBuildInfo(data))
-      .catch(() => {
-        setBuildInfo({
-          commit: 'unknown',
-          branch: 'unknown',
-          timestamp: new Date().toISOString(),
-        });
-      });
-  }, []);
-
-  if (!buildInfo) {
-    return (
-      <div className="text-xs opacity-70">
-        loading...
-      </div>
-    );
-  }
+  // Read build metadata from NEXT_PUBLIC_ env vars (embedded at build time)
+  const commit = process.env.NEXT_PUBLIC_COMMIT_SHA || 'unknown';
+  const branch = process.env.NEXT_PUBLIC_BRANCH_NAME || 'unknown';
+  const buildTime = process.env.NEXT_PUBLIC_BUILD_TIME || new Date().toISOString();
 
   return (
     <div className="text-xs opacity-70">
-      {buildInfo.branch}@{buildInfo.commit.slice(0, 7)} • Built {buildInfo.timestamp}
+      {branch}@{commit.slice(0, 7)} • Built {buildTime}
     </div>
   );
 }
