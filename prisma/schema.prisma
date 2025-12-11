@@ -152,8 +152,10 @@ model Node {
   firstSeen DateTime @default(now()) @map("first_seen")
   /// Last time we successfully polled this node
   lastSeen  DateTime? @map("last_seen")
-  /// Whether the node is currently reachable
+  /// Whether the node is currently reachable (legacy, use status instead)
   isActive  Boolean  @default(true) @map("is_active")
+  /// Node lifecycle status for pruning (ACTIVE → INACTIVE → ARCHIVED)
+  status    NodeStatus @default(ACTIVE)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -174,6 +176,8 @@ model Node {
   @@index([isActive, version])
   @@index([isActive, lastSeen(sort: Desc)])
   @@index([isPublic])
+  @@index([status])
+  @@index([status, lastSeen(sort: Desc)])
   @@map("nodes")
 }
 
@@ -283,6 +287,16 @@ enum JobStatus {
   RUNNING
   COMPLETED
   FAILED
+}
+
+/// Node lifecycle status for pruning strategy
+enum NodeStatus {
+  /// Node is actively responding to polls
+  ACTIVE
+  /// Node hasn't responded in >24 hours
+  INACTIVE
+  /// Node hasn't responded in >7 days, excluded from default views
+  ARCHIVED
 }
 
 // ============================================
