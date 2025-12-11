@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "pNode Pulse",
+    "slug": "pnode-pulse-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "scheme": "pnodepulse",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0b"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.rectorlabs.pnodepulse"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0a0a0b"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.rectorlabs.pnodepulse"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-linking"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "pnode-pulse-mobile"
+      }
+    }
+  }
+}

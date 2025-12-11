@@ -1,0 +1,120 @@
+{
+  "common": {
+    "loading": "Cargando...",
+    "error": "Error",
+    "retry": "Reintentar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "search": "Buscar",
+    "filter": "Filtrar",
+    "sort": "Ordenar",
+    "refresh": "Actualizar",
+    "viewAll": "Ver Todo",
+    "learnMore": "Más Información",
+    "noData": "No hay datos disponibles"
+  },
+  "nav": {
+    "home": "Inicio",
+    "dashboard": "Panel",
+    "nodes": "Nodos",
+    "map": "Mapa de Red",
+    "analytics": "Analíticas",
+    "alerts": "Alertas",
+    "portfolio": "Portafolio",
+    "reports": "Informes",
+    "settings": "Configuración",
+    "leaderboard": "Clasificación",
+    "skipToContent": "Saltar al contenido principal",
+    "mainMenu": "Menú principal"
+  },
+  "dashboard": {
+    "title": "Resumen de la Red",
+    "subtitle": "Estadísticas en tiempo real de la red pNode",
+    "totalNodes": "Nodos Totales",
+    "activeNodes": "Nodos Activos",
+    "networkHealth": "Salud de la Red",
+    "totalStorage": "Almacenamiento Total",
+    "avgUptime": "Tiempo de Actividad Promedio",
+    "lastUpdated": "Última Actualización"
+  },
+  "nodes": {
+    "title": "Explorador de pNodes",
+    "subtitle": "Explorar y monitorear participantes de la red pNode",
+    "nodeDetails": "Detalles del Nodo",
+    "status": "Estado",
+    "version": "Versión",
+    "uptime": "Tiempo Activo",
+    "storage": "Almacenamiento",
+    "cpu": "CPU",
+    "memory": "Memoria",
+    "online": "En Línea",
+    "offline": "Desconectado",
+    "degraded": "Degradado",
+    "lastSeen": "Última Vez Visto",
+    "location": "Ubicación",
+    "performance": "Rendimiento"
+  },
+  "analytics": {
+    "title": "Panel de Analíticas",
+    "subtitle": "Rendimiento y tendencias de la red",
+    "growthForecast": "Pronóstico de Crecimiento",
+    "capacityProjection": "Proyección de Capacidad",
+    "performanceTrends": "Tendencias de Rendimiento",
+    "healthScore": "Puntuación de Salud",
+    "timeRange": {
+      "1h": "1 Hora",
+      "24h": "24 Horas",
+      "7d": "7 Días",
+      "30d": "30 Días"
+    }
+  },
+  "alerts": {
+    "title": "Alertas",
+    "subtitle": "Monitorear eventos y notificaciones de la red",
+    "noAlerts": "No hay alertas en este momento",
+    "critical": "Crítico",
+    "warning": "Advertencia",
+    "info": "Información",
+    "acknowledge": "Reconocer",
+    "dismiss": "Descartar"
+  },
+  "settings": {
+    "title": "Configuración",
+    "subtitle": "Gestionar tus preferencias",
+    "language": "Idioma",
+    "theme": "Tema",
+    "notifications": "Notificaciones",
+    "timezone": "Zona Horaria",
+    "apiKeys": "Claves API",
+    "sessions": "Sesiones",
+    "nodeSettings": "Configuración de Nodos",
+    "selectLanguage": "Selecciona tu idioma preferido"
+  },
+  "auth": {
+    "connectWallet": "Conectar Billetera",
+    "disconnect": "Desconectar",
+    "connected": "Conectado",
+    "signIn": "Iniciar Sesión",
+    "signOut": "Cerrar Sesión"
+  },
+  "footer": {
+    "poweredBy": "Impulsado por Xandeum Network",
+    "documentation": "Documentación",
+    "github": "GitHub",
+    "discord": "Discord",
+    "twitter": "Twitter"
+  },
+  "realtime": {
+    "live": "En Vivo",
+    "reconnecting": "Reconectando...",
+    "offline": "Desconectado",
+    "lastUpdate": "Última actualización"
+  },
+  "errors": {
+    "networkError": "Error de red. Por favor, inténtalo de nuevo.",
+    "notFound": "Página no encontrada",
+    "serverError": "Error del servidor. Por favor, inténtalo más tarde.",
+    "unauthorized": "Por favor, conecta tu billetera para continuar."
+  }
+}

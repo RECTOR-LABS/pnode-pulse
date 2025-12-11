@@ -1,0 +1,878 @@
+// Prisma Schema for pNode Pulse
+// https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User Authentication (Phase 3.5)
+// ============================================
+
+/// User account (wallet-based authentication)
+model User {
+  id              String   @id @default(cuid())
+  /// Solana wallet public key (Base58)
+  walletAddress   String   @unique @map("wallet_address")
+  /// Display name (optional)
+  displayName     String?  @map("display_name")
+  /// Avatar URL
+  avatarUrl       String?  @map("avatar_url")
+
+  /// User preferences
+  preferences     Json     @default("{}")
+
+  /// Account status
+  isActive        Boolean  @default(true) @map("is_active")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  lastLoginAt     DateTime? @map("last_login_at")
+
+  // Relations
+  sessions        UserSession[]
+  nodeClaims      NodeClaim[]
+  apiKeys         ApiKey[]
+  profile         OperatorProfile?
+
+  @@index([walletAddress])
+  @@map("users")
+}
+
+/// User session for JWT management
+model UserSession {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  /// JWT token hash (for invalidation)
+  tokenHash       String   @map("token_hash")
+  /// User agent string
+  userAgent       String?  @map("user_agent")
+  /// IP address
+  ipAddress       String?  @map("ip_address")
+
+  expiresAt       DateTime @map("expires_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  lastUsedAt      DateTime @default(now()) @map("last_used_at")
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+/// Auth challenge for wallet signature verification
+model AuthChallenge {
+  id              String   @id @default(cuid())
+  /// Wallet address this challenge is for
+  walletAddress   String   @map("wallet_address")
+  /// Random nonce
+  nonce           String
+  /// Challenge message
+  message         String
+  /// Expiration time (5 minutes)
+  expiresAt       DateTime @map("expires_at")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([walletAddress])
+  @@index([nonce])
+  @@map("auth_challenges")
+}
+
+/// Node ownership claim
+model NodeClaim {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+  nodeId          Int      @map("node_id")
+
+  /// Verification method used
+  verificationMethod ClaimVerificationMethod @map("verification_method")
+  /// Status of the claim
+  status          ClaimStatus @default(PENDING)
+  /// Custom display name for the node
+  displayName     String?  @map("display_name")
+
+  /// Verification data (token, signature, etc.)
+  verificationData Json?   @map("verification_data")
+
+  claimedAt       DateTime? @map("claimed_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([nodeId])
+  @@index([userId])
+  @@index([status])
+  @@map("node_claims")
+}
+
+enum ClaimVerificationMethod {
+  WALLET_SIGNATURE
+  VERIFICATION_FILE
+  DNS_TXT
+}
+
+enum ClaimStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+// ============================================
+// Core Models
+// ============================================
+
+/// Registry of all known pNodes
+model Node {
+  id        Int      @id @default(autoincrement())
+  /// IP:Port address (e.g., "192.190.136.36:6000")
+  address   String   @unique
+  /// Gossip address (e.g., "192.190.136.36:9001")
+  gossipAddress String?
+  /// Base58 public key
+  pubkey    String?
+  /// pNode software version
+  version   String?
+  /// Whether RPC port is publicly accessible (from v0.7.0+ get-pods-with-stats)
+  isPublic  Boolean? @map("is_public")
+  /// RPC service port (typically 6000, from v0.7.0+ get-pods-with-stats)
+  rpcPort   Int?     @map("rpc_port")
+  /// First time this node was seen
+  firstSeen DateTime @default(now()) @map("first_seen")
+  /// Last time we successfully polled this node
+  lastSeen  DateTime? @map("last_seen")
+  /// Whether the node is currently reachable
+  isActive  Boolean  @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  metrics   NodeMetric[]
+  peers     NodePeer[]   @relation("NodePeers")
+  peeredBy  NodePeer[]   @relation("PeeredByNodes")
+  alerts    Alert[]
+  portfolios PortfolioNode[]
+  uptimeEvents UptimeEvent[]
+
+  @@index([address])
+  @@index([pubkey])
+  @@index([isActive])
+  @@index([version])
+  @@index([lastSeen(sort: Desc)])
+  @@index([isActive, version])
+  @@index([isActive, lastSeen(sort: Desc)])
+  @@index([isPublic])
+  @@map("nodes")
+}
+
+/// Time-series metrics for each node (TimescaleDB hypertable)
+/// Note: Prisma doesn't support hypertables directly, use raw SQL migration
+model NodeMetric {
+  id              BigInt   @id @default(autoincrement())
+  time            DateTime @default(now())
+  nodeId          Int      @map("node_id")
+
+  // System metrics
+  cpuPercent      Float?   @map("cpu_percent")
+  ramUsed         BigInt?  @map("ram_used")
+  ramTotal        BigInt?  @map("ram_total")
+  uptime          Int?
+
+  // Storage metrics
+  fileSize        BigInt?  @map("file_size")
+  totalBytes      BigInt?  @map("total_bytes")
+  totalPages      Int?     @map("total_pages")
+  currentIndex    Int?     @map("current_index")
+  /// Total storage allocated in bytes (from v0.7.0+ get-pods-with-stats)
+  storageCommitted BigInt? @map("storage_committed")
+  /// Storage utilization percentage (from v0.7.0+ get-pods-with-stats)
+  storageUsagePercent Float? @map("storage_usage_percent")
+
+  // Network metrics
+  packetsReceived Int?     @map("packets_received")
+  packetsSent     Int?     @map("packets_sent")
+  activeStreams   Int?     @map("active_streams")
+
+  // Relations
+  node            Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId, time(sort: Desc)])
+  @@map("node_metrics")
+}
+
+/// Peer relationships between nodes (from get-pods)
+model NodePeer {
+  id            Int      @id @default(autoincrement())
+  nodeId        Int      @map("node_id")
+  peerNodeId    Int?     @map("peer_node_id")
+  /// Peer address if not yet registered as a node
+  peerAddress   String   @map("peer_address")
+  lastSeenAt    DateTime @map("last_seen_at")
+  peerVersion   String?  @map("peer_version")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  node          Node     @relation("NodePeers", fields: [nodeId], references: [id], onDelete: Cascade)
+  peerNode      Node?    @relation("PeeredByNodes", fields: [peerNodeId], references: [id], onDelete: SetNull)
+
+  @@unique([nodeId, peerAddress])
+  @@index([nodeId])
+  @@index([peerNodeId])
+  @@map("node_peers")
+}
+
+// ============================================
+// Aggregated Views (managed separately)
+// ============================================
+
+/// Network-wide aggregated statistics (computed periodically)
+model NetworkStats {
+  id              Int      @id @default(autoincrement())
+  time            DateTime @default(now())
+
+  totalNodes      Int      @map("total_nodes")
+  activeNodes     Int      @map("active_nodes")
+  totalStorage    BigInt   @map("total_storage")
+  avgCpuPercent   Float    @map("avg_cpu_percent")
+  avgRamPercent   Float    @map("avg_ram_percent")
+  avgUptime       Int      @map("avg_uptime")
+  totalPeers      Int      @map("total_peers")
+
+  /// JSON object tracking version distribution: { "0.6.0": 15, "0.5.1": 10, ... }
+  versionDistribution Json? @map("version_distribution")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([time(sort: Desc)])
+  @@map("network_stats")
+}
+
+/// Collection job tracking
+model CollectionJob {
+  id          Int      @id @default(autoincrement())
+  startedAt   DateTime @default(now()) @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  status      JobStatus @default(RUNNING)
+
+  nodesPolled   Int    @default(0) @map("nodes_polled")
+  nodesSuccess  Int    @default(0) @map("nodes_success")
+  nodesFailed   Int    @default(0) @map("nodes_failed")
+
+  errorMessage  String? @map("error_message")
+
+  @@index([status])
+  @@index([startedAt(sort: Desc)])
+  @@map("collection_jobs")
+}
+
+enum JobStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+// ============================================
+// Alerting System (Phase 3)
+// ============================================
+
+/// Alert rule definition
+model AlertRule {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+
+  /// Target nodes to monitor
+  targetType  AlertTargetType @default(ALL_NODES) @map("target_type")
+  nodeIds     Int[]           @map("node_ids")
+
+  /// Condition
+  metric      AlertMetric
+  operator    AlertOperator
+  threshold   Float
+  /// Duration in seconds the condition must hold (optional)
+  duration    Int?
+
+  /// Notification channels (JSON array of channel IDs)
+  channels    Json      @default("[]")
+  /// Cooldown between repeated alerts in seconds
+  cooldown    Int       @default(300)
+
+  /// Escalation policy (optional)
+  escalationPolicyId String? @map("escalation_policy_id")
+
+  /// State
+  isEnabled   Boolean   @default(true) @map("is_enabled")
+  lastTriggeredAt DateTime? @map("last_triggered_at")
+
+  /// Owner (session for anonymous, user for authenticated)
+  sessionId   String?   @map("session_id")
+  userId      String?   @map("user_id")
+
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  alerts      Alert[]
+  escalationPolicy EscalationPolicy? @relation(fields: [escalationPolicyId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@index([userId])
+  @@index([isEnabled])
+  @@index([escalationPolicyId])
+  @@map("alert_rules")
+}
+
+/// Triggered alert instance
+model Alert {
+  id          String      @id @default(cuid())
+  ruleId      String      @map("rule_id")
+  nodeId      Int?        @map("node_id")
+
+  /// Alert details
+  metric      AlertMetric
+  value       Float
+  threshold   Float
+  message     String
+
+  /// State
+  status      AlertStatus @default(ACTIVE)
+  triggeredAt DateTime    @default(now()) @map("triggered_at")
+  acknowledgedAt DateTime? @map("acknowledged_at")
+  resolvedAt  DateTime?   @map("resolved_at")
+  acknowledgedBy String?  @map("acknowledged_by")
+
+  /// Notification tracking
+  notificationsSent Json  @default("{}") @map("notifications_sent")
+
+  /// Escalation tracking
+  currentEscalationStep Int @default(0) @map("current_escalation_step")
+  lastEscalationAt DateTime? @map("last_escalation_at")
+
+  createdAt   DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  rule        AlertRule   @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  node        Node?       @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+
+  @@index([ruleId])
+  @@index([nodeId])
+  @@index([status])
+  @@index([triggeredAt(sort: Desc)])
+  @@map("alerts")
+}
+
+/// Notification channel configuration
+model NotificationChannel {
+  id          String                  @id @default(cuid())
+  type        NotificationChannelType
+  name        String
+  /// Type-specific configuration (email, webhook URL, chat ID, etc.)
+  config      Json
+  isVerified  Boolean                 @default(false) @map("is_verified")
+
+  /// Verification (for email)
+  verificationCode String?            @map("verification_code")
+  verificationExpiry DateTime?        @map("verification_expiry")
+
+  /// Owner
+  sessionId   String?                 @map("session_id")
+  userId      String?                 @map("user_id")
+
+  createdAt   DateTime                @default(now()) @map("created_at")
+  updatedAt   DateTime                @updatedAt @map("updated_at")
+
+  @@index([sessionId])
+  @@index([userId])
+  @@index([type])
+  @@map("notification_channels")
+}
+
+/// Escalation policy for unacknowledged alerts
+model EscalationPolicy {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+
+  /// Owner
+  sessionId   String?  @map("session_id")
+  userId      String?  @map("user_id")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  steps       EscalationStep[]
+  rules       AlertRule[]
+
+  @@index([sessionId])
+  @@index([userId])
+  @@map("escalation_policies")
+}
+
+/// Individual step in an escalation policy
+model EscalationStep {
+  id          String   @id @default(cuid())
+  policyId    String   @map("policy_id")
+
+  /// Order of this step (1, 2, 3...)
+  stepOrder   Int      @map("step_order")
+  /// Delay in minutes after alert before this step triggers
+  delayMinutes Int     @map("delay_minutes")
+  /// Channel IDs to notify at this step
+  channels    Json     @default("[]")
+  /// Optional: repeat notification every X minutes until acknowledged
+  repeatIntervalMinutes Int? @map("repeat_interval_minutes")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  policy      EscalationPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, stepOrder])
+  @@index([policyId])
+  @@map("escalation_steps")
+}
+
+// Enums for alerting
+
+enum AlertTargetType {
+  ALL_NODES
+  SPECIFIC_NODES
+  BOOKMARKED
+}
+
+enum AlertMetric {
+  CPU_PERCENT
+  RAM_PERCENT
+  STORAGE_SIZE
+  UPTIME
+  NODE_STATUS
+  PACKETS_RECEIVED
+  PACKETS_SENT
+}
+
+enum AlertOperator {
+  GT
+  GTE
+  LT
+  LTE
+  EQ
+  NEQ
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
+  SUPPRESSED
+}
+
+enum NotificationChannelType {
+  EMAIL
+  DISCORD
+  TELEGRAM
+}
+
+// ============================================
+// Operator Dashboard (Phase 3)
+// ============================================
+
+/// Portfolio of nodes an operator manages
+model Portfolio {
+  id          String   @id @default(cuid())
+  name        String   @default("My Portfolio")
+
+  /// Owner
+  sessionId   String?  @map("session_id")
+  userId      String?  @map("user_id")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  nodes       PortfolioNode[]
+  reports     ScheduledReport[]
+
+  @@index([sessionId])
+  @@index([userId])
+  @@map("portfolios")
+}
+
+/// Node membership in a portfolio
+model PortfolioNode {
+  id          String   @id @default(cuid())
+  portfolioId String   @map("portfolio_id")
+  nodeId      Int      @map("node_id")
+
+  /// Custom label for the node
+  label       String?
+  /// Is this node starred/favorited
+  isStarred   Boolean  @default(false) @map("is_starred")
+  /// Custom SLA target for this node (percentage, e.g., 99.9)
+  slaTarget   Float?   @map("sla_target")
+
+  addedAt     DateTime @default(now()) @map("added_at")
+
+  // Relations
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  node        Node      @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioId, nodeId])
+  @@index([portfolioId])
+  @@index([nodeId])
+  @@map("portfolio_nodes")
+}
+
+/// Uptime events for tracking node availability
+model UptimeEvent {
+  id          BigInt   @id @default(autoincrement())
+  nodeId      Int      @map("node_id")
+
+  /// Event type: node went online or offline
+  eventType   UptimeEventType @map("event_type")
+  /// When the event occurred
+  timestamp   DateTime @default(now())
+
+  /// For offline events, duration until next online (filled when resolved)
+  durationSeconds Int? @map("duration_seconds")
+
+  // Relations
+  node        Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId, timestamp(sort: Desc)])
+  @@index([eventType])
+  @@map("uptime_events")
+}
+
+enum UptimeEventType {
+  ONLINE
+  OFFLINE
+}
+
+// ============================================
+// Scheduled Reports (Phase 3)
+// ============================================
+
+/// Scheduled report configuration
+model ScheduledReport {
+  id          String   @id @default(cuid())
+  name        String
+
+  /// Report type determines content
+  reportType  ReportType @map("report_type")
+
+  /// Schedule configuration
+  schedule    ReportSchedule
+  /// Cron expression for custom schedules (optional)
+  cronExpr    String?  @map("cron_expr")
+  /// Timezone for scheduling (e.g., "America/New_York")
+  timezone    String   @default("UTC")
+  /// Hour to send (0-23)
+  sendHour    Int      @default(9) @map("send_hour")
+  /// Day of week for weekly (0=Sun, 1=Mon, etc.)
+  sendDayOfWeek Int?   @map("send_day_of_week")
+  /// Day of month for monthly (1-28)
+  sendDayOfMonth Int?  @map("send_day_of_month")
+
+  /// Recipients (JSON array of email addresses)
+  recipients  Json     @default("[]")
+  /// Notification channels to use (channel IDs)
+  channelIds  String[] @map("channel_ids")
+
+  /// Scope: portfolio nodes or all nodes
+  scope       ReportScope @default(PORTFOLIO)
+  /// If PORTFOLIO scope, which portfolio
+  portfolioId String?  @map("portfolio_id")
+
+  /// State
+  isEnabled   Boolean  @default(true) @map("is_enabled")
+  lastSentAt  DateTime? @map("last_sent_at")
+  nextSendAt  DateTime? @map("next_send_at")
+
+  /// Owner
+  sessionId   String?  @map("session_id")
+  userId      String?  @map("user_id")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  portfolio   Portfolio? @relation(fields: [portfolioId], references: [id], onDelete: SetNull)
+  deliveries  ReportDelivery[]
+
+  @@index([sessionId])
+  @@index([userId])
+  @@index([nextSendAt])
+  @@index([isEnabled])
+  @@map("scheduled_reports")
+}
+
+/// Report delivery log
+model ReportDelivery {
+  id          String   @id @default(cuid())
+  reportId    String   @map("report_id")
+
+  /// Delivery status
+  status      DeliveryStatus @default(PENDING)
+  /// Error message if failed
+  error       String?
+  /// Recipients this was sent to
+  recipients  Json     @default("[]")
+
+  /// Timestamps
+  scheduledFor DateTime @map("scheduled_for")
+  sentAt      DateTime? @map("sent_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  report      ScheduledReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([reportId])
+  @@index([status])
+  @@map("report_deliveries")
+}
+
+enum ReportType {
+  WEEKLY_SUMMARY
+  DAILY_DIGEST
+  MONTHLY_SLA
+  CUSTOM
+}
+
+enum ReportSchedule {
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+enum ReportScope {
+  ALL_NODES
+  PORTFOLIO
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+// ============================================
+// Public API (Phase 4)
+// ============================================
+
+/// API Key for public API access
+model ApiKey {
+  id              String   @id @default(cuid())
+  userId          String   @map("user_id")
+
+  /// Key name for identification
+  name            String
+  /// Key prefix for display (e.g., "pk_live_abc...")
+  prefix          String   @unique
+  /// Hashed key value (SHA-256)
+  keyHash         String   @map("key_hash")
+
+  /// Permissions/scopes (JSON array)
+  scopes          Json     @default("[\"read\"]")
+  /// Rate limit tier
+  tier            ApiKeyTier @default(FREE)
+
+  /// Last usage tracking
+  lastUsedAt      DateTime? @map("last_used_at")
+  /// Total request count
+  requestCount    BigInt   @default(0) @map("request_count")
+
+  /// Status
+  isActive        Boolean  @default(true) @map("is_active")
+  expiresAt       DateTime? @map("expires_at")
+  revokedAt       DateTime? @map("revoked_at")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usageLogs       ApiKeyUsage[]
+
+  @@index([userId])
+  @@index([prefix])
+  @@index([keyHash])
+  @@index([isActive])
+  @@map("api_keys")
+}
+
+/// API Key usage log for analytics and rate limiting
+model ApiKeyUsage {
+  id              BigInt   @id @default(autoincrement())
+  apiKeyId        String   @map("api_key_id")
+
+  /// Time bucket (hourly)
+  bucket          DateTime
+  /// Endpoint path
+  endpoint        String
+  /// HTTP method
+  method          String   @default("GET")
+
+  /// Request count in this bucket
+  requestCount    Int      @default(1) @map("request_count")
+  /// Total response time in ms
+  totalResponseMs Int      @default(0) @map("total_response_ms")
+  /// Error count
+  errorCount      Int      @default(0) @map("error_count")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  apiKey          ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@unique([apiKeyId, bucket, endpoint, method])
+  @@index([apiKeyId])
+  @@index([bucket])
+  @@map("api_key_usage")
+}
+
+enum ApiKeyTier {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+// ============================================
+// Community Features (Phase 4.5)
+// ============================================
+
+/// Operator public profile
+model OperatorProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique @map("user_id")
+
+  /// Display name (username)
+  displayName     String   @map("display_name")
+  /// Profile bio/description
+  bio             String?
+  /// Avatar URL
+  avatarUrl       String?  @map("avatar_url")
+  /// Website/social links (JSON)
+  links           Json     @default("[]")
+
+  /// Privacy settings
+  isPublic        Boolean  @default(true) @map("is_public")
+  showNodeStats   Boolean  @default(true) @map("show_node_stats")
+  showBadges      Boolean  @default(true) @map("show_badges")
+
+  /// Profile stats (denormalized for performance)
+  totalNodes      Int      @default(0) @map("total_nodes")
+  totalUptime     BigInt   @default(0) @map("total_uptime")
+  totalStorage    BigInt   @default(0) @map("total_storage")
+  avgCpuEfficiency Float   @default(0) @map("avg_cpu_efficiency")
+
+  /// Ranking (updated periodically)
+  rank            Int?
+  rankPeriod      String?  @map("rank_period")
+  rankUpdatedAt   DateTime? @map("rank_updated_at")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badges          OperatorBadge[]
+
+  @@index([displayName])
+  @@index([rank])
+  @@index([isPublic])
+  @@map("operator_profiles")
+}
+
+/// Achievement badge definition
+model Badge {
+  id              String   @id @default(cuid())
+
+  /// Badge identifier (e.g., "early_adopter", "uptime_champion")
+  slug            String   @unique
+  /// Display name
+  name            String
+  /// Description of how to earn it
+  description     String
+  /// Badge icon URL or emoji
+  icon            String
+  /// Badge tier/rarity
+  tier            BadgeTier @default(COMMON)
+
+  /// Achievement criteria (JSON)
+  /// e.g., { "type": "uptime", "threshold": 2592000 } (30 days in seconds)
+  criteria        Json
+
+  /// How many operators have earned this
+  earnedCount     Int      @default(0) @map("earned_count")
+
+  /// Is this badge currently available to earn
+  isActive        Boolean  @default(true) @map("is_active")
+  /// Display order
+  displayOrder    Int      @default(0) @map("display_order")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  operators       OperatorBadge[]
+
+  @@index([slug])
+  @@index([tier])
+  @@index([isActive])
+  @@map("badges")
+}
+
+/// Badge earned by an operator
+model OperatorBadge {
+  id              String   @id @default(cuid())
+  profileId       String   @map("profile_id")
+  badgeId         String   @map("badge_id")
+
+  /// When the badge was earned
+  earnedAt        DateTime @default(now()) @map("earned_at")
+  /// Achievement value when earned (e.g., uptime seconds)
+  achievementValue Float?  @map("achievement_value")
+  /// Optional node that triggered this badge
+  nodeId          Int?     @map("node_id")
+
+  /// Is this badge featured on profile
+  isFeatured      Boolean  @default(false) @map("is_featured")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Relations
+  profile         OperatorProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  badge           Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, badgeId])
+  @@index([profileId])
+  @@index([badgeId])
+  @@index([earnedAt(sort: Desc)])
+  @@map("operator_badges")
+}
+
+enum BadgeTier {
+  COMMON
+  UNCOMMON
+  RARE
+  EPIC
+  LEGENDARY
+}

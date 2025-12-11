@@ -1,0 +1,39 @@
+{
+  "name": "pnode-pulse-grafana-datasource",
+  "version": "1.0.0",
+  "description": "Grafana data source plugin for pNode Pulse API",
+  "scripts": {
+    "build": "webpack -c webpack.config.ts --env production",
+    "dev": "webpack -w -c webpack.config.ts --env development",
+    "test": "jest --passWithNoTests",
+    "lint": "eslint --cache --ext .ts,.tsx src",
+    "typecheck": "tsc --noEmit"
+  },
+  "author": "RECTOR-LABS",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@grafana/data": "^10.2.0",
+    "@grafana/runtime": "^10.2.0",
+    "@grafana/ui": "^10.2.0",
+    "@grafana/toolkit": "^10.2.0",
+    "@types/lodash": "^4.14.202",
+    "@types/node": "^20.10.0",
+    "copy-webpack-plugin": "^11.0.0",
+    "css-loader": "^6.8.1",
+    "eslint": "^8.55.0",
+    "replace-in-file-webpack-plugin": "^1.0.6",
+    "sass": "^1.69.5",
+    "sass-loader": "^13.3.2",
+    "style-loader": "^3.3.3",
+    "ts-loader": "^9.5.1",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.3.2",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "lodash": "^4.17.21",
+    "tslib": "^2.6.2"
+  }
+}

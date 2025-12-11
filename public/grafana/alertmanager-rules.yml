@@ -1,0 +1,95 @@
+# pNode Pulse - Alertmanager Rules
+# Import these rules into your Prometheus/Alertmanager setup
+
+groups:
+  - name: pnode_alerts
+    rules:
+      # Node Down Alert
+      - alert: PNodeDown
+        expr: pnode_up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "pNode {{ $labels.node }} is down"
+          description: "pNode {{ $labels.node }} has been offline for more than 5 minutes."
+
+      # High CPU Usage
+      - alert: PNodeHighCPU
+        expr: pnode_cpu_percent > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU on pNode {{ $labels.node }}"
+          description: "pNode {{ $labels.node }} CPU usage is {{ $value | printf \"%.1f\" }}% (threshold: 80%)."
+
+      # Critical CPU Usage
+      - alert: PNodeCriticalCPU
+        expr: pnode_cpu_percent > 95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical CPU on pNode {{ $labels.node }}"
+          description: "pNode {{ $labels.node }} CPU usage is {{ $value | printf \"%.1f\" }}% (threshold: 95%)."
+
+      # High RAM Usage
+      - alert: PNodeHighRAM
+        expr: pnode_ram_percent > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High RAM on pNode {{ $labels.node }}"
+          description: "pNode {{ $labels.node }} RAM usage is {{ $value | printf \"%.1f\" }}% (threshold: 85%)."
+
+      # Critical RAM Usage
+      - alert: PNodeCriticalRAM
+        expr: pnode_ram_percent > 95
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical RAM on pNode {{ $labels.node }}"
+          description: "pNode {{ $labels.node }} RAM usage is {{ $value | printf \"%.1f\" }}% (threshold: 95%)."
+
+      # Low Peer Count
+      - alert: PNodeLowPeers
+        expr: pnode_peer_count < 10
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low peer count on pNode {{ $labels.node }}"
+          description: "pNode {{ $labels.node }} has only {{ $value }} peers (threshold: 10)."
+
+      # Network Health - Too Many Offline Nodes
+      - alert: PNodeNetworkDegraded
+        expr: (pnode_active_nodes / pnode_total_nodes) * 100 < 90
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "pNode network health degraded"
+          description: "Only {{ $value | printf \"%.1f\" }}% of pNodes are online (threshold: 90%)."
+
+      # Network Health - Critical
+      - alert: PNodeNetworkCritical
+        expr: (pnode_active_nodes / pnode_total_nodes) * 100 < 75
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "pNode network health critical"
+          description: "Only {{ $value | printf \"%.1f\" }}% of pNodes are online (threshold: 75%)."
+
+      # Node Restarted (uptime reset)
+      - alert: PNodeRestarted
+        expr: changes(pnode_uptime_seconds[1h]) > 0 and pnode_uptime_seconds < 3600
+        for: 1m
+        labels:
+          severity: info
+        annotations:
+          summary: "pNode {{ $labels.node }} was restarted"
+          description: "pNode {{ $labels.node }} uptime is {{ $value | humanizeDuration }}, indicating a recent restart."
