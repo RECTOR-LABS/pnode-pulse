@@ -6,6 +6,7 @@ import { StatCard } from "@/components/ui/stat-card";
 import { CollectionStatus } from "@/components/ui/collection-status";
 import { NetworkHealth } from "@/components/ui/network-health";
 import { GraveyardStats } from "@/components/dashboard/graveyard-stats";
+import { IpChangesWidget } from "@/components/dashboard/ip-changes-widget";
 import { formatBytes, formatUptime, formatPercent, formatNumber } from "@/lib/utils/format";
 import { NODE_REFETCH_INTERVAL_MS } from "@/lib/constants/limits";
 
@@ -159,10 +160,13 @@ export function NetworkOverview() {
         </div>
       </div>
 
-      {/* Network History & Collection Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Network History & Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Graveyard Stats (#167) */}
         <GraveyardStats />
+
+        {/* IP Changes (#169) */}
+        <IpChangesWidget />
 
         {/* Collection Status */}
         <div className="card p-6">

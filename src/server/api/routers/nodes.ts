@@ -584,4 +584,77 @@ export const nodesRouter = createTRPCRouter({
 
       return node;
     }),
+
+  /**
+   * #169: Get recent IP address changes across the network
+   */
+  recentAddressChanges: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(20),
+        range: z.enum(["24h", "7d", "30d"]).default("7d"),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const { limit, range } = input;
+
+      const rangeMs = {
+        "24h": 24 * 60 * 60 * 1000,
+        "7d": 7 * 24 * 60 * 60 * 1000,
+        "30d": 30 * 24 * 60 * 60 * 1000,
+      };
+
+      const since = new Date(Date.now() - rangeMs[range]);
+
+      const changes = await ctx.db.nodeAddressChange.findMany({
+        where: {
+          detectedAt: { gte: since },
+        },
+        orderBy: { detectedAt: "desc" },
+        take: limit,
+        include: {
+          node: {
+            select: {
+              id: true,
+              pubkey: true,
+              version: true,
+              isActive: true,
+            },
+          },
+        },
+      });
+
+      // Get count of total changes in period
+      const totalCount = await ctx.db.nodeAddressChange.count({
+        where: {
+          detectedAt: { gte: since },
+        },
+      });
+
+      // Get count of unique nodes that changed
+      const uniqueNodes = await ctx.db.nodeAddressChange.groupBy({
+        by: ["nodeId"],
+        where: {
+          detectedAt: { gte: since },
+        },
+      });
+
+      return {
+        changes: changes.map((c) => ({
+          id: c.id.toString(),
+          nodeId: c.nodeId,
+          pubkey: c.node.pubkey,
+          version: c.node.version,
+          isActive: c.node.isActive,
+          oldAddress: c.oldAddress,
+          newAddress: c.newAddress,
+          detectedAt: c.detectedAt,
+        })),
+        stats: {
+          totalChanges: totalCount,
+          uniqueNodes: uniqueNodes.length,
+          range,
+        },
+      };
+    }),
 });
