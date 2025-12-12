@@ -638,7 +638,7 @@ From Fortune (Dec 8):
 Updated to 8 IPs (removed dead 192.190.136.37). Skipp's list was accurate.
 
 **Action Items** (Dec 12-13):
-- [ ] [Issue #175](https://github.com/RECTOR-LABS/pnode-pulse/issues/175) - Investigate `get-pods-with-stats` vs `get-stats` data completeness
+- ✅ [Issue #175](https://github.com/RECTOR-LABS/pnode-pulse/issues/175) - Hybrid collection for private nodes - CLOSED
 - ✅ Verify 192.190.136.37 - CONFIRMED DEAD, removed from list
 
 ### Community Libraries
