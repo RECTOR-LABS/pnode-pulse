@@ -385,6 +385,44 @@ See GitHub Issues and Milestones for current work.
 - Response structure from `get-stats` is FLAT (differs from official docs)
 - `get-pods` includes `pubkey` field not documented officially
 
+## Official Documentation Review (#168 - Dec 13, 2025)
+
+### Documentation Sources
+
+| URL | Content | Status |
+|-----|---------|--------|
+| https://docs.xandeum.network/api/pnode-rpc-prpc-reference | pRPC API Reference | ✅ Reviewed |
+| https://docs.xandeum.network/xandeum-pnode-setup-guide | Setup Guide (v0.7 Heidelberg) | ✅ Reviewed |
+| https://docs.xandeum.network | Main docs index | ✅ Reviewed |
+
+### Discrepancies Found
+
+**1. get-stats Response Structure**
+- **Official Docs**: NESTED structure (`metadata.total_bytes`, `stats.cpu_percent`)
+- **Actual API**: FLAT structure (`total_bytes`, `cpu_percent` at root)
+- **Our Implementation**: ✅ Correctly uses FLAT structure based on actual responses
+
+**2. get-pods pubkey Field**
+- **Official Docs**: NOT documented
+- **Actual API**: Returns `pubkey` (string | null) for each pod
+- **Our Implementation**: ✅ Correctly handles as nullable
+
+**3. get-pods-with-stats Method**
+- **Official Docs**: NOT documented (v0.7.0 feature)
+- **Source**: Discord intelligence from Brad (Dec 8-10, 2025)
+- **Our Implementation**: ✅ Based on actual API responses, fully typed
+
+**4. get-pods last_seen Field**
+- **Official Docs**: Shows `last_seen` (human-readable string)
+- **Actual API**: Uses `last_seen_timestamp` (unix number)
+- **Our Implementation**: ✅ Uses timestamp version
+
+### Conclusion
+
+Our implementation is **correct** - based on actual API behavior rather than outdated docs.
+Official documentation appears to be behind the actual API implementation.
+Discord intelligence from Brad/Xandeum team has been accurate source of truth.
+
 ## Xandeum API Intelligence (Discord #apps-developers, Dec 6-8, 2024)
 
 ### Network Statistics (from community analysis)
