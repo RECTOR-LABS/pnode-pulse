@@ -157,7 +157,7 @@ async function getOrCreateNode(
 }
 
 /**
- * Save metrics for a node
+ * Save metrics for a node (full stats from get-stats)
  */
 async function saveMetrics(
   nodeId: number,
@@ -182,6 +182,49 @@ async function saveMetrics(
       // v0.7.0+ fields from get-pods-with-stats
       storageCommitted: storageCommitted !== undefined ? storageCommitted : null,
       storageUsagePercent: storageUsagePercent !== undefined ? storageUsagePercent : null,
+    },
+  });
+}
+
+/**
+ * Save partial metrics for a node (limited data from get-pods-with-stats)
+ *
+ * Used for private nodes that we can't query directly.
+ * Brown's observation (Dec 11, 2025): get-pods-with-stats returns less
+ * complete data than get-stats, but it's the only source for private nodes.
+ *
+ * Fields available from get-pods-with-stats:
+ * - uptime, storage_committed, storage_used, storage_usage_percent
+ *
+ * Fields NOT available (only from get-stats):
+ * - cpu_percent, ram_used, ram_total, active_streams, packets_*, etc.
+ */
+async function savePartialMetrics(
+  nodeId: number,
+  uptime: number,
+  storageCommitted: bigint | null,
+  storageUsed: bigint | null,
+  storageUsagePercent: number | null
+) {
+  await db.nodeMetric.create({
+    data: {
+      nodeId,
+      uptime,
+      // Storage fields from get-pods-with-stats
+      storageCommitted,
+      storageUsagePercent,
+      // Use storage_used as totalBytes since it represents actual data stored
+      totalBytes: storageUsed,
+      // Fields we don't have from get-pods-with-stats - set to null/0
+      cpuPercent: null,
+      ramUsed: null,
+      ramTotal: null,
+      fileSize: null,
+      totalPages: null,
+      currentIndex: null,
+      packetsReceived: null,
+      packetsSent: null,
+      activeStreams: null,
     },
   });
 }
@@ -347,6 +390,122 @@ async function discoverNodes(results: CollectionResult[]) {
 }
 
 /**
+ * Process metrics for private nodes from get-pods-with-stats data
+ *
+ * For nodes we can't query directly (private nodes), we use the data
+ * reported by public nodes via get-pods-with-stats. This gives us:
+ * - uptime, storage_committed, storage_used, storage_usage_percent
+ *
+ * Issue #175: Brown noted get-pods-with-stats is less complete than get-stats,
+ * but it's the only source of metrics for private nodes (~83% of network).
+ */
+async function processPrivateNodeMetrics(
+  results: CollectionResult[],
+  successfulAddresses: Set<string>
+) {
+  // Collect all pod data from successful queries, deduplicated by pubkey/address
+  const podDataMap = new Map<string, {
+    nodeId?: number;
+    address: string;
+    pubkey: string | null;
+    uptime: number;
+    storageCommitted: bigint | null;
+    storageUsed: bigint | null;
+    storageUsagePercent: number | null;
+    isPublic: boolean | null;
+    version: string;
+  }>();
+
+  for (const result of results) {
+    if (!result.success || !result.pods) continue;
+
+    for (const pod of result.pods.pods) {
+      const rpcAddress = pod.address.replace(":9001", `:${PRPC_PORT}`);
+      const key = pod.pubkey || rpcAddress;
+
+      // Skip if we already successfully queried this node directly
+      if (successfulAddresses.has(rpcAddress)) continue;
+
+      // Skip if uptime is null (no useful metrics to save)
+      if (pod.uptime === null) continue;
+
+      // Store/update pod data (later results may have fresher data)
+      podDataMap.set(key, {
+        address: rpcAddress,
+        pubkey: pod.pubkey,
+        uptime: pod.uptime,
+        storageCommitted: pod.storage_committed !== null ? BigInt(pod.storage_committed) : null,
+        storageUsed: pod.storage_used !== null ? BigInt(pod.storage_used) : null,
+        storageUsagePercent: pod.storage_usage_percent,
+        isPublic: pod.is_public,
+        version: pod.version,
+      });
+    }
+  }
+
+  if (podDataMap.size === 0) return;
+
+  // Look up node IDs for the pods we have data for
+  const addresses = Array.from(podDataMap.values()).map((p) => p.address);
+  const existingNodes = await db.node.findMany({
+    where: { address: { in: addresses } },
+    select: { id: true, address: true, pubkey: true },
+  });
+
+  // Map addresses/pubkeys to node IDs
+  const addressToId = new Map<string, number>();
+  const pubkeyToId = new Map<string, number>();
+  for (const node of existingNodes) {
+    addressToId.set(node.address, node.id);
+    if (node.pubkey) {
+      pubkeyToId.set(node.pubkey, node.id);
+    }
+  }
+
+  // Save partial metrics and update node status
+  let savedCount = 0;
+  for (const [key, podData] of podDataMap) {
+    // Find node ID by pubkey first, then address
+    let nodeId = podData.pubkey ? pubkeyToId.get(podData.pubkey) : undefined;
+    if (!nodeId) {
+      nodeId = addressToId.get(podData.address);
+    }
+
+    if (!nodeId) {
+      // Node doesn't exist yet - will be created by discoverNodes
+      continue;
+    }
+
+    // Save partial metrics from pods data
+    await savePartialMetrics(
+      nodeId,
+      podData.uptime,
+      podData.storageCommitted,
+      podData.storageUsed,
+      podData.storageUsagePercent
+    );
+
+    // Update node status - mark as active since we see it in gossip
+    // Also update version and isPublic from pods data
+    await db.node.update({
+      where: { id: nodeId },
+      data: {
+        isActive: true,
+        lastSeen: new Date(),
+        version: podData.version,
+        isPublic: podData.isPublic,
+      },
+    });
+
+    savedCount++;
+  }
+
+  if (savedCount > 0) {
+    logger.info("Saved partial metrics for private nodes", { count: savedCount });
+  }
+}
+
+/**
  * Update peer relationships
  */
 async function updatePeers(nodeId: number, pods: PodsWithStatsResult) {
@@ -496,6 +655,7 @@ export async function runCollection(): Promise<{
 
     let successCount = 0;
     let failedCount = 0;
+    const successfulAddresses = new Set<string>(); // Track nodes we successfully queried
 
     // Process results
     for (const result of results) {
@@ -533,6 +693,7 @@ export async function runCollection(): Promise<{
       if (result.success && result.stats) {
         await saveMetrics(node.id, result.stats, storageCommitted, storageUsagePercent);
         await updateNodeStatus(node.id, true, result.version?.version);
+        successfulAddresses.add(result.address); // Track successful query
 
         // Publish real-time metrics update
         const ramPercent = result.stats.ram_total > 0
@@ -563,6 +724,10 @@ export async function runCollection(): Promise<{
     await discoverNodes(results);
     const discoveredAfter = await db.node.count();
     const discovered = discoveredAfter - discoveredBefore;
+
+    // Process metrics for private nodes from get-pods-with-stats data (#175)
+    // For nodes we can't query directly, save what we can from federated data
+    await processPrivateNodeMetrics(results, successfulAddresses);
 
     // Compute network stats
     await computeNetworkStats();
