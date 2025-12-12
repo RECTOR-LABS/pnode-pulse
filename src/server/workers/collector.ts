@@ -343,29 +343,53 @@ async function discoverNodes(results: CollectionResult[]) {
     logger.info("Detected IP address changes during discovery", { count: ipChanges.length });
 
     for (const change of ipChanges) {
-      // Log the change
-      await db.nodeAddressChange.create({
-        data: {
-          nodeId: change.nodeId,
+      try {
+        // Check if new address already exists for another node
+        const existingWithAddress = await db.node.findUnique({
+          where: { address: change.newAddress },
+        });
+
+        if (existingWithAddress && existingWithAddress.id !== change.nodeId) {
+          // Address conflict - another node has this address
+          // Skip update to avoid unique constraint violation
+          logger.warn("IP change skipped - address already exists", {
+            pubkey: change.pubkey,
+            oldAddress: change.oldAddress,
+            newAddress: change.newAddress,
+            conflictingNodeId: existingWithAddress.id,
+          });
+          continue;
+        }
+
+        // Log the change
+        await db.nodeAddressChange.create({
+          data: {
+            nodeId: change.nodeId,
+            oldAddress: change.oldAddress,
+            newAddress: change.newAddress,
+          },
+        });
+
+        // Update the node's address
+        await db.node.update({
+          where: { id: change.nodeId },
+          data: {
+            address: change.newAddress,
+            gossipAddress: change.newAddress.replace(`:${PRPC_PORT}`, ":9001"),
+          },
+        });
+
+        logger.info("Node IP address changed", {
+          pubkey: change.pubkey,
           oldAddress: change.oldAddress,
           newAddress: change.newAddress,
-        },
-      });
-
-      // Update the node's address
-      await db.node.update({
-        where: { id: change.nodeId },
-        data: {
-          address: change.newAddress,
-          gossipAddress: change.newAddress.replace(`:${PRPC_PORT}`, ":9001"),
-        },
-      });
-
-      logger.info("Node IP address changed", {
-        pubkey: change.pubkey,
-        oldAddress: change.oldAddress,
-        newAddress: change.newAddress,
-      });
+        });
+      } catch (error) {
+        logger.error("Failed to process IP change", {
+          pubkey: change.pubkey,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
   }
 
