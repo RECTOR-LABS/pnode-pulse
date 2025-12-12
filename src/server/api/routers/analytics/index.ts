@@ -15,6 +15,7 @@ import { forecastingRouter } from "./forecasting";
 import { peersRouter } from "./peers";
 import { degradationRouter } from "./degradation";
 import { growthRouter } from "./growth";
+import { graveyardRouter } from "./graveyard";
 
 export const analyticsRouter = createTRPCRouter({
   // Health Analytics
@@ -48,4 +49,7 @@ export const analyticsRouter = createTRPCRouter({
 
   // Growth Modeling
   ...growthRouter._def.procedures,
+
+  // Graveyard (archived nodes)
+  graveyard: graveyardRouter,
 });

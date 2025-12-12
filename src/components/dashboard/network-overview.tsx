@@ -1,11 +1,11 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Suspense } from "react";
 import { trpc } from "@/lib/trpc";
 import { StatCard } from "@/components/ui/stat-card";
 import { CollectionStatus } from "@/components/ui/collection-status";
 import { NetworkHealth } from "@/components/ui/network-health";
+import { GraveyardStats } from "@/components/dashboard/graveyard-stats";
 import { formatBytes, formatUptime, formatPercent, formatNumber } from "@/lib/utils/format";
 import { NODE_REFETCH_INTERVAL_MS } from "@/lib/constants/limits";
 
@@ -159,17 +159,23 @@ export function NetworkOverview() {
         </div>
       </div>
 
-      {/* Collection Status */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold mb-4">Collection Status</h2>
-        {collectionStatus ? (
-          <CollectionStatus
-            latest={collectionStatus.latest}
-            recent={collectionStatus.recent}
-          />
-        ) : (
-          <div className="text-muted-foreground text-sm py-4">Loading...</div>
-        )}
+      {/* Network History & Collection Status */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Graveyard Stats (#167) */}
+        <GraveyardStats />
+
+        {/* Collection Status */}
+        <div className="card p-6">
+          <h2 className="text-lg font-semibold mb-4">Collection Status</h2>
+          {collectionStatus ? (
+            <CollectionStatus
+              latest={collectionStatus.latest}
+              recent={collectionStatus.recent}
+            />
+          ) : (
+            <div className="text-muted-foreground text-sm py-4">Loading...</div>
+          )}
+        </div>
       </div>
 
       {/* Quick Stats Row */}
