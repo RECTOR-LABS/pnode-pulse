@@ -66,6 +66,12 @@ async function collectFromNode(address: string): Promise<CollectionResult> {
 
 /**
  * Get or create a node in the database
+ *
+ * Matching strategy (per Brad's recommendation):
+ * 1. First try to find by pubkey (immutable identifier)
+ * 2. If found by pubkey but address differs, log the IP change and update address
+ * 3. If not found by pubkey, try by address (legacy fallback)
+ * 4. Create new node if neither found
  */
 async function getOrCreateNode(
   address: string,
@@ -74,25 +80,70 @@ async function getOrCreateNode(
   isPublic?: boolean | null,
   rpcPort?: number | null
 ) {
-  const existing = await db.node.findUnique({ where: { address } });
+  // Strategy 1: Try to find by pubkey first (preferred - pubkey is immutable)
+  if (pubkey) {
+    const existingByPubkey = await db.node.findUnique({ where: { pubkey } });
 
-  if (existing) {
-    // Update if we have new info
-    if (version || pubkey || isPublic !== undefined || rpcPort !== undefined) {
+    if (existingByPubkey) {
+      // Check if IP address changed
+      if (existingByPubkey.address !== address) {
+        // Log the IP change
+        await db.nodeAddressChange.create({
+          data: {
+            nodeId: existingByPubkey.id,
+            oldAddress: existingByPubkey.address,
+            newAddress: address,
+          },
+        });
+
+        logger.info("Node IP address changed", {
+          pubkey,
+          oldAddress: existingByPubkey.address,
+          newAddress: address,
+        });
+      }
+
+      // Update node with new address and other info
       return db.node.update({
-        where: { id: existing.id },
+        where: { id: existingByPubkey.id },
         data: {
-          version: version ?? existing.version,
-          pubkey: pubkey ?? existing.pubkey,
-          isPublic: isPublic !== undefined ? isPublic : existing.isPublic,
-          rpcPort: rpcPort !== undefined ? rpcPort : existing.rpcPort,
+          address, // Update to new address
+          gossipAddress: address.replace(`:${PRPC_PORT}`, ":9001"),
+          version: version ?? existingByPubkey.version,
+          isPublic: isPublic !== undefined ? isPublic : existingByPubkey.isPublic,
+          rpcPort: rpcPort !== undefined ? rpcPort : existingByPubkey.rpcPort,
         },
       });
     }
-    return existing;
   }
 
-  // Create new node
+  // Strategy 2: Fallback to address matching (for legacy nodes without pubkey)
+  const existingByAddress = await db.node.findUnique({ where: { address } });
+
+  if (existingByAddress) {
+    // Update if we have new info (but don't overwrite existing pubkey with null)
+    const shouldUpdate =
+      version ||
+      (pubkey && !existingByAddress.pubkey) ||
+      isPublic !== undefined ||
+      rpcPort !== undefined;
+
+    if (shouldUpdate) {
+      return db.node.update({
+        where: { id: existingByAddress.id },
+        data: {
+          version: version ?? existingByAddress.version,
+          // Only set pubkey if it doesn't already exist (first time seeing it)
+          pubkey: existingByAddress.pubkey ?? pubkey,
+          isPublic: isPublic !== undefined ? isPublic : existingByAddress.isPublic,
+          rpcPort: rpcPort !== undefined ? rpcPort : existingByAddress.rpcPort,
+        },
+      });
+    }
+    return existingByAddress;
+  }
+
+  // Strategy 3: Create new node
   return db.node.create({
     data: {
       address,
@@ -151,15 +202,27 @@ async function updateNodeStatus(nodeId: number, isActive: boolean, version?: str
 
 /**
  * Process discovered peers and add new nodes
+ *
+ * Uses pubkey as primary identifier (per Brad's recommendation):
+ * - If pubkey exists, check if node already known by pubkey
+ * - If known by pubkey but address differs, log IP change
+ * - Fall back to address matching for legacy nodes without pubkey
  */
 async function discoverNodes(results: CollectionResult[]) {
-  const knownAddresses = new Set<string>();
+  // Get all known nodes with both address and pubkey
+  const existingNodes = await db.node.findMany({
+    select: { id: true, address: true, pubkey: true },
+  });
 
-  // Get all known addresses
-  const existingNodes = await db.node.findMany({ select: { address: true } });
-  existingNodes.forEach((n) => knownAddresses.add(n.address));
+  const knownAddresses = new Set<string>(existingNodes.map((n) => n.address));
+  const knownPubkeys = new Map<string, { id: number; address: string }>();
+  existingNodes.forEach((n) => {
+    if (n.pubkey) {
+      knownPubkeys.set(n.pubkey, { id: n.id, address: n.address });
+    }
+  });
 
-  // Find new nodes from pods responses
+  // Track what we discover
   const newNodes: Array<{
     address: string;
     pubkey: string | null;
@@ -168,6 +231,16 @@ async function discoverNodes(results: CollectionResult[]) {
     rpcPort: number | null;
   }> = [];
 
+  const ipChanges: Array<{
+    nodeId: number;
+    oldAddress: string;
+    newAddress: string;
+    pubkey: string;
+  }> = [];
+
+  // Process seen addresses/pubkeys to avoid duplicates within this batch
+  const seenInBatch = new Set<string>();
+
   for (const result of results) {
     if (!result.success || !result.pods) continue;
 
@@ -175,22 +248,87 @@ async function discoverNodes(results: CollectionResult[]) {
       // Convert gossip address to RPC address
       const rpcAddress = pod.address.replace(":9001", `:${PRPC_PORT}`);
 
-      if (!knownAddresses.has(rpcAddress)) {
-        knownAddresses.add(rpcAddress);
-        newNodes.push({
-          address: rpcAddress,
-          pubkey: pod.pubkey,
-          version: pod.version,
-          isPublic: pod.is_public,
-          rpcPort: pod.rpc_port,
-        });
+      // Skip if already processed in this batch
+      const batchKey = pod.pubkey || rpcAddress;
+      if (seenInBatch.has(batchKey)) continue;
+      seenInBatch.add(batchKey);
+
+      // Strategy 1: Check by pubkey first (preferred)
+      if (pod.pubkey && knownPubkeys.has(pod.pubkey)) {
+        const existing = knownPubkeys.get(pod.pubkey)!;
+
+        // Detect IP change
+        if (existing.address !== rpcAddress) {
+          ipChanges.push({
+            nodeId: existing.id,
+            oldAddress: existing.address,
+            newAddress: rpcAddress,
+            pubkey: pod.pubkey,
+          });
+
+          // Update our local tracking
+          knownAddresses.delete(existing.address);
+          knownAddresses.add(rpcAddress);
+          knownPubkeys.set(pod.pubkey, { id: existing.id, address: rpcAddress });
+        }
+        continue; // Node already exists
       }
+
+      // Strategy 2: Check by address (legacy fallback)
+      if (knownAddresses.has(rpcAddress)) {
+        continue; // Node already exists
+      }
+
+      // Strategy 3: Truly new node
+      knownAddresses.add(rpcAddress);
+      if (pod.pubkey) {
+        knownPubkeys.set(pod.pubkey, { id: -1, address: rpcAddress }); // -1 = pending creation
+      }
+
+      newNodes.push({
+        address: rpcAddress,
+        pubkey: pod.pubkey,
+        version: pod.version,
+        isPublic: pod.is_public,
+        rpcPort: pod.rpc_port,
+      });
+    }
+  }
+
+  // Process IP changes
+  if (ipChanges.length > 0) {
+    logger.info("Detected IP address changes during discovery", { count: ipChanges.length });
+
+    for (const change of ipChanges) {
+      // Log the change
+      await db.nodeAddressChange.create({
+        data: {
+          nodeId: change.nodeId,
+          oldAddress: change.oldAddress,
+          newAddress: change.newAddress,
+        },
+      });
+
+      // Update the node's address
+      await db.node.update({
+        where: { id: change.nodeId },
+        data: {
+          address: change.newAddress,
+          gossipAddress: change.newAddress.replace(`:${PRPC_PORT}`, ":9001"),
+        },
+      });
+
+      logger.info("Node IP address changed", {
+        pubkey: change.pubkey,
+        oldAddress: change.oldAddress,
+        newAddress: change.newAddress,
+      });
     }
   }
 
   // Create new nodes
   if (newNodes.length > 0) {
-    logger.info('Discovered new nodes', { count: newNodes.length });
+    logger.info("Discovered new nodes", { count: newNodes.length });
 
     for (const node of newNodes) {
       await db.node.create({

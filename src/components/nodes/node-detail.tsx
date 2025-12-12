@@ -48,6 +48,11 @@ export function NodeDetail({ nodeId }: NodeDetailProps) {
 
   const { data: peers, isLoading: peersLoading } = trpc.nodes.peers.useQuery(nodeId);
 
+  const { data: addressHistory } = trpc.nodes.addressHistory.useQuery(
+    { nodeId, limit: 10 },
+    { enabled: !!node }
+  );
+
   if (nodeLoading) {
     return <NodeDetailSkeleton />;
   }
@@ -236,6 +241,37 @@ export function NodeDetail({ nodeId }: NodeDetailProps) {
         </div>
         <PeerList peers={peers || []} isLoading={peersLoading} />
       </div>
+
+      {/* IP Address History */}
+      {addressHistory && addressHistory.length > 0 && (
+        <div className="card p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <HistoryIcon />
+            <h2 className="text-lg font-semibold">IP Address History</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            This node has changed IP addresses {addressHistory.length} time{addressHistory.length > 1 ? "s" : ""}.
+            The pubkey remains constant across IP changes.
+          </p>
+          <div className="space-y-3">
+            {addressHistory.map((change) => (
+              <div
+                key={change.id}
+                className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg text-sm"
+              >
+                <div className="flex items-center gap-2 font-mono">
+                  <span className="text-muted-foreground">{formatAddress(change.oldAddress)}</span>
+                  <ArrowRightIcon />
+                  <span className="text-foreground font-medium">{formatAddress(change.newAddress)}</span>
+                </div>
+                <span className="text-muted-foreground ml-auto">
+                  {formatRelativeTime(new Date(change.detectedAt))}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -292,6 +328,22 @@ function PageIcon() {
   return (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+    </svg>
+  );
+}
+
+function HistoryIcon() {
+  return (
+    <svg className="w-5 h-5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  );
+}
+
+function ArrowRightIcon() {
+  return (
+    <svg className="w-4 h-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
     </svg>
   );
 }
