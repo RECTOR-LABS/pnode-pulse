@@ -1,118 +1,220 @@
 # pNode Pulse
 
+[![Live Demo](https://img.shields.io/badge/demo-pulse.rectorspace.com-blue?style=for-the-badge)](https://pulse.rectorspace.com)
+[![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+
 **Real-time analytics platform for Xandeum's pNode network**
 
-## What is This?
+> Built for the [Superteam Bounty: Build Analytics Platform for Xandeum pNodes](https://earn.superteam.fun/listing/build-analytics-platform-for-xandeum-pnodes/)
 
-A public dashboard for monitoring and exploring Xandeum's distributed storage network (pNodes). Think Solscan/Filfox but for Xandeum's storage layer.
+---
 
-## The Problem
+## Live Demo
 
-Xandeum is building a scalable storage layer for Solana with distributed pNodes, but there's **no public explorer** to monitor:
-- Network health & total capacity
-- Individual pNode performance
-- Storage utilization & growth trends
-- Peer connectivity & uptime
+**[pulse.rectorspace.com](https://pulse.rectorspace.com)**
 
-## The Solution
+![pNode Pulse Dashboard](docs/assets/dashboard-preview.png)
 
-A comprehensive analytics platform that aggregates pNode data via pRPC and presents it in an intuitive dashboard.
+---
 
-## Technical Context
+## Features
 
-### Xandeum Overview
-- **What**: Scalable storage layer for Solana programs
-- **How**: Distributed pNodes store encrypted data pages with configurable redundancy
-- **Why**: Solana accounts are expensive; Xandeum provides "disk" to Solana's "RAM"
+### Network Overview
+- **Real-time node discovery** via pRPC `get-pods-with-stats` (v0.7.0+)
+- **146+ nodes tracked** with automatic IP change detection
+- **Network health metrics**: CPU, RAM, storage, uptime
+- **Version distribution** across the network
 
-### pRPC API (Data Source)
-Base: `http://<pnode-ip>:6000/rpc` (JSON-RPC 2.0)
+### Storage Analytics
+- **1.7+ PB total network storage** capacity tracking
+- **Storage utilization** per node and network-wide
+- **Capacity projections** based on growth trends
+- **Public vs Private node** classification
 
-| Method | Returns |
-|--------|---------|
-| `get-version` | pNode software version |
-| `get-stats` | CPU, RAM, uptime, packets, storage metrics |
-| `get-pods` | Network peers (address, version, last seen) |
+### Node Monitoring
+- **Individual node details** with full metrics history
+- **Performance comparison** across nodes
+- **Node leaderboard** by storage/uptime
+- **Graveyard tracker** for inactive nodes
 
-### Network Ports
-| Port | Service |
-|------|---------|
-| 6000 | pRPC API |
-| 9001 | Gossip protocol |
-| 5000 | Atlas server |
-| 80 | Stats dashboard (localhost) |
+### Advanced Features
+- **IP change tracking** with historical logs
+- **TimescaleDB** for time-series analytics
+- **Auto-discovery** via gossip network
+- **Blue/green deployment** for zero downtime
 
-### Available Metrics
-- **System**: CPU %, RAM used/total, uptime
-- **Storage**: Total bytes, total pages, file size
-- **Network**: Packets sent/received, active streams
-- **Peers**: Address, version, last seen, total count
+---
 
-## Competitors
+## Tech Stack
 
-| Platform | Network | Focus |
-|----------|---------|-------|
-| Filfox | Filecoin | Storage provider rankings, deals |
-| Filscan | Filecoin | SP analytics, rewards calculator |
-| beaconcha.in | Ethereum | Validator monitoring |
-| Solana Beach | Solana | Validator stats, stake distribution |
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS |
+| Backend | tRPC, Node.js |
+| Database | PostgreSQL + TimescaleDB |
+| Cache | Redis |
+| Deployment | Docker Compose, GitHub Actions |
 
-## Development
+---
+
+## Quick Start
 
 ### Prerequisites
-- Node.js 18+
-- npm
+- Node.js 20+
 - Docker & Docker Compose
+- npm or yarn
 
-### Quick Start
+### Development Setup
+
 ```bash
+# Clone the repository
+git clone https://github.com/RECTOR-LABS/pnode-pulse.git
+cd pnode-pulse
+
 # Start database services
 cp .env.example .env
-docker compose up -d
+docker compose up -d postgres redis
 
-# Install dependencies and run
+# Install dependencies
 npm install
+
+# Run database migrations
+npx prisma migrate deploy
+npx prisma generate
+
+# Start development server
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000)
 
-### Services
-| Service | Port | Description |
-|---------|------|-------------|
-| Next.js | 3000 | Web application |
-| PostgreSQL | 5434 | Database (TimescaleDB) |
-| Redis | 6381 | Cache |
+### Start Data Collector
 
-### Tech Stack
-- **Framework**: Next.js 14 (App Router)
-- **Language**: TypeScript (strict mode)
-- **Styling**: Tailwind CSS
-- **Database**: PostgreSQL + TimescaleDB
-- **API**: tRPC
+```bash
+# In a separate terminal
+npm run collector
+```
 
-### Project Structure
+---
+
+## Architecture
+
 ```
-src/
-├── app/              # Next.js App Router pages
-├── components/       # React components
-├── lib/
-│   ├── prpc/         # pRPC client library
-│   ├── db/           # Database models and queries
-│   └── utils/        # Utilities
-├── server/
-│   ├── api/          # tRPC routers
-│   └── workers/      # Background jobs
-└── types/            # TypeScript types
+┌─────────────────────────────────────────────────────────────┐
+│                      pNode Pulse                            │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
+│  │   Next.js   │  │  Collector  │  │   TimescaleDB       │ │
+│  │  Dashboard  │◄─┤   Worker    │─►│  (Time-series DB)   │ │
+│  └──────┬──────┘  └──────┬──────┘  └─────────────────────┘ │
+│         │                │                                  │
+│         │                ▼                                  │
+│         │         ┌─────────────┐                          │
+│         └────────►│    Redis    │ (Cache)                  │
+│                   └─────────────┘                          │
+└─────────────────────────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    pNode Network                            │
+├─────────────────────────────────────────────────────────────┤
+│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       │
+│  │ pNode 1 │  │ pNode 2 │  │ pNode 3 │  │ pNode N │ ...   │
+│  │ :6000   │  │ :6000   │  │ :6000   │  │ :6000   │       │
+│  └─────────┘  └─────────┘  └─────────┘  └─────────┘       │
+│                                                             │
+│  Gossip Network (:9001) ◄───────────────────────────────►  │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## pRPC API Integration
+
+pNode Pulse uses the pRPC JSON-RPC 2.0 API to collect data:
+
+| Method | Description | Version |
+|--------|-------------|---------|
+| `get-version` | Node software version | All |
+| `get-stats` | CPU, RAM, uptime, storage metrics | All |
+| `get-pods` | Peer list (legacy) | < v0.7.0 |
+| `get-pods-with-stats` | Full network with storage stats | v0.7.0+ |
+
+### Example Request
+
+```bash
+curl -X POST http://192.190.136.36:6000/rpc \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"get-pods-with-stats","id":1}'
+```
+
+---
+
+## Documentation
+
+- **[User Guide](docs/USER_GUIDE.md)** - How to use each feature
+- **[Deployment Guide](docs/DEPLOYMENT.md)** - Self-hosting instructions
+- **[API Reference](docs/API.md)** - Public endpoints documentation
+
+---
+
+## Project Structure
+
+```
+pnode-pulse/
+├── src/
+│   ├── app/              # Next.js App Router pages
+│   ├── components/       # React components
+│   │   ├── dashboard/    # Dashboard widgets
+│   │   ├── nodes/        # Node-related components
+│   │   └── ui/           # Shared UI components
+│   ├── lib/
+│   │   ├── prpc/         # pRPC client library
+│   │   ├── db/           # Prisma client & queries
+│   │   └── utils/        # Formatting utilities
+│   ├── server/
+│   │   ├── api/          # tRPC routers
+│   │   └── workers/      # Data collector
+│   └── types/            # TypeScript types
+├── prisma/               # Database schema & migrations
+├── docs/                 # Documentation
+└── docker/               # Docker configurations
+```
+
+---
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection string | Required |
+| `REDIS_HOST` | Redis hostname | `localhost` |
+| `REDIS_PORT` | Redis port | `6379` |
+| `PRPC_SEED_NODES` | Comma-separated seed IPs | Built-in list |
+
+---
+
+## Contributing
+
+Contributions are welcome! Please read our contributing guidelines before submitting PRs.
+
+---
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+---
 
 ## Resources
 
-- [Xandeum Docs](https://www.xandeum.network/docs)
-- [pRPC Reference](https://docs.xandeum.network/api/pnode-rpc-prpc-reference)
+- [Xandeum Network](https://xandeum.network)
+- [Xandeum Docs](https://docs.xandeum.network)
+- [pRPC Reference](https://docs.xandeum.network/xandeum-pnode-setup-guide)
 - [Discord](https://discord.com/invite/mGAxAuwnR9)
-- [GitHub](https://github.com/Xandeum)
 
-## Status
+---
 
-**Phase: Foundation (Phase 1)**
+**Built with tawakkul for the Xandeum ecosystem**

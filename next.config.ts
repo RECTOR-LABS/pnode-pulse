@@ -28,9 +28,19 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // HTTP headers for caching
+  // HTTP headers for caching, CORS, and security
   async headers() {
     return [
+      // Security headers for all routes
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "X-XSS-Protection", value: "1; mode=block" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
       // Static assets - aggressive caching (1 year, immutable)
       {
         source: "/:path*.(ico|png|jpg|jpeg|gif|svg|woff|woff2|webp|avif)",
@@ -60,18 +70,13 @@ const nextConfig: NextConfig = {
           { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
         ],
       },
-      // Public API v1 - edge cached with SWR
+      // Public API v1 - CORS enabled for external consumers & embeds
       {
-        source: "/api/v1/network/:path*",
+        source: "/api/v1/:path*",
         headers: [
-          { key: "Cache-Control", value: "public, s-maxage=30, stale-while-revalidate=60" },
-          { key: "CDN-Cache-Control", value: "public, max-age=30, stale-while-revalidate=60" },
-          { key: "Vercel-CDN-Cache-Control", value: "public, max-age=30, stale-while-revalidate=60" },
-        ],
-      },
-      {
-        source: "/api/v1/nodes",
-        headers: [
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "Access-Control-Allow-Methods", value: "GET, OPTIONS" },
+          { key: "Access-Control-Allow-Headers", value: "Content-Type, Authorization" },
           { key: "Cache-Control", value: "public, s-maxage=30, stale-while-revalidate=60" },
           { key: "CDN-Cache-Control", value: "public, max-age=30, stale-while-revalidate=60" },
         ],
@@ -79,24 +84,29 @@ const nextConfig: NextConfig = {
       {
         source: "/api/v1/leaderboard",
         headers: [
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "Access-Control-Allow-Methods", value: "GET, OPTIONS" },
           { key: "Cache-Control", value: "public, s-maxage=60, stale-while-revalidate=300" },
           { key: "CDN-Cache-Control", value: "public, max-age=60, stale-while-revalidate=300" },
         ],
       },
-      // Badges - longer cache (less frequent updates)
+      // Badges - CORS enabled, longer cache (less frequent updates)
       {
         source: "/api/badge/:path*",
         headers: [
+          { key: "Access-Control-Allow-Origin", value: "*" },
+          { key: "Access-Control-Allow-Methods", value: "GET, OPTIONS" },
           { key: "Cache-Control", value: "public, s-maxage=300, stale-while-revalidate=600" },
           { key: "CDN-Cache-Control", value: "public, max-age=300, stale-while-revalidate=600" },
         ],
       },
-      // Embed routes - moderate cache
+      // Embed routes - allow iframe embedding from any origin
       {
         source: "/embed/:path*",
         headers: [
           { key: "Cache-Control", value: "public, s-maxage=60, stale-while-revalidate=300" },
           { key: "X-Frame-Options", value: "ALLOWALL" },
+          { key: "Content-Security-Policy", value: "frame-ancestors *" },
         ],
       },
       // Real-time API - no cache

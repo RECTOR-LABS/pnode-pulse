@@ -83,12 +83,14 @@ docker compose logs -f web     # View logs
 173.212.220.65
 161.97.97.41
 192.190.136.36
-192.190.136.37
 192.190.136.38
 192.190.136.28
 192.190.136.29
 207.244.255.1
 ```
+
+**Note**: 192.190.136.37 removed (Dec 13, 2025) - not responding to pRPC calls.
+Current version: v0.7.3 (as of Dec 13, 2025)
 
 ### RPC Methods
 
@@ -385,6 +387,44 @@ See GitHub Issues and Milestones for current work.
 - Response structure from `get-stats` is FLAT (differs from official docs)
 - `get-pods` includes `pubkey` field not documented officially
 
+## Official Documentation Review (#168 - Dec 13, 2025)
+
+### Documentation Sources
+
+| URL | Content | Status |
+|-----|---------|--------|
+| https://docs.xandeum.network/api/pnode-rpc-prpc-reference | pRPC API Reference | ✅ Reviewed |
+| https://docs.xandeum.network/xandeum-pnode-setup-guide | Setup Guide (v0.7 Heidelberg) | ✅ Reviewed |
+| https://docs.xandeum.network | Main docs index | ✅ Reviewed |
+
+### Discrepancies Found
+
+**1. get-stats Response Structure**
+- **Official Docs**: NESTED structure (`metadata.total_bytes`, `stats.cpu_percent`)
+- **Actual API**: FLAT structure (`total_bytes`, `cpu_percent` at root)
+- **Our Implementation**: ✅ Correctly uses FLAT structure based on actual responses
+
+**2. get-pods pubkey Field**
+- **Official Docs**: NOT documented
+- **Actual API**: Returns `pubkey` (string | null) for each pod
+- **Our Implementation**: ✅ Correctly handles as nullable
+
+**3. get-pods-with-stats Method**
+- **Official Docs**: NOT documented (v0.7.0 feature)
+- **Source**: Discord intelligence from Brad (Dec 8-10, 2025)
+- **Our Implementation**: ✅ Based on actual API responses, fully typed
+
+**4. get-pods last_seen Field**
+- **Official Docs**: Shows `last_seen` (human-readable string)
+- **Actual API**: Uses `last_seen_timestamp` (unix number)
+- **Our Implementation**: ✅ Uses timestamp version
+
+### Conclusion
+
+Our implementation is **correct** - based on actual API behavior rather than outdated docs.
+Official documentation appears to be behind the actual API implementation.
+Discord intelligence from Brad/Xandeum team has been accurate source of truth.
+
 ## Xandeum API Intelligence (Discord #apps-developers, Dec 6-8, 2024)
 
 ### Network Statistics (from community analysis)
@@ -527,13 +567,79 @@ From Fortune (Dec 8):
 - ❌ **Old (dead)**: https://pnodes.xandeum.network/
 - ✅ **New**: https://docs.xandeum.network/xandeum-pnode-setup-guide
 
-**Action Items**:
-- [Issue #164](https://github.com/RECTOR-LABS/pnode-pulse/issues/164) - Use pubkey for correlation
-- [Issue #165](https://github.com/RECTOR-LABS/pnode-pulse/issues/165) - Implement pruning strategy
-- [Issue #166](https://github.com/RECTOR-LABS/pnode-pulse/issues/166) - Verify null handling
-- [Issue #167](https://github.com/RECTOR-LABS/pnode-pulse/issues/167) - Node Graveyard feature
-- [Issue #168](https://github.com/RECTOR-LABS/pnode-pulse/issues/168) - Review official docs
-- [Issue #169](https://github.com/RECTOR-LABS/pnode-pulse/issues/169) - IP change tracking
+**Action Items** (Dec 9-11):
+- ✅ [Issue #164](https://github.com/RECTOR-LABS/pnode-pulse/issues/164) - Use pubkey for correlation - CLOSED
+- ✅ [Issue #165](https://github.com/RECTOR-LABS/pnode-pulse/issues/165) - Implement pruning strategy - CLOSED
+- ✅ [Issue #166](https://github.com/RECTOR-LABS/pnode-pulse/issues/166) - Verify null handling - CLOSED
+- ✅ [Issue #167](https://github.com/RECTOR-LABS/pnode-pulse/issues/167) - Node Graveyard feature - CLOSED
+- ✅ [Issue #168](https://github.com/RECTOR-LABS/pnode-pulse/issues/168) - Review official docs - CLOSED
+- ✅ [Issue #169](https://github.com/RECTOR-LABS/pnode-pulse/issues/169) - IP change tracking - CLOSED
+
+### Discord Intelligence (Dec 11-12, 2025)
+
+**False 5K Node Claim Debunked**:
+- Someone (inw6) claimed 5k pNodes exist - **FALSE**
+- mrhcon: "I can tell you with certainty, there are not 5k nodes"
+- Actual count remains ~100-138 nodes
+
+**Staking Status**:
+- mrhcon confirmed: "Staking is not active yet"
+
+**API Data Completeness Issue** (Brown, Dec 11):
+> "Although I noticed the details that come with `get-pods-with-stats` are not complete as compared to the `get-stats` call"
+
+⚠️ **Implication**: May need to call BOTH endpoints for complete node data:
+- `get-pods-with-stats` for network-wide discovery
+- `get-stats` on individual nodes for complete metrics
+
+**Network Goals** (Ymetro):
+- Xandeum target: **1K pNodes** in near future
+- Solana comparison: needs 5K validators for future growth
+
+**Validator vs pNode Confusion** (Yang incident):
+- Yang got all zeros from API - was querying **validator network** (v2.2.0)
+- pNode network uses different versions (0.5.x - 0.7.x)
+- Important distinction to document
+
+**pNode License Shop**: CLOSED
+- Brad confirmed onboarding is for incentivized DevNet only
+- Submissions closed unless you have existing pNode license
+
+**Bounty Submission Confirmed Valid** (Skipp to saloni):
+> Q: "I'm not running a pNode myself. I'm only building an analytics dashboard using public DevNet data (via pRPC)... is this correct for submission?"
+> A: "checks ✅ the 'retrieving a list of pnodes appearing in a gossip using pNode RPC calls' part of the scope"
+
+✅ Our approach (using public pRPC without running own pNode) is valid for bounty.
+
+**Skipp's Client Updates** (Dec 12):
+- Configurable timeouts for longer queries
+- Default seed IPs pre-shipped in clients
+- New helper: queries all seeds concurrently (~8x faster)
+
+**Skipp's Default Seed IPs**:
+```
+173.212.220.65, 161.97.97.41, 192.190.136.36, 192.190.136.38,
+207.244.255.1, 192.190.136.28, 192.190.136.29, 173.212.203.145
+```
+
+**Seed IP Comparison**:
+| IP | Our List | Skipp's List | Status |
+|----|----------|--------------|--------|
+| 173.212.203.145 | ✅ | ✅ | v0.7.3 |
+| 173.212.220.65 | ✅ | ✅ | v0.7.3 |
+| 161.97.97.41 | ✅ | ✅ | v0.7.3 |
+| 192.190.136.36 | ✅ | ✅ | v0.7.3 |
+| 192.190.136.37 | ~~✅~~ | ❌ | ❌ DEAD (Dec 13) |
+| 192.190.136.38 | ✅ | ✅ | v0.7.3 |
+| 192.190.136.28 | ✅ | ✅ | v0.7.3 |
+| 192.190.136.29 | ✅ | ✅ | v0.7.3 |
+| 207.244.255.1 | ✅ | ✅ | v0.7.3 |
+
+Updated to 8 IPs (removed dead 192.190.136.37). Skipp's list was accurate.
+
+**Action Items** (Dec 12-13):
+- ✅ [Issue #175](https://github.com/RECTOR-LABS/pnode-pulse/issues/175) - Hybrid collection for private nodes - CLOSED
+- ✅ Verify 192.190.136.37 - CONFIRMED DEAD, removed from list
 
 ### Community Libraries
 

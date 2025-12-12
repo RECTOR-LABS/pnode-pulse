@@ -16,13 +16,15 @@ export function RealtimeIndicator({ showLabel = true }: RealtimeIndicatorProps) 
   const getStatusColor = () => {
     if (connected) return "bg-status-active";
     if (reconnectAttempts > 0) return "bg-yellow-500";
-    return "bg-status-inactive";
+    // Use neutral color for polling mode (not alarming)
+    return "bg-blue-400";
   };
 
   const getStatusLabel = () => {
     if (connected) return "Live";
     if (reconnectAttempts > 0) return "Reconnecting...";
-    return "Offline";
+    // Don't show alarming "Offline" - HTTP polling still works
+    return "Polling";
   };
 
   const getAriaLabel = () => {
@@ -32,9 +34,9 @@ export function RealtimeIndicator({ showLabel = true }: RealtimeIndicatorProps) 
         : "Real-time connection active";
     }
     if (reconnectAttempts > 0) {
-      return `Connection lost. Reconnection attempt ${reconnectAttempts}`;
+      return `Reconnecting... Attempt ${reconnectAttempts}`;
     }
-    return "Real-time connection offline";
+    return "Data refreshes automatically via polling";
   };
 
   return (
@@ -44,9 +46,11 @@ export function RealtimeIndicator({ showLabel = true }: RealtimeIndicatorProps) 
       aria-label={getAriaLabel()}
       className="flex items-center gap-2 text-sm"
       title={
-        lastUpdate
-          ? `Last update: ${new Date(lastUpdate).toLocaleTimeString()}`
-          : "Waiting for updates..."
+        connected
+          ? lastUpdate
+            ? `Live updates enabled. Last: ${new Date(lastUpdate).toLocaleTimeString()}`
+            : "Live updates enabled"
+          : "Data refreshes every 30 seconds"
       }
     >
       <span className="relative flex h-2 w-2" aria-hidden="true">

@@ -532,4 +532,129 @@ export const nodesRouter = createTRPCRouter({
         ram: m.avg_ram_percent,
       }));
     }),
+
+  /**
+   * #164: Get IP address change history for a node
+   */
+  addressHistory: publicProcedure
+    .input(
+      z.object({
+        nodeId: z.number(),
+        limit: z.number().min(1).max(100).default(20),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const { nodeId, limit } = input;
+
+      const changes = await ctx.db.nodeAddressChange.findMany({
+        where: { nodeId },
+        orderBy: { detectedAt: "desc" },
+        take: limit,
+      });
+
+      return changes.map((c) => ({
+        id: c.id.toString(),
+        oldAddress: c.oldAddress,
+        newAddress: c.newAddress,
+        detectedAt: c.detectedAt,
+      }));
+    }),
+
+  /**
+   * #164: Get node by pubkey
+   */
+  byPubkey: publicProcedure
+    .input(z.string())
+    .query(async ({ ctx, input }) => {
+      const node = await ctx.db.node.findUnique({
+        where: { pubkey: input },
+        include: {
+          _count: {
+            select: { metrics: true, peers: true, addressChanges: true },
+          },
+        },
+      });
+
+      if (!node) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: `Node with pubkey ${input} not found`,
+        });
+      }
+
+      return node;
+    }),
+
+  /**
+   * #169: Get recent IP address changes across the network
+   */
+  recentAddressChanges: publicProcedure
+    .input(
+      z.object({
+        limit: z.number().min(1).max(100).default(20),
+        range: z.enum(["24h", "7d", "30d"]).default("7d"),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const { limit, range } = input;
+
+      const rangeMs = {
+        "24h": 24 * 60 * 60 * 1000,
+        "7d": 7 * 24 * 60 * 60 * 1000,
+        "30d": 30 * 24 * 60 * 60 * 1000,
+      };
+
+      const since = new Date(Date.now() - rangeMs[range]);
+
+      const changes = await ctx.db.nodeAddressChange.findMany({
+        where: {
+          detectedAt: { gte: since },
+        },
+        orderBy: { detectedAt: "desc" },
+        take: limit,
+        include: {
+          node: {
+            select: {
+              id: true,
+              pubkey: true,
+              version: true,
+              isActive: true,
+            },
+          },
+        },
+      });
+
+      // Get count of total changes in period
+      const totalCount = await ctx.db.nodeAddressChange.count({
+        where: {
+          detectedAt: { gte: since },
+        },
+      });
+
+      // Get count of unique nodes that changed
+      const uniqueNodes = await ctx.db.nodeAddressChange.groupBy({
+        by: ["nodeId"],
+        where: {
+          detectedAt: { gte: since },
+        },
+      });
+
+      return {
+        changes: changes.map((c) => ({
+          id: c.id.toString(),
+          nodeId: c.nodeId,
+          pubkey: c.node.pubkey,
+          version: c.node.version,
+          isActive: c.node.isActive,
+          oldAddress: c.oldAddress,
+          newAddress: c.newAddress,
+          detectedAt: c.detectedAt,
+        })),
+        stats: {
+          totalChanges: totalCount,
+          uniqueNodes: uniqueNodes.length,
+          range,
+        },
+      };
+    }),
 });

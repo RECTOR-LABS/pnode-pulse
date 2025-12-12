@@ -66,6 +66,12 @@ async function collectFromNode(address: string): Promise<CollectionResult> {
 
 /**
  * Get or create a node in the database
+ *
+ * Matching strategy (per Brad's recommendation):
+ * 1. First try to find by pubkey (immutable identifier)
+ * 2. If found by pubkey but address differs, log the IP change and update address
+ * 3. If not found by pubkey, try by address (legacy fallback)
+ * 4. Create new node if neither found
  */
 async function getOrCreateNode(
   address: string,
@@ -74,25 +80,70 @@ async function getOrCreateNode(
   isPublic?: boolean | null,
   rpcPort?: number | null
 ) {
-  const existing = await db.node.findUnique({ where: { address } });
+  // Strategy 1: Try to find by pubkey first (preferred - pubkey is immutable)
+  if (pubkey) {
+    const existingByPubkey = await db.node.findUnique({ where: { pubkey } });
 
-  if (existing) {
-    // Update if we have new info
-    if (version || pubkey || isPublic !== undefined || rpcPort !== undefined) {
+    if (existingByPubkey) {
+      // Check if IP address changed
+      if (existingByPubkey.address !== address) {
+        // Log the IP change
+        await db.nodeAddressChange.create({
+          data: {
+            nodeId: existingByPubkey.id,
+            oldAddress: existingByPubkey.address,
+            newAddress: address,
+          },
+        });
+
+        logger.info("Node IP address changed", {
+          pubkey,
+          oldAddress: existingByPubkey.address,
+          newAddress: address,
+        });
+      }
+
+      // Update node with new address and other info
       return db.node.update({
-        where: { id: existing.id },
+        where: { id: existingByPubkey.id },
         data: {
-          version: version ?? existing.version,
-          pubkey: pubkey ?? existing.pubkey,
-          isPublic: isPublic !== undefined ? isPublic : existing.isPublic,
-          rpcPort: rpcPort !== undefined ? rpcPort : existing.rpcPort,
+          address, // Update to new address
+          gossipAddress: address.replace(`:${PRPC_PORT}`, ":9001"),
+          version: version ?? existingByPubkey.version,
+          isPublic: isPublic !== undefined ? isPublic : existingByPubkey.isPublic,
+          rpcPort: rpcPort !== undefined ? rpcPort : existingByPubkey.rpcPort,
         },
       });
     }
-    return existing;
   }
 
-  // Create new node
+  // Strategy 2: Fallback to address matching (for legacy nodes without pubkey)
+  const existingByAddress = await db.node.findUnique({ where: { address } });
+
+  if (existingByAddress) {
+    // Update if we have new info (but don't overwrite existing pubkey with null)
+    const shouldUpdate =
+      version ||
+      (pubkey && !existingByAddress.pubkey) ||
+      isPublic !== undefined ||
+      rpcPort !== undefined;
+
+    if (shouldUpdate) {
+      return db.node.update({
+        where: { id: existingByAddress.id },
+        data: {
+          version: version ?? existingByAddress.version,
+          // Only set pubkey if it doesn't already exist (first time seeing it)
+          pubkey: existingByAddress.pubkey ?? pubkey,
+          isPublic: isPublic !== undefined ? isPublic : existingByAddress.isPublic,
+          rpcPort: rpcPort !== undefined ? rpcPort : existingByAddress.rpcPort,
+        },
+      });
+    }
+    return existingByAddress;
+  }
+
+  // Strategy 3: Create new node
   return db.node.create({
     data: {
       address,
@@ -106,7 +157,7 @@ async function getOrCreateNode(
 }
 
 /**
- * Save metrics for a node
+ * Save metrics for a node (full stats from get-stats)
  */
 async function saveMetrics(
   nodeId: number,
@@ -136,6 +187,49 @@ async function saveMetrics(
 }
 
 /**
+ * Save partial metrics for a node (limited data from get-pods-with-stats)
+ *
+ * Used for private nodes that we can't query directly.
+ * Brown's observation (Dec 11, 2025): get-pods-with-stats returns less
+ * complete data than get-stats, but it's the only source for private nodes.
+ *
+ * Fields available from get-pods-with-stats:
+ * - uptime, storage_committed, storage_used, storage_usage_percent
+ *
+ * Fields NOT available (only from get-stats):
+ * - cpu_percent, ram_used, ram_total, active_streams, packets_*, etc.
+ */
+async function savePartialMetrics(
+  nodeId: number,
+  uptime: number,
+  storageCommitted: bigint | null,
+  storageUsed: bigint | null,
+  storageUsagePercent: number | null
+) {
+  await db.nodeMetric.create({
+    data: {
+      nodeId,
+      uptime,
+      // Storage fields from get-pods-with-stats
+      storageCommitted,
+      storageUsagePercent,
+      // Use storage_used as totalBytes since it represents actual data stored
+      totalBytes: storageUsed,
+      // Fields we don't have from get-pods-with-stats - set to null/0
+      cpuPercent: null,
+      ramUsed: null,
+      ramTotal: null,
+      fileSize: null,
+      totalPages: null,
+      currentIndex: null,
+      packetsReceived: null,
+      packetsSent: null,
+      activeStreams: null,
+    },
+  });
+}
+
+/**
  * Update node status
  */
 async function updateNodeStatus(nodeId: number, isActive: boolean, version?: string) {
@@ -151,15 +245,27 @@ async function updateNodeStatus(nodeId: number, isActive: boolean, version?: str
 
 /**
  * Process discovered peers and add new nodes
+ *
+ * Uses pubkey as primary identifier (per Brad's recommendation):
+ * - If pubkey exists, check if node already known by pubkey
+ * - If known by pubkey but address differs, log IP change
+ * - Fall back to address matching for legacy nodes without pubkey
  */
 async function discoverNodes(results: CollectionResult[]) {
-  const knownAddresses = new Set<string>();
+  // Get all known nodes with both address and pubkey
+  const existingNodes = await db.node.findMany({
+    select: { id: true, address: true, pubkey: true },
+  });
 
-  // Get all known addresses
-  const existingNodes = await db.node.findMany({ select: { address: true } });
-  existingNodes.forEach((n) => knownAddresses.add(n.address));
+  const knownAddresses = new Set<string>(existingNodes.map((n) => n.address));
+  const knownPubkeys = new Map<string, { id: number; address: string }>();
+  existingNodes.forEach((n) => {
+    if (n.pubkey) {
+      knownPubkeys.set(n.pubkey, { id: n.id, address: n.address });
+    }
+  });
 
-  // Find new nodes from pods responses
+  // Track what we discover
   const newNodes: Array<{
     address: string;
     pubkey: string | null;
@@ -168,6 +274,16 @@ async function discoverNodes(results: CollectionResult[]) {
     rpcPort: number | null;
   }> = [];
 
+  const ipChanges: Array<{
+    nodeId: number;
+    oldAddress: string;
+    newAddress: string;
+    pubkey: string;
+  }> = [];
+
+  // Process seen addresses/pubkeys to avoid duplicates within this batch
+  const seenInBatch = new Set<string>();
+
   for (const result of results) {
     if (!result.success || !result.pods) continue;
 
@@ -175,14 +291,103 @@ async function discoverNodes(results: CollectionResult[]) {
       // Convert gossip address to RPC address
       const rpcAddress = pod.address.replace(":9001", `:${PRPC_PORT}`);
 
-      if (!knownAddresses.has(rpcAddress)) {
-        knownAddresses.add(rpcAddress);
-        newNodes.push({
-          address: rpcAddress,
-          pubkey: pod.pubkey,
-          version: pod.version,
-          isPublic: pod.is_public,
-          rpcPort: pod.rpc_port,
+      // Skip if already processed in this batch
+      const batchKey = pod.pubkey || rpcAddress;
+      if (seenInBatch.has(batchKey)) continue;
+      seenInBatch.add(batchKey);
+
+      // Strategy 1: Check by pubkey first (preferred)
+      if (pod.pubkey && knownPubkeys.has(pod.pubkey)) {
+        const existing = knownPubkeys.get(pod.pubkey)!;
+
+        // Detect IP change
+        if (existing.address !== rpcAddress) {
+          ipChanges.push({
+            nodeId: existing.id,
+            oldAddress: existing.address,
+            newAddress: rpcAddress,
+            pubkey: pod.pubkey,
+          });
+
+          // Update our local tracking
+          knownAddresses.delete(existing.address);
+          knownAddresses.add(rpcAddress);
+          knownPubkeys.set(pod.pubkey, { id: existing.id, address: rpcAddress });
+        }
+        continue; // Node already exists
+      }
+
+      // Strategy 2: Check by address (legacy fallback)
+      if (knownAddresses.has(rpcAddress)) {
+        continue; // Node already exists
+      }
+
+      // Strategy 3: Truly new node
+      knownAddresses.add(rpcAddress);
+      if (pod.pubkey) {
+        knownPubkeys.set(pod.pubkey, { id: -1, address: rpcAddress }); // -1 = pending creation
+      }
+
+      newNodes.push({
+        address: rpcAddress,
+        pubkey: pod.pubkey,
+        version: pod.version,
+        isPublic: pod.is_public,
+        rpcPort: pod.rpc_port,
+      });
+    }
+  }
+
+  // Process IP changes
+  if (ipChanges.length > 0) {
+    logger.info("Detected IP address changes during discovery", { count: ipChanges.length });
+
+    for (const change of ipChanges) {
+      try {
+        // Check if new address already exists for another node
+        const existingWithAddress = await db.node.findUnique({
+          where: { address: change.newAddress },
+        });
+
+        if (existingWithAddress && existingWithAddress.id !== change.nodeId) {
+          // Address conflict - another node has this address
+          // Skip update to avoid unique constraint violation
+          logger.warn("IP change skipped - address already exists", {
+            pubkey: change.pubkey,
+            oldAddress: change.oldAddress,
+            newAddress: change.newAddress,
+            conflictingNodeId: existingWithAddress.id,
+          });
+          continue;
+        }
+
+        // Log the change
+        await db.nodeAddressChange.create({
+          data: {
+            nodeId: change.nodeId,
+            oldAddress: change.oldAddress,
+            newAddress: change.newAddress,
+          },
+        });
+
+        // Update the node's address
+        await db.node.update({
+          where: { id: change.nodeId },
+          data: {
+            address: change.newAddress,
+            gossipAddress: change.newAddress.replace(`:${PRPC_PORT}`, ":9001"),
+          },
+        });
+
+        logger.info("Node IP address changed", {
+          pubkey: change.pubkey,
+          oldAddress: change.oldAddress,
+          newAddress: change.newAddress,
+        });
+      } catch (error) {
+        logger.error("Failed to process IP change", {
+          pubkey: change.pubkey,
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }
@@ -190,7 +395,7 @@ async function discoverNodes(results: CollectionResult[]) {
 
   // Create new nodes
   if (newNodes.length > 0) {
-    logger.info('Discovered new nodes', { count: newNodes.length });
+    logger.info("Discovered new nodes", { count: newNodes.length });
 
     for (const node of newNodes) {
       await db.node.create({
@@ -205,6 +410,122 @@ async function discoverNodes(results: CollectionResult[]) {
         },
       });
     }
+  }
+}
+
+/**
+ * Process metrics for private nodes from get-pods-with-stats data
+ *
+ * For nodes we can't query directly (private nodes), we use the data
+ * reported by public nodes via get-pods-with-stats. This gives us:
+ * - uptime, storage_committed, storage_used, storage_usage_percent
+ *
+ * Issue #175: Brown noted get-pods-with-stats is less complete than get-stats,
+ * but it's the only source of metrics for private nodes (~83% of network).
+ */
+async function processPrivateNodeMetrics(
+  results: CollectionResult[],
+  successfulAddresses: Set<string>
+) {
+  // Collect all pod data from successful queries, deduplicated by pubkey/address
+  const podDataMap = new Map<string, {
+    nodeId?: number;
+    address: string;
+    pubkey: string | null;
+    uptime: number;
+    storageCommitted: bigint | null;
+    storageUsed: bigint | null;
+    storageUsagePercent: number | null;
+    isPublic: boolean | null;
+    version: string;
+  }>();
+
+  for (const result of results) {
+    if (!result.success || !result.pods) continue;
+
+    for (const pod of result.pods.pods) {
+      const rpcAddress = pod.address.replace(":9001", `:${PRPC_PORT}`);
+      const key = pod.pubkey || rpcAddress;
+
+      // Skip if we already successfully queried this node directly
+      if (successfulAddresses.has(rpcAddress)) continue;
+
+      // Skip if uptime is null (no useful metrics to save)
+      if (pod.uptime === null) continue;
+
+      // Store/update pod data (later results may have fresher data)
+      podDataMap.set(key, {
+        address: rpcAddress,
+        pubkey: pod.pubkey,
+        uptime: pod.uptime,
+        storageCommitted: pod.storage_committed !== null ? BigInt(pod.storage_committed) : null,
+        storageUsed: pod.storage_used !== null ? BigInt(pod.storage_used) : null,
+        storageUsagePercent: pod.storage_usage_percent,
+        isPublic: pod.is_public,
+        version: pod.version,
+      });
+    }
+  }
+
+  if (podDataMap.size === 0) return;
+
+  // Look up node IDs for the pods we have data for
+  const addresses = Array.from(podDataMap.values()).map((p) => p.address);
+  const existingNodes = await db.node.findMany({
+    where: { address: { in: addresses } },
+    select: { id: true, address: true, pubkey: true },
+  });
+
+  // Map addresses/pubkeys to node IDs
+  const addressToId = new Map<string, number>();
+  const pubkeyToId = new Map<string, number>();
+  for (const node of existingNodes) {
+    addressToId.set(node.address, node.id);
+    if (node.pubkey) {
+      pubkeyToId.set(node.pubkey, node.id);
+    }
+  }
+
+  // Save partial metrics and update node status
+  let savedCount = 0;
+  for (const [key, podData] of podDataMap) {
+    // Find node ID by pubkey first, then address
+    let nodeId = podData.pubkey ? pubkeyToId.get(podData.pubkey) : undefined;
+    if (!nodeId) {
+      nodeId = addressToId.get(podData.address);
+    }
+
+    if (!nodeId) {
+      // Node doesn't exist yet - will be created by discoverNodes
+      continue;
+    }
+
+    // Save partial metrics from pods data
+    await savePartialMetrics(
+      nodeId,
+      podData.uptime,
+      podData.storageCommitted,
+      podData.storageUsed,
+      podData.storageUsagePercent
+    );
+
+    // Update node status - mark as active since we see it in gossip
+    // Also update version and isPublic from pods data
+    await db.node.update({
+      where: { id: nodeId },
+      data: {
+        isActive: true,
+        lastSeen: new Date(),
+        version: podData.version,
+        isPublic: podData.isPublic,
+      },
+    });
+
+    savedCount++;
+  }
+
+  if (savedCount > 0) {
+    logger.info("Saved partial metrics for private nodes", { count: savedCount });
   }
 }
 
@@ -358,6 +679,7 @@ export async function runCollection(): Promise<{
 
     let successCount = 0;
     let failedCount = 0;
+    const successfulAddresses = new Set<string>(); // Track nodes we successfully queried
 
     // Process results
     for (const result of results) {
@@ -395,6 +717,7 @@ export async function runCollection(): Promise<{
       if (result.success && result.stats) {
         await saveMetrics(node.id, result.stats, storageCommitted, storageUsagePercent);
         await updateNodeStatus(node.id, true, result.version?.version);
+        successfulAddresses.add(result.address); // Track successful query
 
         // Publish real-time metrics update
         const ramPercent = result.stats.ram_total > 0
@@ -425,6 +748,10 @@ export async function runCollection(): Promise<{
     await discoverNodes(results);
     const discoveredAfter = await db.node.count();
     const discovered = discoveredAfter - discoveredBefore;
+
+    // Process metrics for private nodes from get-pods-with-stats data (#175)
+    // For nodes we can't query directly, save what we can from federated data
+    await processPrivateNodeMetrics(results, successfulAddresses);
 
     // Compute network stats
     await computeNetworkStats();

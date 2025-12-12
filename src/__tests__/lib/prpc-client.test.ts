@@ -353,14 +353,13 @@ describe('Public pNodes List', () => {
       '173.212.220.65',
       '161.97.97.41',
       '192.190.136.36',
-      '192.190.136.37',
       '192.190.136.38',
       '192.190.136.28',
       '192.190.136.29',
       '207.244.255.1',
     ];
 
-    expect(PUBLIC_PNODES.length).toBe(9);
+    expect(PUBLIC_PNODES.length).toBe(8);
     expect(PUBLIC_PNODES[0]).toBe('173.212.203.145');
   });
 

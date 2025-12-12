@@ -134,14 +134,15 @@ enum ClaimStatus {
 // ============================================
 
 /// Registry of all known pNodes
+/// Primary identifier is pubkey (immutable), address can change
 model Node {
   id        Int      @id @default(autoincrement())
-  /// IP:Port address (e.g., "192.190.136.36:6000")
+  /// IP:Port address (e.g., "192.190.136.36:6000") - can change over time
   address   String   @unique
   /// Gossip address (e.g., "192.190.136.36:9001")
   gossipAddress String?
-  /// Base58 public key
-  pubkey    String?
+  /// Base58 public key - PRIMARY IDENTIFIER (immutable, unique when present)
+  pubkey    String?  @unique
   /// pNode software version
   version   String?
   /// Whether RPC port is publicly accessible (from v0.7.0+ get-pods-with-stats)
@@ -152,8 +153,10 @@ model Node {
   firstSeen DateTime @default(now()) @map("first_seen")
   /// Last time we successfully polled this node
   lastSeen  DateTime? @map("last_seen")
-  /// Whether the node is currently reachable
+  /// Whether the node is currently reachable (legacy, use status instead)
   isActive  Boolean  @default(true) @map("is_active")
+  /// Node lifecycle status for pruning (ACTIVE → INACTIVE → ARCHIVED)
+  status    NodeStatus @default(ACTIVE)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -165,16 +168,38 @@ model Node {
   alerts    Alert[]
   portfolios PortfolioNode[]
   uptimeEvents UptimeEvent[]
+  addressChanges NodeAddressChange[]
 
   @@index([address])
-  @@index([pubkey])
   @@index([isActive])
   @@index([version])
   @@index([lastSeen(sort: Desc)])
   @@index([isActive, version])
   @@index([isActive, lastSeen(sort: Desc)])
   @@index([isPublic])
+  @@index([status])
+  @@index([status, lastSeen(sort: Desc)])
   @@map("nodes")
+}
+
+/// Tracks IP address changes for a node (when pubkey stays same but IP changes)
+model NodeAddressChange {
+  id          BigInt   @id @default(autoincrement())
+  nodeId      Int      @map("node_id")
+
+  /// Previous IP:Port address
+  oldAddress  String   @map("old_address")
+  /// New IP:Port address
+  newAddress  String   @map("new_address")
+  /// When the change was detected
+  detectedAt  DateTime @default(now()) @map("detected_at")
+
+  // Relations
+  node        Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([nodeId])
+  @@index([detectedAt(sort: Desc)])
+  @@map("node_address_changes")
 }
 
 /// Time-series metrics for each node (TimescaleDB hypertable)
@@ -283,6 +308,16 @@ enum JobStatus {
   RUNNING
   COMPLETED
   FAILED
+}
+
+/// Node lifecycle status for pruning strategy
+enum NodeStatus {
+  /// Node is actively responding to polls
+  ACTIVE
+  /// Node hasn't responded in >24 hours
+  INACTIVE
+  /// Node hasn't responded in >7 days, excluded from default views
+  ARCHIVED
 }
 
 // ============================================
