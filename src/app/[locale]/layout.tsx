@@ -82,33 +82,28 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
 
   // Get messages for this locale
   const messages = await getMessages();
-  const dir = isRtlLocale(locale as Locale) ? "rtl" : "ltr";
 
   return (
-    <html lang={locale} dir={dir} suppressHydrationWarning>
-      <body
-        className={`${inter.variable} ${geistMono.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}
-      >
-        <NextIntlClientProvider messages={messages}>
-          <TRPCProvider>
-            <WalletContextProvider>
-              <AuthProvider>
-                <BookmarkProvider>
-                  <Header />
-                  <main id="main-content" className="flex-1" role="main">
-                    {children}
-                  </main>
-                  <Footer />
-                </BookmarkProvider>
-              </AuthProvider>
-            </WalletContextProvider>
-          </TRPCProvider>
-        </NextIntlClientProvider>
-        <Script
-          src="/register-sw.js"
-          strategy="afterInteractive"
-        />
-      </body>
-    </html>
+    <div className={`${inter.variable} ${geistMono.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}>
+      <NextIntlClientProvider messages={messages}>
+        <TRPCProvider>
+          <WalletContextProvider>
+            <AuthProvider>
+              <BookmarkProvider>
+                <Header />
+                <main id="main-content" className="flex-1" role="main">
+                  {children}
+                </main>
+                <Footer />
+              </BookmarkProvider>
+            </AuthProvider>
+          </WalletContextProvider>
+        </TRPCProvider>
+      </NextIntlClientProvider>
+      <Script
+        src="/register-sw.js"
+        strategy="afterInteractive"
+      />
+    </div>
   );
 }

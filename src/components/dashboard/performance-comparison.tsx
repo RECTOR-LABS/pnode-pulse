@@ -4,6 +4,9 @@ import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { formatPercent } from "@/lib/utils/format";
 
+// Helper to ensure valid number for SVG paths (returns 0 for NaN/Infinity)
+const safeNum = (n: number): number => (Number.isFinite(n) ? n : 0);
+
 type Metric = "cpu" | "ram";
 type Range = "7d" | "30d" | "90d";
 
@@ -161,11 +164,11 @@ export function PerformanceComparison() {
           {/* Network line */}
           <path
             d={`
-              M 0,${110 - ((chartData[0]?.network ?? 0 - minValue) / valueRange) * 100}
+              M 0,${safeNum(110 - (((chartData[0]?.network ?? 0) - minValue) / valueRange) * 100)}
               ${chartData
                 .map((d, i) => {
-                  const x = (i / (chartData.length - 1)) * 400;
-                  const y = 110 - ((d.network - minValue) / valueRange) * 100;
+                  const x = safeNum(chartData.length > 1 ? (i / (chartData.length - 1)) * 400 : 200);
+                  const y = safeNum(110 - ((d.network - minValue) / valueRange) * 100);
                   return `L ${x},${y}`;
                 })
                 .join(" ")}
@@ -179,12 +182,12 @@ export function PerformanceComparison() {
           {selectedNode && (
             <path
               d={`
-                M 0,${110 - (((chartData[0]?.node ?? chartData[0]?.network ?? 0) - minValue) / valueRange) * 100}
+                M 0,${safeNum(110 - (((chartData[0]?.node ?? chartData[0]?.network ?? 0) - minValue) / valueRange) * 100)}
                 ${chartData
                   .map((d, i) => {
-                    const x = (i / (chartData.length - 1)) * 400;
+                    const x = safeNum(chartData.length > 1 ? (i / (chartData.length - 1)) * 400 : 200);
                     const value = d.node ?? d.network;
-                    const y = 110 - ((value - minValue) / valueRange) * 100;
+                    const y = safeNum(110 - ((value - minValue) / valueRange) * 100);
                     return `L ${x},${y}`;
                   })
                   .join(" ")}

@@ -4,6 +4,9 @@ import { trpc } from "@/lib/trpc";
 import { formatBytes } from "@/lib/utils/format";
 import { linearRegression, projectValues, projectMilestone } from "@/lib/utils/projections";
 
+// Helper to ensure valid number for SVG paths (returns 0 for NaN/Infinity)
+const safeNum = (n: number): number => (Number.isFinite(n) ? n : 0);
+
 // Target milestones in bytes
 const MILESTONES = [
   { value: 5 * 1024 ** 4, label: "5 TB" },
@@ -78,13 +81,13 @@ export function CapacityProjection() {
           {/* Historical data area */}
           <path
             d={`
-              M 0,${140 - ((dataPoints[0].value - minValue) / valueRange) * 130}
+              M 0,${safeNum(140 - ((dataPoints[0].value - minValue) / valueRange) * 130)}
               ${dataPoints.map((d, i) => {
-                const x = (i / (allPoints.length - 1)) * 400;
-                const y = 140 - ((d.value - minValue) / valueRange) * 130;
+                const x = safeNum(allPoints.length > 1 ? (i / (allPoints.length - 1)) * 400 : 200);
+                const y = safeNum(140 - ((d.value - minValue) / valueRange) * 130);
                 return `L ${x},${y}`;
               }).join(" ")}
-              L ${((dataPoints.length - 1) / (allPoints.length - 1)) * 400},140
+              L ${safeNum(allPoints.length > 1 ? ((dataPoints.length - 1) / (allPoints.length - 1)) * 400 : 200)},140
               L 0,140
               Z
             `}
@@ -95,10 +98,10 @@ export function CapacityProjection() {
           {/* Historical data line */}
           <path
             d={`
-              M 0,${140 - ((dataPoints[0].value - minValue) / valueRange) * 130}
+              M 0,${safeNum(140 - ((dataPoints[0].value - minValue) / valueRange) * 130)}
               ${dataPoints.map((d, i) => {
-                const x = (i / (allPoints.length - 1)) * 400;
-                const y = 140 - ((d.value - minValue) / valueRange) * 130;
+                const x = safeNum(allPoints.length > 1 ? (i / (allPoints.length - 1)) * 400 : 200);
+                const y = safeNum(140 - ((d.value - minValue) / valueRange) * 130);
                 return `L ${x},${y}`;
               }).join(" ")}
             `}
@@ -110,12 +113,12 @@ export function CapacityProjection() {
           {/* Projection line (dashed) */}
           <path
             d={`
-              M ${((dataPoints.length - 1) / (allPoints.length - 1)) * 400},${
-                140 - ((dataPoints[dataPoints.length - 1].value - minValue) / valueRange) * 130
+              M ${safeNum(allPoints.length > 1 ? ((dataPoints.length - 1) / (allPoints.length - 1)) * 400 : 200)},${
+                safeNum(140 - ((dataPoints[dataPoints.length - 1].value - minValue) / valueRange) * 130)
               }
               ${projections.map((d, i) => {
-                const x = ((dataPoints.length + i) / (allPoints.length - 1)) * 400;
-                const y = 140 - ((d.value - minValue) / valueRange) * 130;
+                const x = safeNum(allPoints.length > 1 ? ((dataPoints.length + i) / (allPoints.length - 1)) * 400 : 200);
+                const y = safeNum(140 - ((d.value - minValue) / valueRange) * 130);
                 return `L ${x},${y}`;
               }).join(" ")}
             `}
@@ -129,16 +132,16 @@ export function CapacityProjection() {
           {/* Projection area */}
           <path
             d={`
-              M ${((dataPoints.length - 1) / (allPoints.length - 1)) * 400},${
-                140 - ((dataPoints[dataPoints.length - 1].value - minValue) / valueRange) * 130
+              M ${safeNum(allPoints.length > 1 ? ((dataPoints.length - 1) / (allPoints.length - 1)) * 400 : 200)},${
+                safeNum(140 - ((dataPoints[dataPoints.length - 1].value - minValue) / valueRange) * 130)
               }
               ${projections.map((d, i) => {
-                const x = ((dataPoints.length + i) / (allPoints.length - 1)) * 400;
-                const y = 140 - ((d.value - minValue) / valueRange) * 130;
+                const x = safeNum(allPoints.length > 1 ? ((dataPoints.length + i) / (allPoints.length - 1)) * 400 : 200);
+                const y = safeNum(140 - ((d.value - minValue) / valueRange) * 130);
                 return `L ${x},${y}`;
               }).join(" ")}
               L 400,140
-              L ${((dataPoints.length - 1) / (allPoints.length - 1)) * 400},140
+              L ${safeNum(allPoints.length > 1 ? ((dataPoints.length - 1) / (allPoints.length - 1)) * 400 : 200)},140
               Z
             `}
             fill="hsl(var(--brand-500))"

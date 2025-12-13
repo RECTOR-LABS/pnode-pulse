@@ -1,11 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { formatBytes } from "@/lib/utils/format";
 
 type Range = "24h" | "7d" | "30d" | "90d";
 type TrendDataPoint = { time: Date; value: number | bigint };
+
+// Helper to ensure valid number for SVG paths (returns fallback for NaN/Infinity)
+const safeNum = (n: number, fallback = 0): number => (Number.isFinite(n) ? n : fallback);
+
+// Convert value to safe number, handling bigint and null/undefined
+const toSafeNumber = (value: number | bigint | null | undefined): number => {
+  if (value === null || value === undefined) return 0;
+  const num = typeof value === "bigint" ? Number(value) : value;
+  return Number.isFinite(num) ? num : 0;
+};
 
 export function NetworkGrowthChart() {
   const [range, setRange] = useState<Range>("7d");
@@ -16,11 +26,59 @@ export function NetworkGrowthChart() {
     { refetchInterval: 60000 }
   );
 
+  // Prepare and validate chart data
+  const chartData = useMemo(() => {
+    if (!data || data.length === 0) return null;
+
+    // Convert all values to safe numbers
+    const values = data.map((d: TrendDataPoint) => toSafeNumber(d.value));
+
+    // Filter out any remaining invalid values for min/max calculation
+    const validValues = values.filter((v) => Number.isFinite(v) && v >= 0);
+
+    if (validValues.length === 0) return null;
+
+    const minValue = Math.min(...validValues);
+    const maxValue = Math.max(...validValues);
+
+    // Handle edge cases for display range
+    const isFlat = maxValue === minValue;
+    let displayMin: number;
+    let displayMax: number;
+
+    if (isFlat) {
+      // For flat data, create 20% padding around the value
+      if (minValue === 0) {
+        // Special case: all zeros - show 0 to 1 range
+        displayMin = 0;
+        displayMax = 1;
+      } else {
+        displayMin = minValue * 0.9;
+        displayMax = maxValue * 1.1;
+      }
+    } else {
+      displayMin = minValue;
+      displayMax = maxValue;
+    }
+
+    const valueRange = displayMax - displayMin || 1;
+
+    return {
+      values,
+      minValue,
+      maxValue,
+      displayMin,
+      displayMax,
+      valueRange,
+      isFlat,
+    };
+  }, [data]);
+
   if (isLoading) {
     return <ChartSkeleton />;
   }
 
-  if (!data || data.length === 0) {
+  if (!data || data.length === 0 || !chartData) {
     return (
       <div className="text-muted-foreground text-sm text-center py-8">
         No trend data available yet. Data will appear after collection runs.
@@ -28,11 +86,7 @@ export function NetworkGrowthChart() {
     );
   }
 
-  // Prepare chart data
-  const values = data.map((d: TrendDataPoint) => Number(d.value));
-  const minValue = Math.min(...values);
-  const maxValue = Math.max(...values);
-  const valueRange = maxValue - minValue || 1;
+  const { values, minValue, maxValue, displayMin, valueRange, isFlat } = chartData;
 
   return (
     <div className="space-y-4">
@@ -83,45 +137,67 @@ export function NetworkGrowthChart() {
 
           {/* Area fill */}
           <path
-            d={`
-              M 0,${140 - ((Number(data[0]?.value ?? 0) - minValue) / valueRange) * 130}
-              ${data
-                .map((d: TrendDataPoint, i: number) => {
-                  const x = (i / (data.length - 1)) * 400;
-                  const y = 140 - ((Number(d.value) - minValue) / valueRange) * 130;
-                  return `L ${x},${y}`;
-                })
-                .join(" ")}
-              L 400,140
-              L 0,140
-              Z
-            `}
-            fill="url(#gradient)"
+            d={(() => {
+              // Calculate points using pre-validated values
+              const points = values.map((value, i) => {
+                const x = safeNum(values.length > 1 ? (i / (values.length - 1)) * 400 : 200);
+                const y = safeNum(140 - ((value - displayMin) / valueRange) * 130, 75);
+                return { x, y };
+              });
+
+              if (points.length === 0) return "";
+
+              // For single point, draw a horizontal line across the chart
+              if (points.length === 1) {
+                const y = points[0].y;
+                return `M 0,${y} L 400,${y} L 400,140 L 0,140 Z`;
+              }
+
+              // Build path: start at first point, line through all points, close area
+              const pathParts = [
+                `M 0,${points[0].y}`,
+                ...points.map((p) => `L ${p.x},${p.y}`),
+                `L 400,140`,
+                `L 0,140`,
+                `Z`,
+              ];
+
+              return pathParts.join(" ");
+            })()}
+            fill="url(#network-growth-gradient)"
             opacity="0.3"
           />
 
           {/* Line */}
           <path
-            d={`
-              M 0,${140 - ((Number(data[0]?.value ?? 0) - minValue) / valueRange) * 130}
-              ${data
-                .map((d: TrendDataPoint, i: number) => {
-                  const x = (i / (data.length - 1)) * 400;
-                  const y = 140 - ((Number(d.value) - minValue) / valueRange) * 130;
-                  return `L ${x},${y}`;
-                })
-                .join(" ")}
-            `}
+            d={(() => {
+              const points = values.map((value, i) => {
+                const x = safeNum(values.length > 1 ? (i / (values.length - 1)) * 400 : 200);
+                const y = safeNum(140 - ((value - displayMin) / valueRange) * 130, 75);
+                return { x, y };
+              });
+
+              if (points.length === 0) return "";
+
+              // For single point, draw a horizontal line across the chart
+              if (points.length === 1) {
+                const y = points[0].y;
+                return `M 0,${y} L 400,${y}`;
+              }
+
+              // Build line path: start at first point x=0, line through all points
+              return [`M 0,${points[0].y}`, ...points.map((p) => `L ${p.x},${p.y}`)].join(" ");
+            })()}
             fill="none"
-            stroke="hsl(var(--brand-500))"
-            strokeWidth="2"
+            stroke="#06B6D4"
+            strokeWidth="2.5"
           />
 
-          {/* Gradient definition */}
+          {/* Gradient definition - unique ID to avoid conflicts */}
           <defs>
-            <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="hsl(var(--brand-500))" />
-              <stop offset="100%" stopColor="hsl(var(--brand-500))" stopOpacity="0" />
+            <linearGradient id="network-growth-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#06B6D4" />
+              <stop offset="100%" stopColor="#06B6D4" stopOpacity="0" />
             </linearGradient>
           </defs>
         </svg>
@@ -139,27 +215,28 @@ export function NetworkGrowthChart() {
           <span className="text-muted-foreground">Current: </span>
           <span className="font-medium">
             {metric === "storage"
-              ? formatBytes(Number(data[data.length - 1]?.value ?? 0))
-              : data[data.length - 1]?.value ?? 0}
+              ? formatBytes(values[values.length - 1] ?? 0)
+              : values[values.length - 1] ?? 0}
           </span>
         </div>
         <div>
           <span className="text-muted-foreground">Change: </span>
-          <span
-            className={`font-medium ${
-              Number(data[data.length - 1]?.value ?? 0) >= Number(data[0]?.value ?? 0)
-                ? "text-status-active"
-                : "text-status-inactive"
-            }`}
-          >
-            {Number(data[data.length - 1]?.value ?? 0) >= Number(data[0]?.value ?? 0) ? "+" : ""}
-            {(
-              ((Number(data[data.length - 1]?.value ?? 0) - Number(data[0]?.value ?? 0)) /
-                (Number(data[0]?.value ?? 1) || 1)) *
-              100
-            ).toFixed(1)}
-            %
-          </span>
+          {(() => {
+            const current = values[values.length - 1] ?? 0;
+            const first = values[0] ?? 0;
+            const change = first !== 0 ? ((current - first) / first) * 100 : 0;
+            const isPositive = current >= first;
+            return (
+              <span
+                className={`font-medium ${
+                  isPositive ? "text-status-active" : "text-status-inactive"
+                }`}
+              >
+                {isPositive ? "+" : ""}
+                {safeNum(change).toFixed(1)}%
+              </span>
+            );
+          })()}
         </div>
       </div>
     </div>
