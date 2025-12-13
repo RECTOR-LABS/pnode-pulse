@@ -40,10 +40,11 @@ export function ConnectWallet() {
       <button
         onClick={handleConnect}
         disabled={connecting}
-        className="flex items-center gap-2 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors disabled:opacity-50"
+        className="group relative flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-brand-500 to-cyan-500 text-white font-medium rounded-xl shadow-md shadow-brand-500/25 hover:shadow-lg hover:shadow-brand-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
       >
         <WalletIcon />
-        {connecting ? "Connecting..." : "Connect Wallet"}
+        <span>{connecting ? "Connecting..." : "Connect Wallet"}</span>
+        <div className="absolute inset-0 rounded-xl bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
       </button>
     );
   }

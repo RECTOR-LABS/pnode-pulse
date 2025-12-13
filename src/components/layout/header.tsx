@@ -77,13 +77,15 @@ export function Header() {
           <div className="flex items-center justify-between mb-6">
             <Link
               href="/"
-              className="flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 rounded-lg"
+              className="flex items-center gap-2.5 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 rounded-lg"
               onClick={() => setMobileMenuOpen(false)}
             >
-              <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center" aria-hidden="true">
-                <span className="text-white font-bold text-sm">P</span>
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-cyan-500 flex items-center justify-center shadow-sm" aria-hidden="true">
+                <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12h4l3-9 4 18 3-9h4" />
+                </svg>
               </div>
-              <span className="font-semibold text-lg">pNode Pulse</span>
+              <span className="font-semibold text-lg tracking-tight whitespace-nowrap">pNode Pulse</span>
             </Link>
             <button
               onClick={() => setMobileMenuOpen(false)}
@@ -158,11 +160,13 @@ export function Header() {
                 </svg>
               </button>
 
-              <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 rounded-lg">
-                <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center" aria-hidden="true">
-                  <span className="text-white font-bold text-sm">P</span>
+              <Link href="/" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 rounded-lg" aria-label="pNode Pulse - Home">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-500 to-cyan-500 flex items-center justify-center shadow-sm" aria-hidden="true">
+                  <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 12h4l3-9 4 18 3-9h4" />
+                  </svg>
                 </div>
-                <span className="font-semibold text-lg hidden sm:inline">pNode Pulse</span>
+                <span className="font-semibold text-lg tracking-tight hidden sm:inline whitespace-nowrap">pNode Pulse</span>
               </Link>
 
               {/* Desktop nav */}
