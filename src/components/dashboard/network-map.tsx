@@ -409,13 +409,13 @@ export function NetworkMap() {
         {/* Hover tooltip */}
         {hoveredNode && !selectedNode && (
           <div
-            className="absolute pointer-events-none bg-popover border border-border rounded-lg shadow-lg p-2 text-xs z-10"
+            className="absolute pointer-events-none bg-background text-foreground border border-border rounded-lg shadow-xl p-2.5 text-xs z-10"
             style={{
               left: (hoveredNode.x! * transform.scale + transform.x) + 20,
               top: (hoveredNode.y! * transform.scale + transform.y) - 20,
             }}
           >
-            <div className="font-medium">{hoveredNode.label}</div>
+            <div className="font-medium text-foreground">{hoveredNode.label}</div>
             <div className="text-muted-foreground">v{hoveredNode.version || "unknown"}</div>
             <div className="text-muted-foreground">{formatBytes(hoveredNode.storage)}</div>
           </div>
@@ -423,7 +423,7 @@ export function NetworkMap() {
 
         {/* Selected node panel */}
         {selectedNode && (
-          <div className="absolute bottom-4 left-4 bg-popover border border-border rounded-lg shadow-lg p-4 w-64 z-10">
+          <div className="absolute bottom-4 left-4 bg-background text-foreground border border-border rounded-lg shadow-xl p-4 w-64 z-10">
             <div className="flex items-start justify-between mb-2">
               <div>
                 <div className="font-medium">{selectedNode.label}</div>
