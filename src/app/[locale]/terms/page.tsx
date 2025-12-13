@@ -1,4 +1,5 @@
 import { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Terms of Service | pNode Pulse",
@@ -97,7 +98,7 @@ export default function TermsOfServicePage() {
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-4 text-foreground">7. Data and Privacy</h2>
           <p className="text-muted-foreground">
-            Your use of the Service is also governed by our <a href="/en/privacy" className="text-brand-500 hover:underline">Privacy Policy</a>, which describes how we collect, use, and protect your data.
+            Your use of the Service is also governed by our <Link href="/privacy" className="text-brand-500 hover:underline">Privacy Policy</Link>, which describes how we collect, use, and protect your data.
           </p>
         </section>
 
