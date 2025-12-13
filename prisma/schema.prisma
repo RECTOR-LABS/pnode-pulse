@@ -158,6 +158,15 @@ model Node {
   /// Node lifecycle status for pruning (ACTIVE → INACTIVE → ARCHIVED)
   status    NodeStatus @default(ACTIVE)
 
+  /// Geolocation - latitude coordinate
+  latitude  Float?
+  /// Geolocation - longitude coordinate
+  longitude Float?
+  /// Country code (ISO 3166-1 alpha-2)
+  country   String?
+  /// City name
+  city      String?
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

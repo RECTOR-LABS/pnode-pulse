@@ -529,4 +529,36 @@ export const networkRouter = createTRPCRouter({
         },
       };
     }),
+
+  /**
+   * Get nodes with geolocation data for world map visualization
+   */
+  geoNodes: publicProcedure.query(async ({ ctx }) => {
+    const nodes = await ctx.db.node.findMany({
+      where: {
+        latitude: { not: null },
+        longitude: { not: null },
+      },
+      select: {
+        id: true,
+        latitude: true,
+        longitude: true,
+        country: true,
+        city: true,
+        isActive: true,
+        version: true,
+      },
+      orderBy: { lastSeen: "desc" },
+    });
+
+    return nodes.map((n) => ({
+      id: n.id,
+      latitude: n.latitude!,
+      longitude: n.longitude!,
+      country: n.country || "Unknown",
+      city: n.city || "Unknown",
+      isActive: n.isActive,
+      version: n.version,
+    }));
+  }),
 });

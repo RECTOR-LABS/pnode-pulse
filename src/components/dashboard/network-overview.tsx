@@ -41,6 +41,19 @@ const NetworkMap = dynamic(
   { loading: () => <NetworkMapSkeleton />, ssr: false }
 );
 
+const GeoMap = dynamic(
+  () => import("@/components/dashboard/geo-map").then((mod) => mod.GeoMap),
+  { loading: () => <GeoMapSkeleton />, ssr: false }
+);
+
+function GeoMapSkeleton() {
+  return (
+    <div className="w-full aspect-[2/1] bg-muted/30 rounded-lg animate-pulse flex items-center justify-center">
+      <span className="text-muted-foreground text-sm">Loading world map...</span>
+    </div>
+  );
+}
+
 const NodesAtRisk = dynamic(
   () => import("@/components/dashboard/nodes-at-risk").then((mod) => mod.NodesAtRisk),
   { loading: () => <ChartSkeleton />, ssr: false }
@@ -120,6 +133,15 @@ export function NetworkOverview() {
           subtitle="per node"
           icon={<UptimeIcon />}
         />
+      </div>
+
+      {/* World Map - Geographic Distribution */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Global Node Distribution</h2>
+          <span className="text-xs text-muted-foreground">Geographic visualization</span>
+        </div>
+        <GeoMap />
       </div>
 
       {/* Network Topology - Featured Widget */}
