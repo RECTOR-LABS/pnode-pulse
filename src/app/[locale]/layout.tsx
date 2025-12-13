@@ -13,7 +13,7 @@ import { Footer } from "@/components/layout/footer";
 import "../globals.css";
 
 export const viewport: Viewport = {
-  themeColor: "#8b5cf6",
+  themeColor: "#0066FF",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
@@ -55,7 +55,10 @@ export const metadata: Metadata = {
     description: "Real-time analytics platform for Xandeum's pNode network",
   },
   icons: {
-    icon: [{ url: "/icons/icon.svg", type: "image/svg+xml" }],
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/icons/icon.svg", type: "image/svg+xml" },
+    ],
     apple: [{ url: "/icons/icon-192x192.svg", sizes: "192x192", type: "image/svg+xml" }],
   },
 };

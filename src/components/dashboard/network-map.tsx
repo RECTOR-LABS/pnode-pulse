@@ -23,14 +23,15 @@ interface GraphEdge {
   target: number;
 }
 
-// Version color mapping
+// Version color mapping - Updated for new brand palette
 const VERSION_COLORS: Record<string, string> = {
-  "0.6.0": "hsl(var(--brand-500))",
-  "0.5.1": "hsl(var(--status-warning))",
-  "0.5.0": "hsl(var(--status-inactive))",
+  "0.7.0": "#0066FF", // Brand blue (latest)
+  "0.6.0": "#06B6D4", // Accent cyan
+  "0.5.1": "#F59E0B", // Warning amber
+  "0.5.0": "#EF4444", // Inactive red
 };
 
-const DEFAULT_COLOR = "hsl(var(--muted-foreground))";
+const DEFAULT_COLOR = "#64748b"; // Muted gray
 
 export function NetworkMap() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -191,10 +192,18 @@ export function NetworkMap() {
     }));
   }, []);
 
-  // Get node color by version
+  // Get node color by version (handles version strings like "0.7.0-trynet.xxx")
   const getNodeColor = (node: GraphNode) => {
-    if (!node.isActive) return "hsl(var(--status-inactive))";
-    return VERSION_COLORS[node.version || ""] || DEFAULT_COLOR;
+    if (!node.isActive) return "#94a3b8"; // Muted gray for inactive
+    if (!node.version) return DEFAULT_COLOR;
+
+    // Check for major version matches
+    if (node.version.startsWith("0.7")) return VERSION_COLORS["0.7.0"];
+    if (node.version.startsWith("0.6")) return VERSION_COLORS["0.6.0"];
+    if (node.version.startsWith("0.5.1")) return VERSION_COLORS["0.5.1"];
+    if (node.version.startsWith("0.5")) return VERSION_COLORS["0.5.0"];
+
+    return VERSION_COLORS[node.version] || DEFAULT_COLOR;
   };
 
   // Get node radius based on storage
@@ -245,12 +254,26 @@ export function NetworkMap() {
             <span>Inactive</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setTransform((prev) => ({ ...prev, scale: Math.min(3, prev.scale * 1.2) }))}
+            className="w-7 h-7 flex items-center justify-center text-sm font-medium rounded bg-muted hover:bg-muted/80 transition-colors"
+            title="Zoom in"
+          >
+            +
+          </button>
+          <button
+            onClick={() => setTransform((prev) => ({ ...prev, scale: Math.max(0.3, prev.scale / 1.2) }))}
+            className="w-7 h-7 flex items-center justify-center text-sm font-medium rounded bg-muted hover:bg-muted/80 transition-colors"
+            title="Zoom out"
+          >
+            -
+          </button>
           <button
             onClick={() => setTransform({ x: 0, y: 0, scale: 1 })}
-            className="px-2 py-1 text-xs rounded bg-muted hover:bg-muted/80 transition-colors"
+            className="px-2 py-1 text-xs rounded bg-muted hover:bg-muted/80 transition-colors ml-1"
           >
-            Reset View
+            Fit
           </button>
         </div>
       </div>
@@ -271,6 +294,27 @@ export function NetworkMap() {
           height={dimensions.height}
           className="w-full h-full"
         >
+          {/* Definitions for animations */}
+          <defs>
+            <linearGradient id="edge-pulse-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#0066FF" stopOpacity="0">
+                <animate attributeName="offset" values="-0.5;1" dur="2s" repeatCount="indefinite" />
+              </stop>
+              <stop offset="50%" stopColor="#06B6D4" stopOpacity="0.8">
+                <animate attributeName="offset" values="0;1.5" dur="2s" repeatCount="indefinite" />
+              </stop>
+              <stop offset="100%" stopColor="#0066FF" stopOpacity="0">
+                <animate attributeName="offset" values="0.5;2" dur="2s" repeatCount="indefinite" />
+              </stop>
+            </linearGradient>
+            <filter id="node-glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
           <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}>
             {/* Background for pan events */}
             <rect
@@ -304,20 +348,51 @@ export function NetworkMap() {
             })}
 
             {/* Nodes */}
-            {nodes.map((node) => {
+            {nodes.map((node, index) => {
               const isSelected = selectedNode?.id === node.id;
               const isHovered = hoveredNode?.id === node.id;
               const radius = getNodeRadius(node);
+              const color = getNodeColor(node);
               return (
-                <g key={node.id}>
+                <g key={node.id} style={{ animationDelay: `${index * 10}ms` }}>
+                  {/* Pulse ring for active nodes */}
+                  {node.isActive && (
+                    <circle
+                      cx={node.x}
+                      cy={node.y}
+                      r={radius}
+                      fill="none"
+                      stroke={color}
+                      strokeWidth={1}
+                      opacity={0.3}
+                    >
+                      <animate
+                        attributeName="r"
+                        values={`${radius};${radius + 8};${radius}`}
+                        dur="3s"
+                        repeatCount="indefinite"
+                        begin={`${(index % 10) * 0.3}s`}
+                      />
+                      <animate
+                        attributeName="opacity"
+                        values="0.3;0;0.3"
+                        dur="3s"
+                        repeatCount="indefinite"
+                        begin={`${(index % 10) * 0.3}s`}
+                      />
+                    </circle>
+                  )}
+                  {/* Main node circle */}
                   <circle
                     cx={node.x}
                     cy={node.y}
                     r={radius + (isSelected || isHovered ? 3 : 0)}
-                    fill={getNodeColor(node)}
-                    stroke={isSelected ? "hsl(var(--foreground))" : isHovered ? "hsl(var(--brand-500))" : "transparent"}
+                    fill={color}
+                    stroke={isSelected ? "#0f172a" : isHovered ? "#0066FF" : "transparent"}
                     strokeWidth={2}
+                    filter={isHovered || isSelected ? "url(#node-glow)" : undefined}
                     className="cursor-pointer transition-all"
+                    style={{ transition: "r 0.2s ease-out, stroke 0.2s ease-out" }}
                     onMouseEnter={() => setHoveredNode(node)}
                     onMouseLeave={() => setHoveredNode(null)}
                     onClick={(e) => {

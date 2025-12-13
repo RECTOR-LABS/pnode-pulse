@@ -23,7 +23,18 @@ export function StatCard({
   status,
 }: StatCardProps) {
   const statusBadge = status && (
-    <span className={`status-badge status-badge-${status}`}>
+    <span className={`status-badge status-badge-${status} flex items-center gap-1.5`}>
+      <span
+        className={`w-2 h-2 rounded-full ${
+          status === "active"
+            ? "bg-status-active status-pulse"
+            : status === "inactive"
+            ? "bg-status-inactive"
+            : status === "warning"
+            ? "bg-status-warning"
+            : "bg-muted-foreground"
+        }`}
+      />
       {status === "active" ? "Online" : status === "inactive" ? "Offline" : status === "warning" ? "Degraded" : "Loading"}
     </span>
   );

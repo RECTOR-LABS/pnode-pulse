@@ -8,18 +8,23 @@
   --muted: #f1f5f9;
   --muted-foreground: #64748b;
 
-  /* Brand Colors - Sky Blue (Xandeum inspired) */
-  --brand-50: #f0f9ff;
-  --brand-100: #e0f2fe;
-  --brand-200: #bae6fd;
-  --brand-300: #7dd3fc;
-  --brand-400: #38bdf8;
-  --brand-500: #0ea5e9;
-  --brand-600: #0284c7;
-  --brand-700: #0369a1;
-  --brand-800: #075985;
-  --brand-900: #0c4a6e;
-  --brand-950: #082f49;
+  /* Brand Colors - Trust Blue → Tech Cyan */
+  --brand-50: #eff6ff;
+  --brand-100: #dbeafe;
+  --brand-200: #bfdbfe;
+  --brand-300: #93c5fd;
+  --brand-400: #3385ff;
+  --brand-500: #0066ff;
+  --brand-600: #0052cc;
+  --brand-700: #0040a0;
+  --brand-800: #003380;
+  --brand-900: #002966;
+  --brand-950: #001a40;
+
+  /* Accent Colors - Tech Cyan */
+  --accent-400: #22d3ee;
+  --accent-500: #06b6d4;
+  --accent-600: #0891b2;
 
   /* Status Colors */
   --status-active: #22c55e;
@@ -35,7 +40,7 @@
   --card: #ffffff;
   --card-foreground: #0f172a;
   --border: #e2e8f0;
-  --ring: #0ea5e9;
+  --ring: #0066ff;
 
   /* Radius */
   --radius: 0.5rem;
@@ -81,6 +86,11 @@
   --color-brand-800: var(--brand-800);
   --color-brand-900: var(--brand-900);
   --color-brand-950: var(--brand-950);
+
+  /* Accent Palette */
+  --color-accent-400: var(--accent-400);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
 
   /* Status Colors */
   --color-status-active: var(--status-active);
@@ -159,4 +169,79 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
+}
+
+/* ===== Animation Classes ===== */
+
+/* Card pulse animation for data refresh */
+@keyframes cardPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.01); box-shadow: 0 0 20px rgba(0, 102, 255, 0.15); }
+  100% { transform: scale(1); }
+}
+
+.card-pulse {
+  animation: cardPulse 0.4s ease-out;
+}
+
+/* Fade in animation for staggered loading */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.3s ease-out forwards;
+}
+
+/* Status dot pulse */
+@keyframes statusPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0.7; }
+}
+
+.status-pulse {
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+/* Subtle glow effect */
+@keyframes subtleGlow {
+  0%, 100% { box-shadow: 0 0 5px rgba(0, 102, 255, 0.2); }
+  50% { box-shadow: 0 0 15px rgba(0, 102, 255, 0.4); }
+}
+
+.animate-glow {
+  animation: subtleGlow 3s ease-in-out infinite;
+}
+
+/* Progress bar animation */
+@keyframes progressFill {
+  from { width: 0; }
+}
+
+.animate-progress {
+  animation: progressFill 0.8s ease-out forwards;
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 0%,
+    var(--border) 50%,
+    var(--muted) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
 }

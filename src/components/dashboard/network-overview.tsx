@@ -36,6 +36,24 @@ const PerformanceComparison = dynamic(
   { loading: () => <ChartSkeleton />, ssr: false }
 );
 
+const NetworkMap = dynamic(
+  () => import("@/components/dashboard/network-map").then((mod) => mod.NetworkMap),
+  { loading: () => <NetworkMapSkeleton />, ssr: false }
+);
+
+const NodesAtRisk = dynamic(
+  () => import("@/components/dashboard/nodes-at-risk").then((mod) => mod.NodesAtRisk),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+function NetworkMapSkeleton() {
+  return (
+    <div className="h-[500px] bg-muted/30 rounded-lg animate-pulse flex items-center justify-center">
+      <span className="text-muted-foreground text-sm">Loading network topology...</span>
+    </div>
+  );
+}
+
 function ChartSkeleton() {
   return (
     <div className="h-48 bg-muted/30 rounded-lg animate-pulse flex items-center justify-center">
@@ -104,6 +122,15 @@ export function NetworkOverview() {
         />
       </div>
 
+      {/* Network Topology - Featured Widget */}
+      <div className="card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold">Network Topology</h2>
+          <span className="text-xs text-muted-foreground">Interactive visualization</span>
+        </div>
+        <NetworkMap />
+      </div>
+
       {/* Two column layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Network Health */}
@@ -160,10 +187,18 @@ export function NetworkOverview() {
         </div>
       </div>
 
-      {/* Network History & Activity */}
+      {/* Predictive Analytics & Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Graveyard Stats (#167) */}
-        <GraveyardStats />
+        {/* Nodes at Risk - Predictive Widget */}
+        <div className="card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold">Nodes at Risk</h2>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-brand-100 text-brand-600 dark:bg-brand-900/20 dark:text-brand-400">
+              Predictive
+            </span>
+          </div>
+          <NodesAtRisk />
+        </div>
 
         {/* IP Changes (#169) */}
         <IpChangesWidget />
@@ -181,6 +216,9 @@ export function NetworkOverview() {
           )}
         </div>
       </div>
+
+      {/* Graveyard Stats */}
+      <GraveyardStats />
 
       {/* Quick Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
