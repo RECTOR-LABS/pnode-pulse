@@ -459,17 +459,54 @@ export const networkRouter = createTRPCRouter({
 
       const storageMap = new Map(metrics.map(m => [m.node_id, m.file_size]));
 
-      // Get peer connections between these nodes
-      const edges = await ctx.db.nodePeer.findMany({
+      // Build address-to-ID map for resolving peer addresses
+      const addressToId = new Map(nodes.map((n) => [n.address, n.id]));
+      // Also map IP-only (without port) to nodeId for matching
+      const ipToId = new Map(nodes.map((n) => [n.address.split(":")[0], n.id]));
+
+      // Get peer connections - include both resolved (peerNodeId) and unresolved (peerAddress) matches
+      const peerData = await ctx.db.nodePeer.findMany({
         where: {
           nodeId: { in: nodeIds },
-          peerNodeId: { in: nodeIds },
         },
         select: {
           nodeId: true,
           peerNodeId: true,
+          peerAddress: true,
         },
       });
+
+      // Build edges from peer data, resolving by peerNodeId OR peerAddress
+      const edgeSet = new Set<string>(); // Dedupe edges
+      const edges: Array<{ source: number; target: number }> = [];
+
+      for (const peer of peerData) {
+        let targetId: number | null = null;
+
+        // First try resolved peerNodeId
+        if (peer.peerNodeId && nodeIds.includes(peer.peerNodeId)) {
+          targetId = peer.peerNodeId;
+        }
+        // Fallback: resolve by peerAddress
+        else if (peer.peerAddress) {
+          // Try exact address match
+          targetId = addressToId.get(peer.peerAddress) ?? null;
+          // Try IP-only match (peerAddress might have different port)
+          if (!targetId) {
+            const peerIp = peer.peerAddress.split(":")[0];
+            targetId = ipToId.get(peerIp) ?? null;
+          }
+        }
+
+        // Add edge if target resolved and not self-loop
+        if (targetId && targetId !== peer.nodeId) {
+          const edgeKey = `${Math.min(peer.nodeId, targetId)}-${Math.max(peer.nodeId, targetId)}`;
+          if (!edgeSet.has(edgeKey)) {
+            edgeSet.add(edgeKey);
+            edges.push({ source: peer.nodeId, target: targetId });
+          }
+        }
+      }
 
       // Calculate max storage for normalization
       const storageValues = Array.from(storageMap.values()).map(v => Number(v));
@@ -484,12 +521,7 @@ export const networkRouter = createTRPCRouter({
           storage: Number(storageMap.get(n.id) ?? 0),
           normalizedSize: (Number(storageMap.get(n.id) ?? 0) / maxStorage),
         })),
-        edges: edges
-          .filter((e) => e.peerNodeId !== null)
-          .map((e) => ({
-            source: e.nodeId,
-            target: e.peerNodeId!,
-          })),
+        edges,
         stats: {
           nodeCount: nodes.length,
           edgeCount: edges.length,
