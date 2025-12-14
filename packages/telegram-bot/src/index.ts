@@ -12,7 +12,7 @@
  * /help - Command list
  */
 
-import { Telegraf, Context } from "telegraf";
+import { Telegraf } from "telegraf";
 import { config } from "./config";
 import { logger } from "./logger";
 
