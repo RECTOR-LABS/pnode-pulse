@@ -36,11 +36,6 @@ const PerformanceComparison = dynamic(
   { loading: () => <ChartSkeleton />, ssr: false }
 );
 
-const NetworkMap = dynamic(
-  () => import("@/components/dashboard/network-map").then((mod) => mod.NetworkMap),
-  { loading: () => <NetworkMapSkeleton />, ssr: false }
-);
-
 const GeoMap = dynamic(
   () => import("@/components/dashboard/geo-map").then((mod) => mod.GeoMap),
   { loading: () => <GeoMapSkeleton />, ssr: false }
@@ -58,14 +53,6 @@ const NodesAtRisk = dynamic(
   () => import("@/components/dashboard/nodes-at-risk").then((mod) => mod.NodesAtRisk),
   { loading: () => <ChartSkeleton />, ssr: false }
 );
-
-function NetworkMapSkeleton() {
-  return (
-    <div className="h-[500px] bg-muted/30 rounded-lg animate-pulse flex items-center justify-center">
-      <span className="text-muted-foreground text-sm">Loading network topology...</span>
-    </div>
-  );
-}
 
 function ChartSkeleton() {
   return (
@@ -142,15 +129,6 @@ export function NetworkOverview() {
           <span className="text-xs text-muted-foreground">Geographic visualization</span>
         </div>
         <GeoMap />
-      </div>
-
-      {/* Network Topology - Featured Widget */}
-      <div className="card p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Network Topology</h2>
-          <span className="text-xs text-muted-foreground">Interactive visualization</span>
-        </div>
-        <NetworkMap />
       </div>
 
       {/* Two column layout */}

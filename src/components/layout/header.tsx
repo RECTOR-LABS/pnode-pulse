@@ -14,7 +14,6 @@ const primaryNav = [
   { name: "Overview", href: "/" },
   { name: "Nodes", href: "/nodes" },
   { name: "Analytics", href: "/analytics" },
-  { name: "Map", href: "/map" },
 ];
 
 // Secondary navigation - in "More" dropdown
