@@ -61,11 +61,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // Fetch user when token changes
-  const { data: userData, refetch: refetchUser } = trpc.auth.me.useQuery(
+  const { data: userData, refetch: refetchUser, isSuccess, isFetched } = trpc.auth.me.useQuery(
     { token: token || "" },
     {
       enabled: !!token,
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 0, // Always fetch fresh on mount (auth is critical)
+      refetchOnMount: true,
+      refetchOnWindowFocus: true,
       retry: false,
     }
   );
@@ -73,12 +75,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (userData) {
       setUser(userData as User);
-    } else if (token && userData === null) {
-      // Token is invalid, clear it
+    } else if (token && isFetched && isSuccess && userData === null) {
+      // Query completed successfully but returned null = invalid/expired token
       setToken(null);
+      setUser(null);
       localStorage.removeItem(TOKEN_KEY);
     }
-  }, [userData, token]);
+  }, [userData, token, isFetched, isSuccess]);
 
   const login = useCallback(async () => {
     if (!publicKey || !signMessage) {
