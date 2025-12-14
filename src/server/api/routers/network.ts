@@ -420,6 +420,7 @@ export const networkRouter = createTRPCRouter({
    */
   /**
    * #36: Get network graph data for visualization
+   * Prioritizes nodes with peer connections to build a meaningful graph
    */
   peerGraph: publicProcedure
     .input(
@@ -432,21 +433,62 @@ export const networkRouter = createTRPCRouter({
       const limit = input?.limit ?? 100;
       const includeInactive = input?.includeInactive ?? false;
 
-      // Get nodes with their latest metrics for sizing
-      const nodes = await ctx.db.node.findMany({
-        where: includeInactive ? {} : { isActive: true },
-        take: limit,
-        orderBy: { lastSeen: "desc" },
-        select: {
-          id: true,
-          address: true,
-          version: true,
-          isActive: true,
-        },
-      });
+      // Get nodes that have peer connections (these form the actual graph)
+      // Prioritize nodes that are part of peer relationships
+      const nodesWithPeers = includeInactive
+        ? await ctx.db.$queryRaw<Array<{
+            id: number;
+            address: string;
+            version: string | null;
+            is_active: boolean;
+          }>>`
+            SELECT DISTINCT n.id, n.address, n.version, n.is_active
+            FROM nodes n
+            WHERE n.id IN (
+              SELECT DISTINCT node_id FROM node_peers
+              UNION
+              SELECT DISTINCT peer_node_id FROM node_peers WHERE peer_node_id IS NOT NULL
+            )
+            ORDER BY n.id
+            LIMIT ${limit}
+          `
+        : await ctx.db.$queryRaw<Array<{
+            id: number;
+            address: string;
+            version: string | null;
+            is_active: boolean;
+          }>>`
+            SELECT DISTINCT n.id, n.address, n.version, n.is_active
+            FROM nodes n
+            WHERE n.id IN (
+              SELECT DISTINCT node_id FROM node_peers
+              UNION
+              SELECT DISTINCT peer_node_id FROM node_peers WHERE peer_node_id IS NOT NULL
+            )
+            AND n.is_active = true
+            ORDER BY n.id
+            LIMIT ${limit}
+          `;
+
+      const nodes = nodesWithPeers.map(n => ({
+        id: n.id,
+        address: n.address,
+        version: n.version,
+        isActive: n.is_active,
+      }));
+
+      // Get node IDs for further queries
+      const nodeIds = nodes.map((n) => n.id);
+
+      if (nodeIds.length === 0) {
+        return {
+          nodes: [],
+          edges: [],
+          stats: { nodeCount: 0, edgeCount: 0, maxStorage: 1 },
+        };
+      }
 
       // Get latest storage metrics for each node
-      const nodeIds = nodes.map((n) => n.id);
       const metrics = await ctx.db.$queryRaw<Array<{
         node_id: number;
         file_size: bigint;
@@ -464,7 +506,7 @@ export const networkRouter = createTRPCRouter({
       // Also map IP-only (without port) to nodeId for matching
       const ipToId = new Map(nodes.map((n) => [n.address.split(":")[0], n.id]));
 
-      // Get peer connections - include both resolved (peerNodeId) and unresolved (peerAddress) matches
+      // Get peer connections between nodes in our set
       const peerData = await ctx.db.nodePeer.findMany({
         where: {
           nodeId: { in: nodeIds },
