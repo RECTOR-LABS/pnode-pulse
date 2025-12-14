@@ -15,6 +15,7 @@ import {
   ChatInputCommandInteraction,
 } from "discord.js";
 import { config } from "./config";
+import { logger } from "./logger";
 
 // Initialize Discord client
 const client = new Client({
@@ -388,7 +389,7 @@ async function handleStats(interaction: ChatInputCommandInteraction) {
 
 // Event handlers
 client.once(Events.ClientReady, (readyClient) => {
-  console.log("Bot is ready! Logged in as " + readyClient.user.tag);
+  logger.info("Bot is ready!", { user: readyClient.user.tag });
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
@@ -410,7 +411,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
         break;
     }
   } catch (error) {
-    console.error("Command error:", error);
+    logger.error("Command error", {
+      command: interaction.commandName,
+      error: error instanceof Error ? error.message : String(error),
+    });
     const reply = {
       content: "An error occurred while executing this command.",
       ephemeral: true,
@@ -428,7 +432,7 @@ async function main() {
   // Register slash commands
   const rest = new REST().setToken(config.discordToken);
 
-  console.log("Registering slash commands...");
+  logger.info("Registering slash commands...");
 
   const route = config.discordGuildId
     ? Routes.applicationGuildCommands(config.discordClientId, config.discordGuildId)
@@ -436,10 +440,13 @@ async function main() {
 
   await rest.put(route, { body: commands.map((c) => c.toJSON()) });
 
-  console.log("Slash commands registered!");
+  logger.info("Slash commands registered!");
 
   // Login to Discord
   await client.login(config.discordToken);
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  logger.error("Failed to start bot", err instanceof Error ? err : new Error(String(err)));
+  process.exit(1);
+});
