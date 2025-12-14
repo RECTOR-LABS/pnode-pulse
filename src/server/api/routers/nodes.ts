@@ -302,23 +302,27 @@ export const nodesRouter = createTRPCRouter({
       }
 
       // For aggregated data, use raw SQL with continuous aggregates
-      const viewName = aggregation === "hourly" ? "node_metrics_hourly" : "node_metrics_daily";
-
-      const metrics = await ctx.db.$queryRawUnsafe<Array<{
+      // Use separate parameterized queries for each view to avoid SQL injection patterns
+      type AggregatedMetric = {
         bucket: Date;
         avg_cpu: number | null;
         avg_ram_percent: number | null;
         max_uptime: number | null;
         max_file_size: bigint | null;
         sample_count: bigint;
-      }>>(
-        `SELECT bucket, avg_cpu, avg_ram_percent, max_uptime, max_file_size, sample_count
-         FROM ${viewName}
-         WHERE node_id = $1 AND bucket >= $2
-         ORDER BY bucket ASC`,
-        nodeId,
-        startTime
-      );
+      };
+
+      const metrics = aggregation === "hourly"
+        ? await ctx.db.$queryRaw<AggregatedMetric[]>`
+            SELECT bucket, avg_cpu, avg_ram_percent, max_uptime, max_file_size, sample_count
+            FROM node_metrics_hourly
+            WHERE node_id = ${nodeId} AND bucket >= ${startTime}
+            ORDER BY bucket ASC`
+        : await ctx.db.$queryRaw<AggregatedMetric[]>`
+            SELECT bucket, avg_cpu, avg_ram_percent, max_uptime, max_file_size, sample_count
+            FROM node_metrics_daily
+            WHERE node_id = ${nodeId} AND bucket >= ${startTime}
+            ORDER BY bucket ASC`;
 
       return metrics;
     }),
@@ -420,22 +424,9 @@ export const nodesRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const { metric, order, limit } = input;
 
-      // Define sort order for each metric
-      // For uptime & storage: higher is better (DESC for top)
-      // For CPU & RAM: lower is better (ASC for top)
-      const isLowerBetter = metric === "cpu" || metric === "ram";
-      const sortDirection = (order === "top") !== isLowerBetter ? "DESC" : "ASC";
-
-      // Map metric to SQL column
-      const metricColumn = {
-        uptime: "lm.uptime",
-        cpu: "lm.cpu_percent",
-        ram: "lm.ram_percent",
-        storage: "lm.file_size",
-      }[metric];
-
-      // Get nodes with their latest metrics, sorted by the specified metric
-      const result = await ctx.db.$queryRawUnsafe<Array<{
+      // Use separate parameterized queries for each metric/order combination
+      // to avoid SQL injection patterns
+      type LeaderboardRow = {
         node_id: number;
         address: string;
         version: string | null;
@@ -443,37 +434,121 @@ export const nodesRouter = createTRPCRouter({
         ram_percent: number | null;
         file_size: bigint | null;
         uptime: number | null;
-      }>>(
-        `WITH latest_metrics AS (
-          SELECT DISTINCT ON (nm.node_id)
-            nm.node_id,
-            nm.cpu_percent,
-            CASE WHEN nm.ram_total > 0
-              THEN (nm.ram_used::float / nm.ram_total * 100)
-              ELSE 0
-            END as ram_percent,
-            nm.file_size,
-            nm.uptime
-          FROM node_metrics nm
-          JOIN nodes n ON n.id = nm.node_id
-          WHERE n.is_active = true
-          ORDER BY nm.node_id, nm.time DESC
-        )
-        SELECT
-          n.id as node_id,
-          n.address,
-          n.version,
-          lm.cpu_percent,
-          lm.ram_percent,
-          lm.file_size,
-          lm.uptime
-        FROM nodes n
-        JOIN latest_metrics lm ON lm.node_id = n.id
-        WHERE n.is_active = true
-        ORDER BY ${metricColumn} ${sortDirection} NULLS LAST
-        LIMIT $1`,
-        limit
-      );
+      };
+
+      // Execute the appropriate query based on metric and order
+      // Using separate tagged templates for each combination
+      let result: LeaderboardRow[];
+
+      if (metric === "uptime") {
+        // Higher uptime is better: top = DESC, bottom = ASC
+        result = order === "top"
+          ? await ctx.db.$queryRaw<LeaderboardRow[]>`
+              WITH latest_metrics AS (
+                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+                  CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
+                  nm.file_size, nm.uptime
+                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
+                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
+              )
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+              WHERE n.is_active = true
+              ORDER BY lm.uptime DESC NULLS LAST LIMIT ${limit}`
+          : await ctx.db.$queryRaw<LeaderboardRow[]>`
+              WITH latest_metrics AS (
+                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+                  CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
+                  nm.file_size, nm.uptime
+                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
+                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
+              )
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+              WHERE n.is_active = true
+              ORDER BY lm.uptime ASC NULLS LAST LIMIT ${limit}`;
+      } else if (metric === "cpu") {
+        // Lower CPU is better: top = ASC, bottom = DESC
+        result = order === "top"
+          ? await ctx.db.$queryRaw<LeaderboardRow[]>`
+              WITH latest_metrics AS (
+                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+                  CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
+                  nm.file_size, nm.uptime
+                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
+                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
+              )
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+              WHERE n.is_active = true
+              ORDER BY lm.cpu_percent ASC NULLS LAST LIMIT ${limit}`
+          : await ctx.db.$queryRaw<LeaderboardRow[]>`
+              WITH latest_metrics AS (
+                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+                  CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
+                  nm.file_size, nm.uptime
+                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
+                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
+              )
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+              WHERE n.is_active = true
+              ORDER BY lm.cpu_percent DESC NULLS LAST LIMIT ${limit}`;
+      } else if (metric === "ram") {
+        // Lower RAM is better: top = ASC, bottom = DESC
+        result = order === "top"
+          ? await ctx.db.$queryRaw<LeaderboardRow[]>`
+              WITH latest_metrics AS (
+                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+                  CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
+                  nm.file_size, nm.uptime
+                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
+                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
+              )
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+              WHERE n.is_active = true
+              ORDER BY lm.ram_percent ASC NULLS LAST LIMIT ${limit}`
+          : await ctx.db.$queryRaw<LeaderboardRow[]>`
+              WITH latest_metrics AS (
+                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+                  CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
+                  nm.file_size, nm.uptime
+                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
+                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
+              )
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+              WHERE n.is_active = true
+              ORDER BY lm.ram_percent DESC NULLS LAST LIMIT ${limit}`;
+      } else {
+        // storage: Higher is better: top = DESC, bottom = ASC
+        result = order === "top"
+          ? await ctx.db.$queryRaw<LeaderboardRow[]>`
+              WITH latest_metrics AS (
+                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+                  CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
+                  nm.file_size, nm.uptime
+                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
+                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
+              )
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+              WHERE n.is_active = true
+              ORDER BY lm.file_size DESC NULLS LAST LIMIT ${limit}`
+          : await ctx.db.$queryRaw<LeaderboardRow[]>`
+              WITH latest_metrics AS (
+                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+                  CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
+                  nm.file_size, nm.uptime
+                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
+                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
+              )
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+              WHERE n.is_active = true
+              ORDER BY lm.file_size ASC NULLS LAST LIMIT ${limit}`;
+      }
 
       return result.map((r) => ({
         nodeId: r.node_id,
@@ -510,21 +585,25 @@ export const nodesRouter = createTRPCRouter({
       };
       const startTime = new Date(now.getTime() - rangeMs[range]);
 
-      // Use daily aggregates for longer ranges, hourly for shorter
-      const viewName = range === "7d" ? "node_metrics_hourly" : "node_metrics_daily";
-
-      const metrics = await ctx.db.$queryRawUnsafe<Array<{
+      // Use separate parameterized queries for each view to avoid SQL injection patterns
+      type MetricsHistoryRow = {
         bucket: Date;
         avg_cpu: number | null;
         avg_ram_percent: number | null;
-      }>>(
-        `SELECT bucket, avg_cpu, avg_ram_percent
-         FROM ${viewName}
-         WHERE node_id = $1 AND bucket >= $2
-         ORDER BY bucket ASC`,
-        nodeId,
-        startTime
-      );
+      };
+
+      // Use hourly aggregates for 7d, daily for longer ranges
+      const metrics = range === "7d"
+        ? await ctx.db.$queryRaw<MetricsHistoryRow[]>`
+            SELECT bucket, avg_cpu, avg_ram_percent
+            FROM node_metrics_hourly
+            WHERE node_id = ${nodeId} AND bucket >= ${startTime}
+            ORDER BY bucket ASC`
+        : await ctx.db.$queryRaw<MetricsHistoryRow[]>`
+            SELECT bucket, avg_cpu, avg_ram_percent
+            FROM node_metrics_daily
+            WHERE node_id = ${nodeId} AND bucket >= ${startTime}
+            ORDER BY bucket ASC`;
 
       return metrics.map((m) => ({
         time: m.bucket,

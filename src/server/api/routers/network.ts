@@ -329,7 +329,6 @@ export const networkRouter = createTRPCRouter({
 
       // Determine which aggregate to use
       const useDaily = range === "30d" || range === "90d";
-      const tableName = useDaily ? "network_metrics_daily" : "network_metrics_hourly";
 
       const rangeMs = {
         "24h": 24 * 60 * 60 * 1000,
@@ -340,19 +339,26 @@ export const networkRouter = createTRPCRouter({
 
       const startTime = new Date(Date.now() - rangeMs[range]);
 
-      const result = await ctx.db.$queryRawUnsafe<Array<{
+      // Use separate parameterized queries for each table to avoid SQL injection patterns
+      type TrendRow = {
         bucket: Date;
         node_count: bigint;
         total_storage: bigint;
         avg_cpu: number;
         avg_ram_percent: number;
-      }>>(
-        `SELECT bucket, node_count, total_storage, avg_cpu, avg_ram_percent
-         FROM ${tableName}
-         WHERE bucket >= $1
-         ORDER BY bucket ASC`,
-        startTime
-      );
+      };
+
+      const result = useDaily
+        ? await ctx.db.$queryRaw<TrendRow[]>`
+            SELECT bucket, node_count, total_storage, avg_cpu, avg_ram_percent
+            FROM network_metrics_daily
+            WHERE bucket >= ${startTime}
+            ORDER BY bucket ASC`
+        : await ctx.db.$queryRaw<TrendRow[]>`
+            SELECT bucket, node_count, total_storage, avg_cpu, avg_ram_percent
+            FROM network_metrics_hourly
+            WHERE bucket >= ${startTime}
+            ORDER BY bucket ASC`;
 
       return result.map((r) => ({
         time: r.bucket,
