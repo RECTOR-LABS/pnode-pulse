@@ -15,6 +15,52 @@ import { createTRPCRouter, publicProcedure } from "../trpc";
 // Severity levels for issues
 type Severity = "info" | "warning" | "critical";
 
+/**
+ * Compare pNode version strings properly
+ * Handles formats like: "0.7.0", "0.7.0-trynet.20251208141952.3b3bb24", "0.5.1"
+ *
+ * Returns: negative if a < b, positive if a > b, 0 if equal
+ */
+function compareVersions(a: string, b: string): number {
+  // Extract base version (before any hyphen for pre-release info)
+  const getBaseVersion = (v: string): number[] => {
+    const base = v.split("-")[0]; // "0.7.0-trynet..." → "0.7.0"
+    return base.split(".").map((part) => {
+      const num = parseInt(part, 10);
+      return isNaN(num) ? 0 : num;
+    });
+  };
+
+  const aParts = getBaseVersion(a);
+  const bParts = getBaseVersion(b);
+
+  // Compare base version parts (major.minor.patch)
+  for (let i = 0; i < 3; i++) {
+    const aVal = aParts[i] ?? 0;
+    const bVal = bParts[i] ?? 0;
+    if (aVal !== bVal) {
+      return bVal - aVal; // Descending order (higher version first)
+    }
+  }
+
+  // If base versions are equal, stable releases (no hyphen) come before pre-releases
+  const aHasPreRelease = a.includes("-");
+  const bHasPreRelease = b.includes("-");
+
+  if (!aHasPreRelease && bHasPreRelease) return -1; // a is stable, comes first
+  if (aHasPreRelease && !bHasPreRelease) return 1;  // b is stable, comes first
+
+  // Both have pre-release or both don't: use string comparison for tie-breaker
+  return b.localeCompare(a);
+}
+
+/**
+ * Sort version strings in descending order (latest first)
+ */
+function sortVersionsDesc(versions: string[]): string[] {
+  return [...versions].sort(compareVersions);
+}
+
 // ============================================
 // #60: Version Tracking
 // ============================================
@@ -54,16 +100,7 @@ export const comparisonRouter = createTRPCRouter({
     }
 
     // Determine latest version (highest semver)
-    const versions = Object.keys(versionCounts).sort((a, b) => {
-      const aParts = a.split(".").map(Number);
-      const bParts = b.split(".").map(Number);
-      for (let i = 0; i < 3; i++) {
-        if ((aParts[i] || 0) !== (bParts[i] || 0)) {
-          return (bParts[i] || 0) - (aParts[i] || 0);
-        }
-      }
-      return 0;
-    });
+    const versions = sortVersionsDesc(Object.keys(versionCounts));
     const latestVersion = versions[0] || null;
 
     // Find nodes needing update
@@ -127,19 +164,9 @@ export const comparisonRouter = createTRPCRouter({
         orderBy: { _count: { version: "desc" } },
       });
 
-      const versions = networkVersions
-        .map((v) => v.version!)
-        .filter(Boolean)
-        .sort((a, b) => {
-          const aParts = a.split(".").map(Number);
-          const bParts = b.split(".").map(Number);
-          for (let i = 0; i < 3; i++) {
-            if ((aParts[i] || 0) !== (bParts[i] || 0)) {
-              return (bParts[i] || 0) - (aParts[i] || 0);
-            }
-          }
-          return 0;
-        });
+      const versions = sortVersionsDesc(
+        networkVersions.map((v) => v.version!).filter(Boolean)
+      );
       const latestVersion = versions[0] || null;
 
       const portfolioNodes = portfolio.nodes.map((pn) => pn.node);
@@ -229,18 +256,7 @@ export const comparisonRouter = createTRPCRouter({
         _count: { version: true },
         where: { version: { not: null } },
       });
-      const latestVersion = versions
-        .map((v) => v.version!)
-        .sort((a, b) => {
-          const aParts = a.split(".").map(Number);
-          const bParts = b.split(".").map(Number);
-          for (let i = 0; i < 3; i++) {
-            if ((aParts[i] || 0) !== (bParts[i] || 0)) {
-              return (bParts[i] || 0) - (aParts[i] || 0);
-            }
-          }
-          return 0;
-        })[0];
+      const latestVersion = sortVersionsDesc(versions.map((v) => v.version!))[0];
 
       // Analyze each portfolio node
       const underperformers: Array<{
@@ -541,16 +557,7 @@ export const comparisonRouter = createTRPCRouter({
       }
 
       // Get latest version
-      const versions = Object.keys(versionCounts).sort((a, b) => {
-        const aParts = a.split(".").map(Number);
-        const bParts = b.split(".").map(Number);
-        for (let i = 0; i < 3; i++) {
-          if ((aParts[i] || 0) !== (bParts[i] || 0)) {
-            return (bParts[i] || 0) - (aParts[i] || 0);
-          }
-        }
-        return 0;
-      });
+      const versions = sortVersionsDesc(Object.keys(versionCounts));
       const latestVersion = versions[0] || null;
       const onLatestPercent = latestVersion
         ? Math.round(((versionCounts[latestVersion] || 0) / peers.length) * 100)
@@ -659,18 +666,7 @@ export const comparisonRouter = createTRPCRouter({
         _count: { version: true },
         where: { version: { not: null } },
       });
-      const latestVersion = versions
-        .map((v) => v.version!)
-        .sort((a, b) => {
-          const aParts = a.split(".").map(Number);
-          const bParts = b.split(".").map(Number);
-          for (let i = 0; i < 3; i++) {
-            if ((aParts[i] || 0) !== (bParts[i] || 0)) {
-              return (bParts[i] || 0) - (aParts[i] || 0);
-            }
-          }
-          return 0;
-        })[0];
+      const latestVersion = sortVersionsDesc(versions.map((v) => v.version!))[0];
 
       const recommendations: Array<{
         id: string;
