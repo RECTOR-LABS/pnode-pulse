@@ -160,8 +160,9 @@ export const peersRouter = createTRPCRouter({
           np.node_id,
           COUNT(*) FILTER (WHERE n.is_active = true) as active_peers
         FROM node_peers np
-        JOIN nodes n ON n.id = np.peer_id
+        JOIN nodes n ON n.id = np.peer_node_id
         WHERE np.node_id = ANY(${nodeIds})
+          AND np.peer_node_id IS NOT NULL
         GROUP BY np.node_id
       `;
 

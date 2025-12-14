@@ -109,23 +109,37 @@ export const degradationRouter = createTRPCRouter({
         select: { id: true, address: true },
       });
 
+      const nodeIds = nodes.map((n) => n.id);
+
+      // Batch fetch all metrics for all nodes at once (instead of N+1 queries)
+      const allMetrics = await ctx.db.nodeMetric.findMany({
+        where: {
+          nodeId: { in: nodeIds },
+          time: { gte: startTime },
+        },
+        orderBy: { time: "asc" },
+        select: {
+          nodeId: true,
+          time: true,
+          cpuPercent: true,
+          ramUsed: true,
+          ramTotal: true,
+          uptime: true,
+        },
+      });
+
+      // Group metrics by nodeId
+      const metricsByNode = new Map<number, typeof allMetrics>();
+      for (const metric of allMetrics) {
+        const existing = metricsByNode.get(metric.nodeId) ?? [];
+        existing.push(metric);
+        metricsByNode.set(metric.nodeId, existing);
+      }
+
       const nodeAnalyses = [];
 
       for (const node of nodes) {
-        const metrics = await ctx.db.nodeMetric.findMany({
-          where: {
-            nodeId: node.id,
-            time: { gte: startTime },
-          },
-          orderBy: { time: "asc" },
-          select: {
-            time: true,
-            cpuPercent: true,
-            ramUsed: true,
-            ramTotal: true,
-            uptime: true,
-          },
-        });
+        const metrics = metricsByNode.get(node.id) ?? [];
 
         if (metrics.length < 3) continue;
 
