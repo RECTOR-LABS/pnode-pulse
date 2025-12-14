@@ -190,7 +190,7 @@ export function GeoMap() {
                   style={{ cursor: "pointer" }}
                 />
                 {/* Count label */}
-                {cluster.count > 1 && (
+                {cluster.count >= 1 && (
                   <text
                     textAnchor="middle"
                     y={radius > 12 ? 5 : 4}
