@@ -5,7 +5,8 @@ import { Link, usePathname } from "@/i18n/navigation";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
 import { FavoritesDropdown } from "@/components/ui/favorites-dropdown";
 import { ExportDialog } from "@/components/export";
-import { ConnectWallet } from "@/components/auth";
+// TODO: Re-enable after auth debugging (post-bounty)
+// import { ConnectWallet } from "@/components/auth";
 import { RealtimeIndicator } from "@/components/ui/realtime-indicator";
 import { LanguageSelector } from "@/components/ui/language-selector";
 
@@ -157,9 +158,9 @@ export function Header() {
               </svg>
               Export Data
             </button>
-            <div className="px-3 pt-2">
+{/*           <div className="px-3 pt-2">
               <ConnectWallet />
-            </div>
+            </div> */}
           </div>
         </div>
       </div>
@@ -271,9 +272,11 @@ export function Header() {
               </button>
               <FavoritesDropdown />
               <LanguageSelector showLabel={false} />
+              {/* TODO: Re-enable after auth debugging (post-bounty)
               <div className="hidden md:flex items-center border-l border-border pl-2 ml-1">
                 <ConnectWallet />
               </div>
+              */}
             </div>
           </div>
         </div>
