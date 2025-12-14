@@ -44,7 +44,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sessionId = useSession();
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [tokenChecked, setTokenChecked] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   const requestChallenge = trpc.auth.requestChallenge.useMutation();
   const verifySignature = trpc.auth.verifySignature.useMutation();
@@ -55,40 +56,78 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const storedToken = localStorage.getItem(TOKEN_KEY);
     if (storedToken) {
+      logger.debug("[Auth] Token found in localStorage");
       setToken(storedToken);
+    } else {
+      logger.debug("[Auth] No token in localStorage");
     }
-    setIsLoading(false);
+    setTokenChecked(true);
   }, []);
 
   // Fetch user when token changes
-  const { data: userData, refetch: refetchUser, isSuccess, isFetched } = trpc.auth.me.useQuery(
+  const {
+    data: userData,
+    refetch: refetchUser,
+    isFetched,
+    isError,
+    isPending,
+  } = trpc.auth.me.useQuery(
     { token: token || "" },
     {
       enabled: !!token,
       staleTime: 0, // Always fetch fresh on mount (auth is critical)
       refetchOnMount: true,
       refetchOnWindowFocus: true,
-      retry: false,
+      retry: 1, // Retry once for network glitches
     }
   );
 
+  // Handle query results
   useEffect(() => {
+    if (!token) {
+      // No token = not authenticated
+      setUser(null);
+      return;
+    }
+
+    if (!isFetched) {
+      // Query still running
+      return;
+    }
+
+    if (isError) {
+      // Query failed (network error, server error, etc.)
+      logger.warn("[Auth] Token verification failed with error, clearing token");
+      setToken(null);
+      setUser(null);
+      localStorage.removeItem(TOKEN_KEY);
+      return;
+    }
+
     if (userData) {
+      // Valid user data returned
+      logger.debug("[Auth] User authenticated", { wallet: userData.walletAddress });
       setUser(userData as User);
-    } else if (token && isFetched && isSuccess && userData === null) {
-      // Query completed successfully but returned null = invalid/expired token
+    } else {
+      // Query succeeded but returned null = session expired/invalid
+      logger.debug("[Auth] Token invalid or session expired, clearing");
       setToken(null);
       setUser(null);
       localStorage.removeItem(TOKEN_KEY);
     }
-  }, [userData, token, isFetched, isSuccess]);
+  }, [userData, token, isFetched, isError]);
+
+  // Compute loading state:
+  // Loading if: localStorage not checked yet OR (token exists AND query not done) OR signing in
+  const isLoading = !tokenChecked || (!!token && isPending) || isSigningIn;
 
   const login = useCallback(async () => {
     if (!publicKey || !signMessage) {
       throw new Error("Wallet not connected");
     }
 
-    setIsLoading(true);
+    setIsSigningIn(true);
+    logger.debug("[Auth] Starting sign-in process...");
 
     try {
       const walletAddress = publicKey.toBase58();
@@ -111,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Store token
       setToken(result.token);
       localStorage.setItem(TOKEN_KEY, result.token);
+      logger.debug("[Auth] Token stored, fetching user data...");
 
       // Migrate session alerts to user account
       if (sessionId) {
@@ -127,8 +167,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Fetch user data
       await refetchUser();
+      logger.debug("[Auth] Sign-in complete");
     } finally {
-      setIsLoading(false);
+      setIsSigningIn(false);
     }
   }, [publicKey, signMessage, requestChallenge, verifySignature, refetchUser, sessionId, migrateAlerts]);
 
