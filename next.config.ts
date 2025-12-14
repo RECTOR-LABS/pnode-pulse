@@ -157,11 +157,11 @@ const nextConfig: NextConfig = {
         ],
       },
       // Embed routes - allow iframe embedding from any origin
+      // Note: X-Frame-Options removed as ALLOWALL is invalid; CSP frame-ancestors is the modern approach
       {
         source: "/embed/:path*",
         headers: [
           { key: "Cache-Control", value: "public, s-maxage=60, stale-while-revalidate=300" },
-          { key: "X-Frame-Options", value: "ALLOWALL" },
           { key: "Content-Security-Policy", value: "frame-ancestors *" },
         ],
       },
