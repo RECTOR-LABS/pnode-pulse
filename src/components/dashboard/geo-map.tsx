@@ -9,8 +9,8 @@ import {
 } from "react-simple-maps";
 import { trpc } from "@/lib/trpc";
 
-// World map topology (low resolution for performance)
-const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
+// World map topology - using land for simpler rendering
+const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json";
 
 interface GeoNode {
   id: number;
@@ -68,12 +68,12 @@ const MapGeographies = memo(function MapGeographies() {
           <Geography
             key={geo.rsmKey}
             geography={geo}
-            fill="#1e293b"
-            stroke="#334155"
+            fill="#374151"
+            stroke="#4b5563"
             strokeWidth={0.5}
             style={{
               default: { outline: "none" },
-              hover: { outline: "none", fill: "#334155" },
+              hover: { outline: "none", fill: "#4b5563" },
               pressed: { outline: "none" },
             }}
           />
