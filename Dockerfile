@@ -5,8 +5,9 @@ WORKDIR /app
 
 # Install dependencies
 # Note: --ignore-scripts skips native compilation (usb package not needed in server)
+# Note: --legacy-peer-deps for react-simple-maps compatibility with React 19
 COPY package*.json ./
-RUN npm ci --ignore-scripts
+RUN npm ci --ignore-scripts --legacy-peer-deps
 
 # Copy source
 COPY . .
