@@ -36,16 +36,16 @@ export function GraveyardStats() {
           </div>
         </div>
 
-        <div className="text-right">
+        <div className="text-right flex-shrink-0">
           <div className="flex items-center gap-4 text-sm">
-            <div>
-              <span className="text-green-600 dark:text-green-400 font-medium">
+            <div className="whitespace-nowrap">
+              <span className="text-status-active font-medium">
                 {data.active}
               </span>
               <span className="text-muted-foreground ml-1">active</span>
             </div>
-            <div>
-              <span className="text-gray-500 font-medium">{data.archived}</span>
+            <div className="whitespace-nowrap">
+              <span className="text-muted-foreground font-medium">{data.archived}</span>
               <span className="text-muted-foreground ml-1">archived</span>
             </div>
           </div>
