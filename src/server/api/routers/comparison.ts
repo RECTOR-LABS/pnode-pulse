@@ -20,8 +20,9 @@ type Severity = "info" | "warning" | "critical";
  * Handles formats like: "0.7.0", "0.7.0-trynet.20251208141952.3b3bb24", "0.5.1"
  *
  * Returns: negative if a < b, positive if a > b, 0 if equal
+ * @exported for testing
  */
-function compareVersions(a: string, b: string): number {
+export function compareVersions(a: string, b: string): number {
   // Extract base version (before any hyphen for pre-release info)
   const getBaseVersion = (v: string): number[] => {
     const base = v.split("-")[0]; // "0.7.0-trynet..." → "0.7.0"
@@ -56,8 +57,9 @@ function compareVersions(a: string, b: string): number {
 
 /**
  * Sort version strings in descending order (latest first)
+ * @exported for testing
  */
-function sortVersionsDesc(versions: string[]): string[] {
+export function sortVersionsDesc(versions: string[]): string[] {
   return [...versions].sort(compareVersions);
 }
 
