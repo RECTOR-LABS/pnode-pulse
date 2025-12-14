@@ -182,16 +182,40 @@ export function GeoMap() {
 
           <rect width={mapWidth} height={mapHeight} fill="url(#geo-bg-gradient)" />
 
-          {/* Simplified world outline (decorative dots pattern) */}
-          <g opacity="0.15">
-            {Array.from({ length: 40 }, (_, i) => (
+          {/* World map continents outline */}
+          <g opacity="0.25" fill="none" stroke="#64748b" strokeWidth="0.5">
+            {/* North America */}
+            <path d="M45,35 L55,28 L70,25 L85,28 L95,35 L100,45 L95,55 L85,62 L75,68 L65,72 L55,70 L48,65 L42,55 L40,45 Z" />
+            {/* South America */}
+            <path d="M75,75 L82,72 L88,78 L90,90 L88,105 L82,118 L75,125 L68,120 L65,108 L67,95 L70,82 Z" />
+            {/* Europe */}
+            <path d="M175,32 L185,28 L200,30 L210,35 L205,42 L195,48 L185,50 L175,48 L170,42 L172,35 Z" />
+            {/* Africa */}
+            <path d="M175,55 L190,52 L205,58 L210,72 L205,90 L195,105 L180,110 L165,105 L160,90 L165,72 L172,60 Z" />
+            {/* Asia */}
+            <path d="M215,25 L240,22 L270,25 L300,32 L320,45 L330,60 L320,75 L295,80 L265,78 L240,72 L220,62 L210,48 L212,35 Z" />
+            {/* Australia */}
+            <path d="M310,100 L330,95 L345,100 L350,112 L345,125 L330,130 L315,128 L305,118 L305,108 Z" />
+            {/* Indonesia/SE Asia islands */}
+            <path d="M280,85 L295,82 L305,88 L300,95 L285,98 L275,92 Z" />
+            {/* Japan */}
+            <path d="M340,40 L348,35 L355,40 L352,50 L345,55 L338,50 Z" />
+            {/* UK */}
+            <path d="M168,35 L175,32 L178,38 L175,44 L168,42 Z" />
+            {/* New Zealand */}
+            <path d="M365,125 L372,120 L378,125 L376,135 L370,140 L363,135 Z" />
+          </g>
+
+          {/* Dotted grid overlay for texture */}
+          <g opacity="0.08">
+            {Array.from({ length: 20 }, (_, i) => (
               <g key={`row-${i}`}>
-                {Array.from({ length: 80 }, (_, j) => (
+                {Array.from({ length: 40 }, (_, j) => (
                   <circle
                     key={`dot-${i}-${j}`}
-                    cx={j * 5 + 2.5}
-                    cy={i * 5 + 2.5}
-                    r="0.5"
+                    cx={j * 10 + 5}
+                    cy={i * 10 + 5}
+                    r="0.3"
                     fill="currentColor"
                   />
                 ))}
