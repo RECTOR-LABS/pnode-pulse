@@ -9,8 +9,7 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
 import { createHash, randomBytes } from "crypto";
-import { jwtVerify } from "jose";
-import { JWT_SECRET, JWT_ISSUER, JWT_AUDIENCE } from "@/lib/auth/jwt-config";
+import { verifyToken as verifyJwtToken } from "@/lib/auth/verify-token";
 
 // API key configuration
 const KEY_PREFIX = "pk_live_";
@@ -25,22 +24,18 @@ export const RATE_LIMITS = {
 } as const;
 
 /**
- * Verify JWT token
+ * Verify JWT token and return user info
+ * Wrapper around the shared verifyToken for backward compatibility
  */
 async function verifyToken(token: string): Promise<{ userId: string; walletAddress: string } | null> {
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET, {
-      issuer: JWT_ISSUER,
-      audience: JWT_AUDIENCE,
-    });
-
-    return {
-      userId: payload.sub as string,
-      walletAddress: payload.wallet as string,
-    };
-  } catch {
+  const result = await verifyJwtToken(token);
+  if (!result.valid || !result.userId || !result.walletAddress) {
     return null;
   }
+  return {
+    userId: result.userId,
+    walletAddress: result.walletAddress,
+  };
 }
 
 /**

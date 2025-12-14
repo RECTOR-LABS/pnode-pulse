@@ -21,8 +21,8 @@ const secondaryNav = [
   { name: "Leaderboard", href: "/leaderboard" },
   { name: "Graveyard", href: "/graveyard" },
   { name: "Portfolio", href: "/portfolio" },
-  { name: "Alerts", href: "/alerts" },
   { name: "Reports", href: "/reports" },
+  // Note: Alerts hidden - requires auth refactor (see Issue #TBD)
 ];
 
 const allNavigation = [...primaryNav, ...secondaryNav];
