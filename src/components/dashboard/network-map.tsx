@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc";
 import { formatBytes } from "@/lib/utils/format";
@@ -16,11 +16,6 @@ interface GraphNode {
   y?: number;
   vx?: number;
   vy?: number;
-}
-
-interface GraphEdge {
-  source: number;
-  target: number;
 }
 
 // Version color mapping - Updated for new brand palette
@@ -39,9 +34,6 @@ export function NetworkMap() {
   const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
-  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
   const { data, isLoading } = trpc.network.peerGraph.useQuery(
     { limit: 100 },
@@ -160,38 +152,6 @@ export function NetworkMap() {
     setSimulationComplete(true);
   }, [data, dimensions]);
 
-  // Pan handlers
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.target === svgRef.current || (e.target as Element).tagName === "rect") {
-      setIsDragging(true);
-      setDragStart({ x: e.clientX - transform.x, y: e.clientY - transform.y });
-    }
-  }, [transform]);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (isDragging) {
-      setTransform((prev) => ({
-        ...prev,
-        x: e.clientX - dragStart.x,
-        y: e.clientY - dragStart.y,
-      }));
-    }
-  }, [isDragging, dragStart]);
-
-  const handleMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-
-  // Zoom handler
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setTransform((prev) => ({
-      ...prev,
-      scale: Math.max(0.3, Math.min(3, prev.scale * delta)),
-    }));
-  }, []);
-
   // Get node color by version (handles version strings like "0.7.0-trynet.xxx")
   const getNodeColor = (node: GraphNode) => {
     if (!node.isActive) return "#94a3b8"; // Muted gray for inactive
@@ -254,39 +214,12 @@ export function NetworkMap() {
             <span>Inactive</span>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setTransform((prev) => ({ ...prev, scale: Math.min(3, prev.scale * 1.2) }))}
-            className="w-7 h-7 flex items-center justify-center text-sm font-medium rounded bg-muted hover:bg-muted/80 transition-colors"
-            title="Zoom in"
-          >
-            +
-          </button>
-          <button
-            onClick={() => setTransform((prev) => ({ ...prev, scale: Math.max(0.3, prev.scale / 1.2) }))}
-            className="w-7 h-7 flex items-center justify-center text-sm font-medium rounded bg-muted hover:bg-muted/80 transition-colors"
-            title="Zoom out"
-          >
-            -
-          </button>
-          <button
-            onClick={() => setTransform({ x: 0, y: 0, scale: 1 })}
-            className="px-2 py-1 text-xs rounded bg-muted hover:bg-muted/80 transition-colors ml-1"
-          >
-            Fit
-          </button>
-        </div>
       </div>
 
       {/* Graph */}
       <div
         ref={containerRef}
-        className="relative w-full h-[500px] bg-muted/30 rounded-lg overflow-hidden cursor-grab active:cursor-grabbing"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onWheel={handleWheel}
+        className="relative w-full h-[500px] bg-muted/30 rounded-lg overflow-hidden"
       >
         <svg
           ref={svgRef}
@@ -315,15 +248,7 @@ export function NetworkMap() {
               </feMerge>
             </filter>
           </defs>
-          <g transform={`translate(${transform.x}, ${transform.y}) scale(${transform.scale})`}>
-            {/* Background for pan events */}
-            <rect
-              x={0}
-              y={0}
-              width={dimensions.width}
-              height={dimensions.height}
-              fill="transparent"
-            />
+          <g>
 
             {/* Edges */}
             {data.edges.map((edge, i) => {
@@ -411,8 +336,8 @@ export function NetworkMap() {
           <div
             className="absolute pointer-events-none bg-background text-foreground border border-border rounded-lg shadow-xl p-2.5 text-xs z-10"
             style={{
-              left: (hoveredNode.x! * transform.scale + transform.x) + 20,
-              top: (hoveredNode.y! * transform.scale + transform.y) - 20,
+              left: hoveredNode.x! + 20,
+              top: hoveredNode.y! - 20,
             }}
           >
             <div className="font-medium text-foreground">{hoveredNode.label}</div>
@@ -460,11 +385,6 @@ export function NetworkMap() {
             </Link>
           </div>
         )}
-      </div>
-
-      {/* Instructions */}
-      <div className="text-xs text-muted-foreground text-center">
-        Drag to pan, scroll to zoom. Click nodes for details. Node size = storage capacity.
       </div>
     </div>
   );
