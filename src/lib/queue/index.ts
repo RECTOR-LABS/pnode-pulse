@@ -15,29 +15,13 @@ import {
   QUEUE_FAILED_JOB_RETENTION,
   DEFAULT_WORKER_CONCURRENCY,
 } from "@/lib/constants/limits";
+import { getRedisConnectionConfig } from "@/lib/constants/redis";
 
-// Redis connection config (uses existing Redis container)
-function getRedisHost(): string {
-  const host = process.env.REDIS_HOST;
-
-  // Development: allow localhost fallback
-  if (!host && process.env.NODE_ENV === "development") {
-    return "localhost";
-  }
-
-  // Production/Test: require explicit configuration
-  if (!host) {
-    throw new Error("REDIS_HOST environment variable is required in production");
-  }
-
-  return host;
-}
-
+// Redis connection config for BullMQ
 function getRedisConfig() {
   return {
-    host: getRedisHost(),
-    port: parseInt(process.env.REDIS_PORT || "6381"),
-    maxRetriesPerRequest: null,
+    ...getRedisConnectionConfig(),
+    maxRetriesPerRequest: null, // Required for BullMQ
   };
 }
 
