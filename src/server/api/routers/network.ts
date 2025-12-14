@@ -603,4 +603,68 @@ export const networkRouter = createTRPCRouter({
       version: n.version,
     }));
   }),
+
+  /**
+   * Get inter-country connections for geo map visualization
+   * Returns aggregated connections between different countries
+   */
+  geoConnections: publicProcedure.query(async ({ ctx }) => {
+    // Get inter-country connections aggregated by country pairs
+    const connections = await ctx.db.$queryRaw<Array<{
+      from_country: string;
+      from_lat: number;
+      from_lng: number;
+      to_country: string;
+      to_lat: number;
+      to_lng: number;
+      connection_count: bigint;
+    }>>`
+      SELECT
+        n1.country as from_country,
+        AVG(n1.latitude) as from_lat,
+        AVG(n1.longitude) as from_lng,
+        n2.country as to_country,
+        AVG(n2.latitude) as to_lat,
+        AVG(n2.longitude) as to_lng,
+        COUNT(*) as connection_count
+      FROM node_peers np
+      JOIN nodes n1 ON np.node_id = n1.id
+      JOIN nodes n2 ON np.peer_node_id = n2.id
+      WHERE n1.country IS NOT NULL
+        AND n2.country IS NOT NULL
+        AND n1.country != n2.country
+        AND n1.is_active = true
+        AND n2.is_active = true
+      GROUP BY n1.country, n2.country
+      ORDER BY connection_count DESC
+      LIMIT 50
+    `;
+
+    // Dedupe bidirectional connections (US→DE and DE→US become one line)
+    const seen = new Set<string>();
+    const dedupedConnections = connections.filter(conn => {
+      const key = [conn.from_country, conn.to_country].sort().join('-');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // Find max for normalization
+    const maxCount = Math.max(...dedupedConnections.map(c => Number(c.connection_count)), 1);
+
+    return dedupedConnections.map(conn => ({
+      from: {
+        country: conn.from_country,
+        lat: conn.from_lat,
+        lng: conn.from_lng,
+      },
+      to: {
+        country: conn.to_country,
+        lat: conn.to_lat,
+        lng: conn.to_lng,
+      },
+      strength: Number(conn.connection_count),
+      normalizedStrength: Number(conn.connection_count) / maxCount,
+    }));
+  }),
 });
