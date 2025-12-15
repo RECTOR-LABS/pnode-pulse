@@ -7,8 +7,6 @@ set -euo pipefail
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.yml}"
 BLUE_PORT=7000
 GREEN_PORT=7001
-HEALTH_CHECK_URL_BLUE="http://localhost:${BLUE_PORT}/api/health"
-HEALTH_CHECK_URL_GREEN="http://localhost:${GREEN_PORT}/api/health"
 MAX_HEALTH_CHECKS=60
 HEALTH_CHECK_INTERVAL=2
 
@@ -27,22 +25,24 @@ is_running() {
   docker compose ps -q "$service" | grep -q .
 }
 
-# Check if a service is healthy
+# Check if a service is healthy using Docker's health status
 is_healthy() {
-  local url=$1
-  curl -sf "$url" > /dev/null 2>&1
+  local service=$1
+  local container_name="pnode-pulse-web-${service}"
+  local status
+  status=$(docker inspect --format='{{.State.Health.Status}}' "$container_name" 2>/dev/null || echo "unhealthy")
+  [ "$status" = "healthy" ]
 }
 
 # Wait for service to become healthy
 wait_for_health() {
   local service=$1
-  local url=$2
   local checks=0
 
   log "Waiting for $service to become healthy..."
 
   while [ $checks -lt $MAX_HEALTH_CHECKS ]; do
-    if is_healthy "$url"; then
+    if is_healthy "$service"; then
       log "$service is healthy!"
       return 0
     fi
@@ -57,9 +57,9 @@ wait_for_health() {
 
 # Determine which environment is currently active
 get_active_env() {
-  if is_running "blue" && is_healthy "$HEALTH_CHECK_URL_BLUE"; then
+  if is_running "blue" && is_healthy "blue"; then
     echo "blue"
-  elif is_running "green" && is_healthy "$HEALTH_CHECK_URL_GREEN"; then
+  elif is_running "green" && is_healthy "green"; then
     echo "green"
   else
     # If neither is running or both are unhealthy, default to blue
@@ -77,11 +77,9 @@ main() {
   if [ "$ACTIVE_ENV" = "blue" ]; then
     TARGET_ENV="green"
     TARGET_PORT=$GREEN_PORT
-    TARGET_HEALTH_URL=$HEALTH_CHECK_URL_GREEN
   else
     TARGET_ENV="blue"
     TARGET_PORT=$BLUE_PORT
-    TARGET_HEALTH_URL=$HEALTH_CHECK_URL_BLUE
   fi
 
   log "Active environment: $ACTIVE_ENV"
@@ -100,7 +98,7 @@ main() {
   fi
 
   # Wait for target to become healthy
-  wait_for_health "$TARGET_ENV" "$TARGET_HEALTH_URL"
+  wait_for_health "$TARGET_ENV"
 
   # Update nginx to point to new environment (if using nginx)
   # This section would typically update nginx config and reload
