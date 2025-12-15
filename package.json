@@ -18,7 +18,8 @@
     "db:generate": "prisma generate",
     "collector": "tsx scripts/start-collector.ts",
     "collect:once": "tsx scripts/collect-once.ts",
-    "alert-processor": "tsx scripts/start-alert-processor.ts"
+    "alert-processor": "tsx scripts/start-alert-processor.ts",
+    "prepare": "husky"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
@@ -65,6 +66,9 @@
     "@vitest/ui": "^2.1.8",
     "eslint": "^9",
     "eslint-config-next": "16.0.10",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.7.4",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",
@@ -72,5 +76,13 @@
   },
   "overrides": {
     "d3-color": "^3.1.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix --max-warnings=0"
+    ],
+    "*.{js,jsx,ts,tsx,json,css,md}": [
+      "prettier --write --ignore-unknown"
+    ]
   }
 }
