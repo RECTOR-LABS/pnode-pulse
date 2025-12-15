@@ -15,12 +15,12 @@ const ContentSecurityPolicy = [
   "default-src 'self'",
   // Scripts: self + inline/eval for Next.js hydration and dev tools
   "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-  // Styles: self + inline for Tailwind and component styles
-  "style-src 'self' 'unsafe-inline'",
+  // Styles: self + inline for Tailwind + Google Fonts stylesheets
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   // Images: self + data URIs + HTTPS sources (for external images)
   "img-src 'self' data: https: blob:",
-  // Fonts: self only (add CDN if using external fonts)
-  "font-src 'self'",
+  // Fonts: self + Google Fonts CDN
+  "font-src 'self' https://fonts.gstatic.com",
   // Connections: self + WebSocket for HMR + external APIs + CDN for map topology
   "connect-src 'self' wss: https://api.sentry.io https://*.ingest.sentry.io https://cdn.jsdelivr.net",
   // Frames: only allow embedding from same origin (main app)

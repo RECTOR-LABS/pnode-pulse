@@ -24,41 +24,45 @@ export function NodeList() {
 
   const { data: versionsData } = trpc.nodes.versions.useQuery();
 
-  const { data, isLoading, refetch, isFetching } = trpc.nodes.listWithMetrics.useQuery(
-    {
-      status,
-      version: version || undefined,
-      search: search || undefined,
-      limit: ITEMS_PER_PAGE,
-      offset: (page - 1) * ITEMS_PER_PAGE,
-      orderBy: sortBy,
-      order: sortOrder,
+  const { data, isLoading, refetch, isFetching } =
+    trpc.nodes.listWithMetrics.useQuery(
+      {
+        status,
+        version: version || undefined,
+        search: search || undefined,
+        limit: ITEMS_PER_PAGE,
+        offset: (page - 1) * ITEMS_PER_PAGE,
+        orderBy: sortBy,
+        order: sortOrder,
+      },
+      {
+        refetchInterval: 30000,
+      },
+    );
+
+  const handleSort = useCallback(
+    (column: string) => {
+      // Map UI column names to API field names
+      const columnMap: Record<string, SortColumn> = {
+        isActive: "isActive",
+        address: "address",
+        version: "version",
+        lastSeen: "lastSeen",
+      };
+
+      const apiColumn = columnMap[column];
+      if (!apiColumn) return;
+
+      if (sortBy === apiColumn) {
+        setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
+      } else {
+        setSortBy(apiColumn);
+        setSortOrder("desc");
+      }
+      setPage(1);
     },
-    {
-      refetchInterval: 30000,
-    }
+    [sortBy],
   );
-
-  const handleSort = useCallback((column: string) => {
-    // Map UI column names to API field names
-    const columnMap: Record<string, SortColumn> = {
-      isActive: "isActive",
-      address: "address",
-      version: "version",
-      lastSeen: "lastSeen",
-    };
-
-    const apiColumn = columnMap[column];
-    if (!apiColumn) return;
-
-    if (sortBy === apiColumn) {
-      setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"));
-    } else {
-      setSortBy(apiColumn);
-      setSortOrder("desc");
-    }
-    setPage(1);
-  }, [sortBy]);
 
   const handleStatusChange = (value: string) => {
     setStatus(value as StatusFilter);
@@ -112,11 +116,13 @@ export function NodeList() {
             value={status}
             onChange={handleStatusChange}
             options={statusOptions}
+            aria-label="Filter by status"
           />
           <Select
             value={version}
             onChange={handleVersionChange}
             options={versionOptions}
+            aria-label="Filter by version"
           />
           <button
             onClick={handleRefresh}
@@ -145,7 +151,10 @@ export function NodeList() {
       {data && (
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <span>
-            <span className="font-medium text-foreground">{formatNumber(data.total)}</span> nodes found
+            <span className="font-medium text-foreground">
+              {formatNumber(data.total)}
+            </span>{" "}
+            nodes found
           </span>
           {(status !== "all" || version || search) && (
             <button

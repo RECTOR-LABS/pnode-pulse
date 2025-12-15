@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import {  checkRateLimit,
+import {
+  checkRateLimit,
   createRateLimitHeaders,
   rateLimitExceededResponse,
   trackApiUsage,
@@ -38,7 +39,10 @@ export async function GET(request: NextRequest) {
 
     const metric = (searchParams.get("metric") || "uptime") as Metric;
     const order = (searchParams.get("order") || "top") as Order;
-    const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "10"), 1), 100);
+    const limit = Math.min(
+      Math.max(parseInt(searchParams.get("limit") || "10"), 1),
+      100,
+    );
     const period = (searchParams.get("period") || "7d") as Period;
 
     const validMetrics: Metric[] = ["uptime", "cpu", "ram", "storage"];
@@ -48,26 +52,28 @@ export async function GET(request: NextRequest) {
     if (!validMetrics.includes(metric)) {
       return NextResponse.json(
         { error: { code: "BAD_REQUEST", message: "Invalid metric parameter" } },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!validOrders.includes(order)) {
       return NextResponse.json(
         { error: { code: "BAD_REQUEST", message: "Invalid order parameter" } },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!validPeriods.includes(period)) {
       return NextResponse.json(
         { error: { code: "BAD_REQUEST", message: "Invalid period parameter" } },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     const hours = PERIOD_HOURS[period];
-    const fromTime = hours ? new Date(Date.now() - hours * 60 * 60 * 1000) : null;
+    const fromTime = hours
+      ? new Date(Date.now() - hours * 60 * 60 * 1000)
+      : null;
 
     // Define result type
     type RankingRow = {
@@ -83,240 +89,241 @@ export async function GET(request: NextRequest) {
 
     // Use separate parameterized queries for each metric/order combination
     // This avoids SQL injection patterns entirely
+    // Note: Using actual database table/column names (snake_case), not Prisma model names
     const getUptimeRankings = async (ascending: boolean) => {
       if (fromTime) {
         return ascending
           ? db.$queryRaw<RankingRow[]>`
-              WITH node_metrics AS (
+              WITH ranked_metrics AS (
                 SELECT n.id as node_id, n.address, n.version,
                   MAX(m.uptime) as metric_value,
                   MAX(m.uptime) as uptime,
-                  AVG(m."cpuPercent") as cpu,
-                  AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                  MAX(m."fileSize") as storage
-                FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-                WHERE n."isActive" = true AND m.time >= ${fromTime}
+                  AVG(m.cpu_percent) as cpu,
+                  AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                  MAX(m.file_size) as storage
+                FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+                WHERE n.is_active = true AND m.time >= ${fromTime}
                 GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
               )
-              SELECT * FROM node_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
+              SELECT * FROM ranked_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
           : db.$queryRaw<RankingRow[]>`
-              WITH node_metrics AS (
+              WITH ranked_metrics AS (
                 SELECT n.id as node_id, n.address, n.version,
                   MAX(m.uptime) as metric_value,
                   MAX(m.uptime) as uptime,
-                  AVG(m."cpuPercent") as cpu,
-                  AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                  MAX(m."fileSize") as storage
-                FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-                WHERE n."isActive" = true AND m.time >= ${fromTime}
+                  AVG(m.cpu_percent) as cpu,
+                  AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                  MAX(m.file_size) as storage
+                FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+                WHERE n.is_active = true AND m.time >= ${fromTime}
                 GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
               )
-              SELECT * FROM node_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
+              SELECT * FROM ranked_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
       }
       return ascending
         ? db.$queryRaw<RankingRow[]>`
-            WITH node_metrics AS (
+            WITH ranked_metrics AS (
               SELECT n.id as node_id, n.address, n.version,
                 MAX(m.uptime) as metric_value,
                 MAX(m.uptime) as uptime,
-                AVG(m."cpuPercent") as cpu,
-                AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                MAX(m."fileSize") as storage
-              FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-              WHERE n."isActive" = true
+                AVG(m.cpu_percent) as cpu,
+                AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                MAX(m.file_size) as storage
+              FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+              WHERE n.is_active = true
               GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
             )
-            SELECT * FROM node_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
+            SELECT * FROM ranked_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
         : db.$queryRaw<RankingRow[]>`
-            WITH node_metrics AS (
+            WITH ranked_metrics AS (
               SELECT n.id as node_id, n.address, n.version,
                 MAX(m.uptime) as metric_value,
                 MAX(m.uptime) as uptime,
-                AVG(m."cpuPercent") as cpu,
-                AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                MAX(m."fileSize") as storage
-              FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-              WHERE n."isActive" = true
+                AVG(m.cpu_percent) as cpu,
+                AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                MAX(m.file_size) as storage
+              FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+              WHERE n.is_active = true
               GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
             )
-            SELECT * FROM node_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
+            SELECT * FROM ranked_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
     };
 
     const getCpuRankings = async (ascending: boolean) => {
       if (fromTime) {
         return ascending
           ? db.$queryRaw<RankingRow[]>`
-              WITH node_metrics AS (
+              WITH ranked_metrics AS (
                 SELECT n.id as node_id, n.address, n.version,
-                  AVG(m."cpuPercent") as metric_value,
+                  AVG(m.cpu_percent) as metric_value,
                   MAX(m.uptime) as uptime,
-                  AVG(m."cpuPercent") as cpu,
-                  AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                  MAX(m."fileSize") as storage
-                FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-                WHERE n."isActive" = true AND m.time >= ${fromTime}
+                  AVG(m.cpu_percent) as cpu,
+                  AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                  MAX(m.file_size) as storage
+                FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+                WHERE n.is_active = true AND m.time >= ${fromTime}
                 GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
               )
-              SELECT * FROM node_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
+              SELECT * FROM ranked_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
           : db.$queryRaw<RankingRow[]>`
-              WITH node_metrics AS (
+              WITH ranked_metrics AS (
                 SELECT n.id as node_id, n.address, n.version,
-                  AVG(m."cpuPercent") as metric_value,
+                  AVG(m.cpu_percent) as metric_value,
                   MAX(m.uptime) as uptime,
-                  AVG(m."cpuPercent") as cpu,
-                  AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                  MAX(m."fileSize") as storage
-                FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-                WHERE n."isActive" = true AND m.time >= ${fromTime}
+                  AVG(m.cpu_percent) as cpu,
+                  AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                  MAX(m.file_size) as storage
+                FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+                WHERE n.is_active = true AND m.time >= ${fromTime}
                 GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
               )
-              SELECT * FROM node_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
+              SELECT * FROM ranked_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
       }
       return ascending
         ? db.$queryRaw<RankingRow[]>`
-            WITH node_metrics AS (
+            WITH ranked_metrics AS (
               SELECT n.id as node_id, n.address, n.version,
-                AVG(m."cpuPercent") as metric_value,
+                AVG(m.cpu_percent) as metric_value,
                 MAX(m.uptime) as uptime,
-                AVG(m."cpuPercent") as cpu,
-                AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                MAX(m."fileSize") as storage
-              FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-              WHERE n."isActive" = true
+                AVG(m.cpu_percent) as cpu,
+                AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                MAX(m.file_size) as storage
+              FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+              WHERE n.is_active = true
               GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
             )
-            SELECT * FROM node_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
+            SELECT * FROM ranked_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
         : db.$queryRaw<RankingRow[]>`
-            WITH node_metrics AS (
+            WITH ranked_metrics AS (
               SELECT n.id as node_id, n.address, n.version,
-                AVG(m."cpuPercent") as metric_value,
+                AVG(m.cpu_percent) as metric_value,
                 MAX(m.uptime) as uptime,
-                AVG(m."cpuPercent") as cpu,
-                AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                MAX(m."fileSize") as storage
-              FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-              WHERE n."isActive" = true
+                AVG(m.cpu_percent) as cpu,
+                AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                MAX(m.file_size) as storage
+              FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+              WHERE n.is_active = true
               GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
             )
-            SELECT * FROM node_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
+            SELECT * FROM ranked_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
     };
 
     const getRamRankings = async (ascending: boolean) => {
       if (fromTime) {
         return ascending
           ? db.$queryRaw<RankingRow[]>`
-              WITH node_metrics AS (
+              WITH ranked_metrics AS (
                 SELECT n.id as node_id, n.address, n.version,
-                  AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as metric_value,
+                  AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as metric_value,
                   MAX(m.uptime) as uptime,
-                  AVG(m."cpuPercent") as cpu,
-                  AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                  MAX(m."fileSize") as storage
-                FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-                WHERE n."isActive" = true AND m.time >= ${fromTime}
+                  AVG(m.cpu_percent) as cpu,
+                  AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                  MAX(m.file_size) as storage
+                FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+                WHERE n.is_active = true AND m.time >= ${fromTime}
                 GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
               )
-              SELECT * FROM node_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
+              SELECT * FROM ranked_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
           : db.$queryRaw<RankingRow[]>`
-              WITH node_metrics AS (
+              WITH ranked_metrics AS (
                 SELECT n.id as node_id, n.address, n.version,
-                  AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as metric_value,
+                  AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as metric_value,
                   MAX(m.uptime) as uptime,
-                  AVG(m."cpuPercent") as cpu,
-                  AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                  MAX(m."fileSize") as storage
-                FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-                WHERE n."isActive" = true AND m.time >= ${fromTime}
+                  AVG(m.cpu_percent) as cpu,
+                  AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                  MAX(m.file_size) as storage
+                FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+                WHERE n.is_active = true AND m.time >= ${fromTime}
                 GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
               )
-              SELECT * FROM node_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
+              SELECT * FROM ranked_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
       }
       return ascending
         ? db.$queryRaw<RankingRow[]>`
-            WITH node_metrics AS (
+            WITH ranked_metrics AS (
               SELECT n.id as node_id, n.address, n.version,
-                AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as metric_value,
+                AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as metric_value,
                 MAX(m.uptime) as uptime,
-                AVG(m."cpuPercent") as cpu,
-                AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                MAX(m."fileSize") as storage
-              FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-              WHERE n."isActive" = true
+                AVG(m.cpu_percent) as cpu,
+                AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                MAX(m.file_size) as storage
+              FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+              WHERE n.is_active = true
               GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
             )
-            SELECT * FROM node_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
+            SELECT * FROM ranked_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
         : db.$queryRaw<RankingRow[]>`
-            WITH node_metrics AS (
+            WITH ranked_metrics AS (
               SELECT n.id as node_id, n.address, n.version,
-                AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as metric_value,
+                AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as metric_value,
                 MAX(m.uptime) as uptime,
-                AVG(m."cpuPercent") as cpu,
-                AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                MAX(m."fileSize") as storage
-              FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-              WHERE n."isActive" = true
+                AVG(m.cpu_percent) as cpu,
+                AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                MAX(m.file_size) as storage
+              FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+              WHERE n.is_active = true
               GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
             )
-            SELECT * FROM node_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
+            SELECT * FROM ranked_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
     };
 
     const getStorageRankings = async (ascending: boolean) => {
       if (fromTime) {
         return ascending
           ? db.$queryRaw<RankingRow[]>`
-              WITH node_metrics AS (
+              WITH ranked_metrics AS (
                 SELECT n.id as node_id, n.address, n.version,
-                  MAX(m."fileSize") as metric_value,
+                  MAX(m.file_size) as metric_value,
                   MAX(m.uptime) as uptime,
-                  AVG(m."cpuPercent") as cpu,
-                  AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                  MAX(m."fileSize") as storage
-                FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-                WHERE n."isActive" = true AND m.time >= ${fromTime}
+                  AVG(m.cpu_percent) as cpu,
+                  AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                  MAX(m.file_size) as storage
+                FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+                WHERE n.is_active = true AND m.time >= ${fromTime}
                 GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
               )
-              SELECT * FROM node_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
+              SELECT * FROM ranked_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
           : db.$queryRaw<RankingRow[]>`
-              WITH node_metrics AS (
+              WITH ranked_metrics AS (
                 SELECT n.id as node_id, n.address, n.version,
-                  MAX(m."fileSize") as metric_value,
+                  MAX(m.file_size) as metric_value,
                   MAX(m.uptime) as uptime,
-                  AVG(m."cpuPercent") as cpu,
-                  AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                  MAX(m."fileSize") as storage
-                FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-                WHERE n."isActive" = true AND m.time >= ${fromTime}
+                  AVG(m.cpu_percent) as cpu,
+                  AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                  MAX(m.file_size) as storage
+                FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+                WHERE n.is_active = true AND m.time >= ${fromTime}
                 GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
               )
-              SELECT * FROM node_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
+              SELECT * FROM ranked_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
       }
       return ascending
         ? db.$queryRaw<RankingRow[]>`
-            WITH node_metrics AS (
+            WITH ranked_metrics AS (
               SELECT n.id as node_id, n.address, n.version,
-                MAX(m."fileSize") as metric_value,
+                MAX(m.file_size) as metric_value,
                 MAX(m.uptime) as uptime,
-                AVG(m."cpuPercent") as cpu,
-                AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                MAX(m."fileSize") as storage
-              FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-              WHERE n."isActive" = true
+                AVG(m.cpu_percent) as cpu,
+                AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                MAX(m.file_size) as storage
+              FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+              WHERE n.is_active = true
               GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
             )
-            SELECT * FROM node_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
+            SELECT * FROM ranked_metrics ORDER BY metric_value ASC NULLS LAST LIMIT ${limit}`
         : db.$queryRaw<RankingRow[]>`
-            WITH node_metrics AS (
+            WITH ranked_metrics AS (
               SELECT n.id as node_id, n.address, n.version,
-                MAX(m."fileSize") as metric_value,
+                MAX(m.file_size) as metric_value,
                 MAX(m.uptime) as uptime,
-                AVG(m."cpuPercent") as cpu,
-                AVG(CASE WHEN m."ramTotal" > 0 THEN (m."ramUsed"::float / m."ramTotal"::float) * 100 ELSE 0 END) as ram,
-                MAX(m."fileSize") as storage
-              FROM "Node" n JOIN "NodeMetric" m ON n.id = m."nodeId"
-              WHERE n."isActive" = true
+                AVG(m.cpu_percent) as cpu,
+                AVG(CASE WHEN m.ram_total > 0 THEN (m.ram_used::float / m.ram_total::float) * 100 ELSE 0 END) as ram,
+                MAX(m.file_size) as storage
+              FROM nodes n JOIN node_metrics m ON n.id = m.node_id
+              WHERE n.is_active = true
               GROUP BY n.id, n.address, n.version HAVING COUNT(*) > 0
             )
-            SELECT * FROM node_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
+            SELECT * FROM ranked_metrics ORDER BY metric_value DESC NULLS LAST LIMIT ${limit}`;
     };
 
     // Execute the appropriate query based on metric and order
@@ -349,9 +356,10 @@ export async function GET(request: NextRequest) {
         nodeId: r.node_id,
         address: r.address,
         version: r.version,
-        value: metric === "storage"
-          ? Number(r.storage)
-          : Math.round(r.metric_value * 100) / 100,
+        value:
+          metric === "storage"
+            ? Number(r.storage)
+            : Math.round(r.metric_value * 100) / 100,
         metrics: {
           uptimeSeconds: r.uptime ?? 0,
           cpuPercent: Math.round((r.cpu ?? 0) * 100) / 100,
@@ -364,7 +372,13 @@ export async function GET(request: NextRequest) {
     const rateLimitHeaders = createRateLimitHeaders(rateLimitResult);
     const responseTime = Date.now() - startTime;
 
-    trackApiUsage(rateLimitResult.apiKeyId, "/api/v1/leaderboard", "GET", responseTime, false);
+    trackApiUsage(
+      rateLimitResult.apiKeyId,
+      "/api/v1/leaderboard",
+      "GET",
+      responseTime,
+      false,
+    );
 
     return NextResponse.json(response, {
       headers: {
@@ -373,14 +387,28 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    logger.error("API Error:", error instanceof Error ? error : new Error(String(error)));
+    logger.error(
+      "API Error:",
+      error instanceof Error ? error : new Error(String(error)),
+    );
 
     const responseTime = Date.now() - startTime;
-    trackApiUsage(rateLimitResult.apiKeyId, "/api/v1/leaderboard", "GET", responseTime, true);
+    trackApiUsage(
+      rateLimitResult.apiKeyId,
+      "/api/v1/leaderboard",
+      "GET",
+      responseTime,
+      true,
+    );
 
     return NextResponse.json(
-      { error: { code: "INTERNAL_ERROR", message: "An unexpected error occurred" } },
-      { status: 500 }
+      {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "An unexpected error occurred",
+        },
+      },
+      { status: 500 },
     );
   }
 }
