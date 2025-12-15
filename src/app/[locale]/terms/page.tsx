@@ -12,7 +12,7 @@ export default function TermsOfServicePage() {
       <div className="prose prose-invert max-w-none">
         <h1 className="text-3xl font-bold mb-2">Terms of Service</h1>
         <p className="text-muted-foreground mb-8">
-          <strong>Effective Date</strong>: December 9, 2025 | <strong>Last Updated</strong>: December 13, 2025
+          <strong>Effective Date</strong>: December 9, 2025 | <strong>Last Updated</strong>: December 15, 2025
         </p>
 
         <section className="mb-8">

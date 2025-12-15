@@ -93,6 +93,16 @@ const nextConfig: NextConfig = {
         destination: "/en/settings/:path*",
         permanent: false,
       },
+      {
+        source: "/privacy",
+        destination: "/en/privacy",
+        permanent: false,
+      },
+      {
+        source: "/terms",
+        destination: "/en/terms",
+        permanent: false,
+      },
     ];
   },
 
