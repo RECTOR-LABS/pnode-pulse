@@ -8,6 +8,34 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
+// Content Security Policy configuration
+// Note: Next.js requires 'unsafe-inline' and 'unsafe-eval' for certain features
+const ContentSecurityPolicy = [
+  "default-src 'self'",
+  // Scripts: self + inline/eval for Next.js hydration and dev tools
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  // Styles: self + inline for Tailwind and component styles
+  "style-src 'self' 'unsafe-inline'",
+  // Images: self + data URIs + HTTPS sources (for external images)
+  "img-src 'self' data: https: blob:",
+  // Fonts: self only (add CDN if using external fonts)
+  "font-src 'self'",
+  // Connections: self + WebSocket for HMR + external APIs
+  "connect-src 'self' wss: https://api.sentry.io https://*.ingest.sentry.io",
+  // Frames: only allow embedding from same origin (main app)
+  "frame-ancestors 'self'",
+  // Frame sources: self for any iframes we use
+  "frame-src 'self'",
+  // Object/embed: none (no Flash/plugins)
+  "object-src 'none'",
+  // Base URI: self only
+  "base-uri 'self'",
+  // Form actions: self only
+  "form-action 'self'",
+  // Upgrade insecure requests in production
+  process.env.NODE_ENV === "production" ? "upgrade-insecure-requests" : "",
+].filter(Boolean).join("; ");
+
 const nextConfig: NextConfig = {
   // Enable standalone output for Docker deployment
   output: "standalone",
@@ -95,6 +123,7 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "X-XSS-Protection", value: "1; mode=block" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Content-Security-Policy", value: ContentSecurityPolicy },
         ],
       },
       // Static assets - aggressive caching (1 year, immutable)
@@ -157,12 +186,12 @@ const nextConfig: NextConfig = {
         ],
       },
       // Embed routes - allow iframe embedding from any origin
-      // Note: X-Frame-Options removed as ALLOWALL is invalid; CSP frame-ancestors is the modern approach
+      // Overrides the default CSP to allow embedding anywhere
       {
         source: "/embed/:path*",
         headers: [
           { key: "Cache-Control", value: "public, s-maxage=60, stale-while-revalidate=300" },
-          { key: "Content-Security-Policy", value: "frame-ancestors *" },
+          { key: "Content-Security-Policy", value: ContentSecurityPolicy.replace("frame-ancestors 'self'", "frame-ancestors *") },
         ],
       },
       // Real-time API - no cache
