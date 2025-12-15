@@ -1,101 +1,152 @@
+<div align="center">
+
 # pNode Pulse
 
-[![Live Demo](https://img.shields.io/badge/demo-pulse.rectorspace.com-blue?style=for-the-badge)](https://pulse.rectorspace.com)
-[![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
-[![Next.js](https://img.shields.io/badge/Next.js-14-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+### Real-time Analytics for the Xandeum pNode Network
 
-**Real-time analytics platform for Xandeum's pNode network**
+[![Live Demo](https://img.shields.io/badge/Live-pulse.rectorspace.com-00D4AA?style=for-the-badge&logo=vercel&logoColor=white)](https://pulse.rectorspace.com)
+[![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
+
+<br/>
+
+**Monitor 200+ nodes across 10+ countries with real-time metrics, storage analytics, and network health insights.**
+
+<br/>
+
+<a href="https://pulse.rectorspace.com">
+  <img src="docs/assets/screenshot-hero.png" alt="pNode Pulse Dashboard" width="100%" />
+</a>
+
+<br/>
+<br/>
+
+[View Live Demo](https://pulse.rectorspace.com) · [Report Bug](https://github.com/RECTOR-LABS/pnode-pulse/issues) · [Request Feature](https://github.com/RECTOR-LABS/pnode-pulse/issues)
+
+</div>
+
+---
+
+## Overview
+
+**pNode Pulse** is a comprehensive analytics platform for monitoring Xandeum's decentralized storage network. Track node performance, storage capacity, network health, and growth trends in real-time.
 
 > Built for the [Superteam Bounty: Build Analytics Platform for Xandeum pNodes](https://earn.superteam.fun/listing/build-analytics-platform-for-xandeum-pnodes/)
 
 ---
 
-## Live Demo
-
-**[pulse.rectorspace.com](https://pulse.rectorspace.com)**
-
-![pNode Pulse Dashboard](docs/assets/dashboard-preview.png)
-
----
-
 ## Features
 
-### Network Overview
-- **Real-time node discovery** via pRPC `get-pods-with-stats` (v0.7.0+)
-- **146+ nodes tracked** with automatic IP change detection
-- **Network health metrics**: CPU, RAM, storage, uptime
-- **Version distribution** across the network
+<table>
+<tr>
+<td width="50%">
 
-### Storage Analytics
-- **1.7+ PB total network storage** capacity tracking
-- **Storage utilization** per node and network-wide
-- **Capacity projections** based on growth trends
-- **Public vs Private node** classification
+### 🌐 Network Overview
 
-### Node Monitoring
-- **Individual node details** with full metrics history
-- **Performance comparison** across nodes
-- **Node leaderboard** by storage/uptime
-- **Graveyard tracker** for inactive nodes
+- **200+ nodes** tracked in real-time
+- Global distribution map with **10+ countries**
+- Network health score with **A-F grading**
+- Version distribution analytics
 
-### Advanced Features
-- **IP change tracking** with historical logs
-- **TimescaleDB** for time-series analytics
-- **Auto-discovery** via gossip network
-- **Blue/green deployment** for zero downtime
+</td>
+<td width="50%">
 
----
+### 💾 Storage Analytics
 
-## Tech Stack
+- **5+ TB** total network capacity
+- Per-node storage metrics
+- Capacity growth projections
+- Public vs Private node classification
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS |
-| Backend | tRPC, Node.js |
-| Database | PostgreSQL + TimescaleDB |
-| Cache | Redis |
-| Deployment | Docker Compose, GitHub Actions |
+</td>
+</tr>
+<tr>
+<td width="50%">
+
+### 📊 Performance Monitoring
+
+- CPU & RAM utilization tracking
+- Uptime leaderboards
+- Node comparison tools
+- Historical trend analysis
+
+</td>
+<td width="50%">
+
+### 🔔 Advanced Features
+
+- IP change detection & logging
+- Node graveyard for inactive nodes
+- Predictive health alerts
+- Real-time WebSocket updates
+
+</td>
+</tr>
+</table>
 
 ---
 
 ## Quick Start
 
 ### Prerequisites
+
 - Node.js 20+
 - Docker & Docker Compose
-- npm or yarn
 
-### Development Setup
+### Installation
 
 ```bash
-# Clone the repository
+# 1. Clone and setup
 git clone https://github.com/RECTOR-LABS/pnode-pulse.git
 cd pnode-pulse
-
-# Start database services
 cp .env.example .env
+
+# 2. Start services
 docker compose up -d postgres redis
-
-# Install dependencies
 npm install
-
-# Run database migrations
 npx prisma migrate deploy
-npx prisma generate
 
-# Start development server
+# 3. Run
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000)
+Open [http://localhost:3000](http://localhost:3000) to view the dashboard.
 
-### Start Data Collector
+---
 
-```bash
-# In a separate terminal
-npm run collector
-```
+## Tech Stack
+
+<table>
+<tr>
+<td align="center" width="96">
+<img src="https://skillicons.dev/icons?i=nextjs" width="48" height="48" alt="Next.js" />
+<br>Next.js 14
+</td>
+<td align="center" width="96">
+<img src="https://skillicons.dev/icons?i=ts" width="48" height="48" alt="TypeScript" />
+<br>TypeScript
+</td>
+<td align="center" width="96">
+<img src="https://skillicons.dev/icons?i=tailwind" width="48" height="48" alt="Tailwind" />
+<br>Tailwind
+</td>
+<td align="center" width="96">
+<img src="https://skillicons.dev/icons?i=postgres" width="48" height="48" alt="PostgreSQL" />
+<br>PostgreSQL
+</td>
+<td align="center" width="96">
+<img src="https://skillicons.dev/icons?i=redis" width="48" height="48" alt="Redis" />
+<br>Redis
+</td>
+<td align="center" width="96">
+<img src="https://skillicons.dev/icons?i=docker" width="48" height="48" alt="Docker" />
+<br>Docker
+</td>
+</tr>
+</table>
+
+**Additional**: tRPC · TimescaleDB · Prisma · Recharts · React Query
 
 ---
 
@@ -103,118 +154,87 @@ npm run collector
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      pNode Pulse                            │
+│                       pNode Pulse                           │
 ├─────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
 │  │   Next.js   │  │  Collector  │  │   TimescaleDB       │ │
 │  │  Dashboard  │◄─┤   Worker    │─►│  (Time-series DB)   │ │
 │  └──────┬──────┘  └──────┬──────┘  └─────────────────────┘ │
 │         │                │                                  │
-│         │                ▼                                  │
-│         │         ┌─────────────┐                          │
-│         └────────►│    Redis    │ (Cache)                  │
-│                   └─────────────┘                          │
+│         └───────────────►│◄──── Redis (Cache) ────────────► │
 └─────────────────────────────────────────────────────────────┘
                            │
                            ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                    pNode Network                            │
+│                    Xandeum pNode Network                    │
 ├─────────────────────────────────────────────────────────────┤
-│  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐       │
-│  │ pNode 1 │  │ pNode 2 │  │ pNode 3 │  │ pNode N │ ...   │
-│  │ :6000   │  │ :6000   │  │ :6000   │  │ :6000   │       │
-│  └─────────┘  └─────────┘  └─────────┘  └─────────┘       │
-│                                                             │
-│  Gossip Network (:9001) ◄───────────────────────────────►  │
+│     pNode 1        pNode 2        pNode 3       pNode N     │
+│      :6000          :6000          :6000         :6000      │
+│         └─────────── Gossip Network (:9001) ────────────┘   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## pRPC API Integration
+## API Reference
 
-pNode Pulse uses the pRPC JSON-RPC 2.0 API to collect data:
+pNode Pulse exposes a public REST API for integration:
 
-| Method | Description | Version |
-|--------|-------------|---------|
-| `get-version` | Node software version | All |
-| `get-stats` | CPU, RAM, uptime, storage metrics | All |
-| `get-pods` | Peer list (legacy) | < v0.7.0 |
-| `get-pods-with-stats` | Full network with storage stats | v0.7.0+ |
+| Endpoint                    | Description                         |
+| --------------------------- | ----------------------------------- |
+| `GET /api/v1/nodes`         | List all nodes with current metrics |
+| `GET /api/v1/nodes/:id`     | Get specific node details           |
+| `GET /api/v1/network/stats` | Network-wide statistics             |
+| `GET /api/v1/leaderboard`   | Node rankings by various metrics    |
+| `GET /api/health`           | Health check endpoint               |
 
-### Example Request
-
-```bash
-curl -X POST http://192.190.136.36:6000/rpc \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","method":"get-pods-with-stats","id":1}'
-```
+[View Full API Documentation →](docs/API.md)
 
 ---
 
 ## Documentation
 
-- **[User Guide](docs/USER_GUIDE.md)** - How to use each feature
-- **[Deployment Guide](docs/DEPLOYMENT.md)** - Self-hosting instructions
-- **[API Reference](docs/API.md)** - Public endpoints documentation
-
----
-
-## Project Structure
-
-```
-pnode-pulse/
-├── src/
-│   ├── app/              # Next.js App Router pages
-│   ├── components/       # React components
-│   │   ├── dashboard/    # Dashboard widgets
-│   │   ├── nodes/        # Node-related components
-│   │   └── ui/           # Shared UI components
-│   ├── lib/
-│   │   ├── prpc/         # pRPC client library
-│   │   ├── db/           # Prisma client & queries
-│   │   └── utils/        # Formatting utilities
-│   ├── server/
-│   │   ├── api/          # tRPC routers
-│   │   └── workers/      # Data collector
-│   └── types/            # TypeScript types
-├── prisma/               # Database schema & migrations
-├── docs/                 # Documentation
-└── docker/               # Docker configurations
-```
-
----
-
-## Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | Required |
-| `REDIS_HOST` | Redis hostname | `localhost` |
-| `REDIS_PORT` | Redis port | `6379` |
-| `PRPC_SEED_NODES` | Comma-separated seed IPs | Built-in list |
+| Document                                                                 | Description                |
+| ------------------------------------------------------------------------ | -------------------------- |
+| [User Guide](docs/USER_GUIDE.md)                                         | How to use each feature    |
+| [Deployment Guide](docs/DEPLOYMENT.md)                                   | Self-hosting instructions  |
+| [API Reference](docs/API.md)                                             | REST API documentation     |
+| [pRPC Reference](https://docs.xandeum.network/xandeum-pnode-setup-guide) | Xandeum pRPC documentation |
 
 ---
 
 ## Contributing
 
-Contributions are welcome! Please read our contributing guidelines before submitting PRs.
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
 ---
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## Resources
+## Acknowledgments
 
-- [Xandeum Network](https://xandeum.network)
-- [Xandeum Docs](https://docs.xandeum.network)
-- [pRPC Reference](https://docs.xandeum.network/xandeum-pnode-setup-guide)
-- [Discord](https://discord.com/invite/mGAxAuwnR9)
+- [Xandeum Network](https://xandeum.network) - The decentralized storage network
+- [Superteam](https://superteam.fun) - For hosting the bounty
+- [Solana](https://solana.com) - The underlying blockchain
 
 ---
 
-**Built with tawakkul for the Xandeum ecosystem**
+<div align="center">
+
+**[Website](https://pulse.rectorspace.com)** · **[Xandeum](https://xandeum.network)** · **[Discord](https://discord.com/invite/mGAxAuwnR9)** · **[GitHub](https://github.com/RECTOR-LABS/pnode-pulse)**
+
+<br/>
+
+Built with ❤️ for the Xandeum ecosystem
+
+</div>
