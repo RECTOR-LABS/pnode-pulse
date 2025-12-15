@@ -2,6 +2,8 @@
 
 Complete guide for self-hosting pNode Pulse on your own infrastructure.
 
+> **Live Instance**: [pulse.rectorspace.com](https://pulse.rectorspace.com) - See it in action before deploying your own.
+
 ---
 
 ## Table of Contents
@@ -11,11 +13,12 @@ Complete guide for self-hosting pNode Pulse on your own infrastructure.
 3. [Production Deployment](#production-deployment)
 4. [Environment Configuration](#environment-configuration)
 5. [Database Setup](#database-setup)
-6. [Running the Collector](#running-the-collector)
+6. [Data Collection](#data-collection)
 7. [Nginx Reverse Proxy](#nginx-reverse-proxy)
 8. [SSL with Certbot](#ssl-with-certbot)
-9. [Monitoring](#monitoring)
-10. [Troubleshooting](#troubleshooting)
+9. [CI/CD with GitHub Actions](#cicd-with-github-actions)
+10. [Monitoring](#monitoring)
+11. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -23,12 +26,12 @@ Complete guide for self-hosting pNode Pulse on your own infrastructure.
 
 ### System Requirements
 
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
-| CPU | 1 core | 2+ cores |
-| RAM | 2 GB | 4+ GB |
-| Storage | 20 GB | 50+ GB (for metrics history) |
-| OS | Ubuntu 20.04+ | Ubuntu 22.04 LTS |
+| Component | Minimum       | Recommended                  |
+| --------- | ------------- | ---------------------------- |
+| CPU       | 1 core        | 2+ cores                     |
+| RAM       | 2 GB          | 4+ GB                        |
+| Storage   | 20 GB         | 50+ GB (for metrics history) |
+| OS        | Ubuntu 20.04+ | Ubuntu 22.04 LTS             |
 
 ### Software Requirements
 
@@ -136,19 +139,19 @@ curl http://localhost:7000/api/health
 
 ### Required Variables
 
-| Variable | Description | Example |
-|----------|-------------|---------|
+| Variable            | Description       | Example          |
+| ------------------- | ----------------- | ---------------- |
 | `POSTGRES_PASSWORD` | Database password | Random 32+ chars |
 
 ### Optional Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | Full connection string | Auto-generated |
-| `REDIS_HOST` | Redis hostname | `redis` (in Docker) |
-| `REDIS_PORT` | Redis port | `6379` |
-| `PRPC_SEED_NODES` | Custom seed nodes | Built-in list |
-| `NODE_ENV` | Environment mode | `production` |
+| Variable          | Description            | Default             |
+| ----------------- | ---------------------- | ------------------- |
+| `DATABASE_URL`    | Full connection string | Auto-generated      |
+| `REDIS_HOST`      | Redis hostname         | `redis` (in Docker) |
+| `REDIS_PORT`      | Redis port             | `6379`              |
+| `PRPC_SEED_NODES` | Custom seed nodes      | Built-in list       |
+| `NODE_ENV`        | Environment mode       | `production`        |
 
 ### Example .env
 
@@ -197,67 +200,54 @@ docker exec -i pnode-pulse-postgres \
 
 ---
 
-## Running the Collector
+## Data Collection
 
-The collector gathers data from pNodes every 30 seconds.
+pNode Pulse automatically collects data from the Xandeum pNode network. The collector runs as part of the main application.
 
-### Option 1: Docker Container (Recommended)
+### How It Works
 
-```bash
-# Create Docker-specific env
-cat > .env.docker << EOF
-DATABASE_URL=postgresql://pnodepulse:PASSWORD@postgres:5432/pnodepulse
-REDIS_HOST=redis
-REDIS_PORT=6379
-NODE_ENV=production
-EOF
+1. **Seed Nodes**: The collector starts with a list of known public pNodes
+2. **Discovery**: Uses `get-pods-with-stats` (v0.7.0+) to discover all nodes in the gossip network
+3. **Polling**: Collects metrics from public nodes every 30 seconds
+4. **Storage**: Metrics are stored in TimescaleDB for time-series analysis
 
-# Start collector
-docker run -d \
-  --name pnode-pulse-collector \
-  --network pnode-pulse-network \
-  --restart unless-stopped \
-  -v "$(pwd)":/app \
-  -w /app \
-  --env-file .env.docker \
-  node:20-alpine \
-  sh -c "npm install && npx prisma generate && npx tsx scripts/start-collector.ts"
+### Seed Nodes Configuration
+
+By default, the collector uses these public pNodes:
+
+```
+173.212.203.145, 173.212.220.65, 161.97.97.41
+192.190.136.36, 192.190.136.38, 192.190.136.28
+192.190.136.29, 207.244.255.1
 ```
 
-### Option 2: Systemd Service
+Override with the `PRPC_SEED_NODES` environment variable:
 
 ```bash
-# /etc/systemd/system/pnode-collector.service
-[Unit]
-Description=pNode Pulse Collector
-After=network.target docker.service
-
-[Service]
-Type=simple
-User=pnodepulse
-WorkingDirectory=/home/pnodepulse/pnode-pulse
-ExecStart=/usr/bin/npm run collector
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
+PRPC_SEED_NODES=192.190.136.36,173.212.203.145
 ```
+
+### Verify Collection
 
 ```bash
-sudo systemctl enable pnode-collector
-sudo systemctl start pnode-collector
+# Check application logs for collection activity
+docker compose logs blue --tail 50 | grep -i collect
+
+# Check database for recent metrics
+docker exec pnode-pulse-postgres psql -U pnodepulse -c \
+  "SELECT COUNT(*) FROM node_metrics WHERE collected_at > NOW() - INTERVAL '5 minutes'"
+
+# Check API for collection status
+curl https://your-domain.com/api/trpc/network.collectionStatus
 ```
 
-### Verify Collector
+### Collection Status
 
-```bash
-# Check logs
-docker logs pnode-pulse-collector --tail 50
+The dashboard displays collection status including:
 
-# Look for successful collections
-docker logs pnode-pulse-collector 2>&1 | grep "Collecting from nodes"
-```
+- Last successful collection time
+- Nodes polled vs nodes responding
+- Recent collection history
 
 ---
 
@@ -326,12 +316,90 @@ sudo certbot renew --dry-run
 
 ---
 
+## CI/CD with GitHub Actions
+
+pNode Pulse includes automated deployment workflows.
+
+### Workflows
+
+| Workflow                | Trigger        | Target                  |
+| ----------------------- | -------------- | ----------------------- |
+| `deploy-staging.yml`    | Push to `dev`  | Staging (port 7002)     |
+| `deploy-production.yml` | Push to `main` | Production (blue/green) |
+
+### Required GitHub Secrets
+
+Configure in repository Settings → Secrets:
+
+| Secret              | Description                         |
+| ------------------- | ----------------------------------- |
+| `VPS_SSH_KEY`       | Private SSH key for deployment user |
+| `POSTGRES_PASSWORD` | Database password                   |
+
+### Staging Deployment Flow
+
+1. Push to `dev` branch
+2. GitHub Actions builds Docker image
+3. Pushes to GitHub Container Registry (GHCR)
+4. SSHs to VPS and pulls new image
+5. Restarts staging container
+
+### Production Deployment Flow
+
+1. Push to `main` branch
+2. GitHub Actions builds Docker image
+3. Pushes to GHCR with `:latest` tag
+4. Runs blue/green deployment:
+   - Starts inactive environment (blue or green)
+   - Waits for health check
+   - Switches traffic
+   - Stops old environment
+
+### Manual Deployment
+
+```bash
+# SSH to VPS
+ssh pnodepulse@your-vps
+
+# Pull latest changes
+cd ~/pnode-pulse
+git pull origin main
+
+# Pull latest image
+docker compose pull blue
+
+# Restart service
+docker compose up -d blue
+```
+
+### Blue/Green Switch
+
+```bash
+# Check current active environment
+docker compose ps | grep healthy
+
+# If blue is active, switch to green
+docker compose --profile green up -d green
+
+# Wait for health check
+curl http://localhost:7001/api/health
+
+# Update nginx to point to 7001
+sudo vim /etc/nginx/sites-enabled/your-site
+sudo nginx -t && sudo systemctl reload nginx
+
+# Stop old blue
+docker compose stop blue
+```
+
+---
+
 ## Monitoring
 
 ### Health Endpoints
 
-| Endpoint | Description |
-|----------|-------------|
+| Endpoint      | Description                           |
+| ------------- | ------------------------------------- |
 | `/api/health` | Full health check (DB, Redis, uptime) |
 
 ### Health Response

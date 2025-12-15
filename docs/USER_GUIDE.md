@@ -2,17 +2,41 @@
 
 This guide walks you through all features of the pNode Pulse analytics platform.
 
+> **Live Demo**: [pulse.rectorspace.com](https://pulse.rectorspace.com)
+
 ---
 
 ## Table of Contents
 
-1. [Dashboard Overview](#dashboard-overview)
-2. [Network Statistics](#network-statistics)
-3. [Node List](#node-list)
-4. [Node Details](#node-details)
-5. [Storage Analytics](#storage-analytics)
-6. [Network Health](#network-health)
-7. [Historical Data](#historical-data)
+1. [Getting Started](#getting-started)
+2. [Dashboard Overview](#dashboard-overview)
+3. [Network Statistics](#network-statistics)
+4. [Node List](#node-list)
+5. [Node Details](#node-details)
+6. [Leaderboard](#leaderboard)
+7. [Storage Analytics](#storage-analytics)
+8. [Network Health](#network-health)
+9. [Historical Data](#historical-data)
+10. [Embeddable Badges](#embeddable-badges)
+11. [API Access](#api-access)
+12. [Language Support](#language-support)
+
+---
+
+## Getting Started
+
+### Accessing the Platform
+
+Visit [pulse.rectorspace.com](https://pulse.rectorspace.com) to access the live platform. No account required.
+
+### What You'll See
+
+The platform provides real-time visibility into the Xandeum pNode network:
+
+- **200+ nodes** tracked across the gossip network
+- **Real-time metrics** updated every 30 seconds
+- **Historical trends** stored in TimescaleDB
+- **Network health** scoring and alerts
 
 ---
 
@@ -22,12 +46,12 @@ The main dashboard at [pulse.rectorspace.com](https://pulse.rectorspace.com) pro
 
 ### Key Metrics Cards
 
-| Metric | Description |
-|--------|-------------|
-| **Total Nodes** | Number of nodes discovered in the gossip network |
-| **Network Storage** | Combined storage capacity across all nodes |
-| **Avg CPU** | Average CPU utilization network-wide |
-| **Avg Uptime** | Average node uptime |
+| Metric              | Description                                      |
+| ------------------- | ------------------------------------------------ |
+| **Total Nodes**     | Number of nodes discovered in the gossip network |
+| **Network Storage** | Combined storage capacity across all nodes       |
+| **Avg CPU**         | Average CPU utilization network-wide             |
+| **Avg Uptime**      | Average node uptime                              |
 
 ### Dashboard Widgets
 
@@ -48,12 +72,12 @@ The main dashboard at [pulse.rectorspace.com](https://pulse.rectorspace.com) pro
 
 At the bottom of the dashboard, you'll find:
 
-| Stat | Description |
-|------|-------------|
-| **Active Nodes** | Nodes responding to polls (green) |
-| **Inactive Nodes** | Nodes not responding (orange) |
-| **Avg RAM Usage** | Network-wide memory utilization |
-| **Peer Connections** | Total gossip network connections |
+| Stat                 | Description                       |
+| -------------------- | --------------------------------- |
+| **Active Nodes**     | Nodes responding to polls (green) |
+| **Inactive Nodes**   | Nodes not responding (orange)     |
+| **Avg RAM Usage**    | Network-wide memory utilization   |
+| **Peer Connections** | Total gossip network connections  |
 
 ### Collection Status
 
@@ -74,6 +98,7 @@ Navigate to `/nodes` to see all discovered nodes.
 ### Sorting
 
 Click column headers to sort by:
+
 - Address
 - Version
 - Last Seen
@@ -84,14 +109,14 @@ Click column headers to sort by:
 
 Each row displays:
 
-| Column | Description |
-|--------|-------------|
-| **Address** | IP:Port of the node |
-| **Version** | pNode software version |
-| **Status** | Active/Inactive indicator |
-| **Public** | Whether RPC port is accessible |
-| **Last Seen** | Time since last successful poll |
-| **Uptime** | Node uptime in human-readable format |
+| Column        | Description                          |
+| ------------- | ------------------------------------ |
+| **Address**   | IP:Port of the node                  |
+| **Version**   | pNode software version               |
+| **Status**    | Active/Inactive indicator            |
+| **Public**    | Whether RPC port is accessible       |
+| **Last Seen** | Time since last successful poll      |
+| **Uptime**    | Node uptime in human-readable format |
 
 ---
 
@@ -109,19 +134,20 @@ Click any node to view detailed information at `/nodes/[id]`.
 
 Real-time and historical metrics:
 
-| Metric | Description |
-|--------|-------------|
-| **CPU %** | Current processor utilization |
-| **RAM Used/Total** | Memory consumption |
-| **Storage Committed** | Allocated storage space |
-| **Storage Used** | Actual data stored |
-| **Uptime** | Time since node started |
-| **Packets Sent/Received** | Network traffic |
-| **Active Streams** | Current data streams |
+| Metric                    | Description                   |
+| ------------------------- | ----------------------------- |
+| **CPU %**                 | Current processor utilization |
+| **RAM Used/Total**        | Memory consumption            |
+| **Storage Committed**     | Allocated storage space       |
+| **Storage Used**          | Actual data stored            |
+| **Uptime**                | Time since node started       |
+| **Packets Sent/Received** | Network traffic               |
+| **Active Streams**        | Current data streams          |
 
 ### History Tab
 
 Time-series charts showing:
+
 - CPU usage over time
 - RAM utilization trends
 - Storage growth
@@ -140,6 +166,7 @@ Time-series charts showing:
 ### Per-Node Storage
 
 Each node with v0.7.0+ reports:
+
 - `storage_committed`: Allocated capacity
 - `storage_used`: Actual usage
 - `storage_usage_percent`: Utilization rate
@@ -147,6 +174,7 @@ Each node with v0.7.0+ reports:
 ### Storage Projection
 
 Based on historical data, the platform projects:
+
 - 7-day growth forecast
 - 30-day capacity estimate
 - Network expansion trends
@@ -157,15 +185,16 @@ Based on historical data, the platform projects:
 
 ### Health Indicators
 
-| Status | CPU | RAM | Description |
-|--------|-----|-----|-------------|
-| **Healthy** | < 50% | < 70% | Normal operation |
-| **Warning** | 50-80% | 70-85% | Monitor closely |
-| **Critical** | > 80% | > 85% | Attention needed |
+| Status       | CPU    | RAM    | Description      |
+| ------------ | ------ | ------ | ---------------- |
+| **Healthy**  | < 50%  | < 70%  | Normal operation |
+| **Warning**  | 50-80% | 70-85% | Monitor closely  |
+| **Critical** | > 80%  | > 85%  | Attention needed |
 
 ### Version Health
 
 The platform tracks version distribution:
+
 - **Current**: Latest stable version
 - **Outdated**: Older but functional versions
 - **Unknown**: Nodes with version detection issues
@@ -177,6 +206,7 @@ The platform tracks version distribution:
 ### Time Ranges
 
 Select from predefined ranges:
+
 - Last 1 hour
 - Last 24 hours
 - Last 7 days
@@ -195,13 +225,117 @@ Data can be exported via the API for external analysis.
 
 ---
 
+## Leaderboard
+
+Navigate to `/leaderboard` for node rankings.
+
+### Categories
+
+| Category        | Description             |
+| --------------- | ----------------------- |
+| **Uptime**      | Longest-running nodes   |
+| **Storage**     | Most storage committed  |
+| **Performance** | Best CPU/RAM efficiency |
+
+### Leaderboard Features
+
+- **Top 10** nodes per category
+- **Your Node** - Find your node's ranking
+- **Historical** - Track ranking changes over time
+- **Badges** - Embed rankings on external sites
+
+---
+
+## Embeddable Badges
+
+Display live network stats on your website or README.
+
+### Available Badges
+
+| Badge          | URL                      | Description              |
+| -------------- | ------------------------ | ------------------------ |
+| Network Status | `/api/badge/network.svg` | Total nodes and health   |
+| Storage        | `/api/badge/storage.svg` | Network storage capacity |
+| Version        | `/api/badge/version.svg` | Latest pNode version     |
+
+### Usage
+
+**Markdown**:
+
+```markdown
+![pNode Network](https://pulse.rectorspace.com/api/badge/network.svg)
+```
+
+**HTML**:
+
+```html
+<img
+  src="https://pulse.rectorspace.com/api/badge/network.svg"
+  alt="pNode Network Status"
+/>
+```
+
+### Badge Examples
+
+Badges are SVG format for crisp display at any size. They update automatically with live data.
+
+---
+
+## API Access
+
+Access network data programmatically via our REST API.
+
+### Quick Start
+
+```bash
+# Get network overview
+curl https://pulse.rectorspace.com/api/trpc/network.overview
+
+# Get node list
+curl "https://pulse.rectorspace.com/api/trpc/nodes.list?input={\"limit\":10}"
+
+# Check health
+curl https://pulse.rectorspace.com/api/health
+```
+
+### Documentation
+
+Full API documentation: [API Reference](./API.md)
+
+### Rate Limits
+
+Currently no rate limits. Please be respectful with request frequency.
+
+---
+
+## Language Support
+
+pNode Pulse supports multiple languages.
+
+### Available Languages
+
+| Language | Code | URL                                               |
+| -------- | ---- | ------------------------------------------------- |
+| English  | `en` | [/en](https://pulse.rectorspace.com/en) (default) |
+| Spanish  | `es` | [/es](https://pulse.rectorspace.com/es)           |
+| Chinese  | `zh` | [/zh](https://pulse.rectorspace.com/zh)           |
+| Russian  | `ru` | [/ru](https://pulse.rectorspace.com/ru)           |
+
+### Language Selection
+
+- Auto-detected from browser preferences
+- Manual selection via URL prefix
+- Preference stored in cookie
+
+---
+
 ## Keyboard Shortcuts
 
-| Key | Action |
-|-----|--------|
+| Key | Action       |
+| --- | ------------ |
 | `/` | Focus search |
 | `r` | Refresh data |
-| `?` | Show help |
+| `?` | Show help    |
 
 ---
 

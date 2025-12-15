@@ -194,12 +194,13 @@ pNode Pulse exposes a public REST API for integration:
 
 ## Documentation
 
-| Document                                                                 | Description                |
-| ------------------------------------------------------------------------ | -------------------------- |
-| [User Guide](docs/USER_GUIDE.md)                                         | How to use each feature    |
-| [Deployment Guide](docs/DEPLOYMENT.md)                                   | Self-hosting instructions  |
-| [API Reference](docs/API.md)                                             | REST API documentation     |
-| [pRPC Reference](https://docs.xandeum.network/xandeum-pnode-setup-guide) | Xandeum pRPC documentation |
+| Document                                                                 | Description                 |
+| ------------------------------------------------------------------------ | --------------------------- |
+| [User Guide](docs/USER_GUIDE.md)                                         | How to use each feature     |
+| [Deployment Guide](docs/DEPLOYMENT.md)                                   | Self-hosting instructions   |
+| [API Reference](docs/API.md)                                             | REST API documentation      |
+| [Operations Runbook](docs/RUNBOOK.md)                                    | Production operations guide |
+| [pRPC Reference](https://docs.xandeum.network/xandeum-pnode-setup-guide) | Xandeum pRPC documentation  |
 
 ---
 
