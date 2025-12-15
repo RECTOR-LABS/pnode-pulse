@@ -9,6 +9,7 @@ BLUE_PORT=7000
 GREEN_PORT=7001
 MAX_HEALTH_CHECKS=60
 HEALTH_CHECK_INTERVAL=2
+NGINX_CONFIG="/etc/nginx/sites-enabled/pulse.rectorspace.com"
 
 log() {
   echo "[$(date +'%Y-%m-%d %H:%M:%S')] $*"
@@ -67,6 +68,44 @@ get_active_env() {
   fi
 }
 
+# Switch nginx to point to a specific port
+switch_nginx() {
+  local target_port=$1
+  local old_port=$2
+
+  log "Switching nginx from port $old_port to port $target_port..."
+
+  # Check if nginx config exists
+  if [ ! -f "$NGINX_CONFIG" ]; then
+    log "WARNING: Nginx config not found at $NGINX_CONFIG, skipping nginx switch"
+    return 0
+  fi
+
+  # Update nginx config to point to new port
+  if sudo sed -i "s/localhost:${old_port}/localhost:${target_port}/g" "$NGINX_CONFIG"; then
+    log "Updated nginx config"
+  else
+    error "Failed to update nginx config"
+  fi
+
+  # Test nginx configuration
+  if sudo nginx -t 2>&1; then
+    log "Nginx config test passed"
+  else
+    # Rollback the change
+    log "Nginx config test failed, rolling back..."
+    sudo sed -i "s/localhost:${target_port}/localhost:${old_port}/g" "$NGINX_CONFIG"
+    error "Nginx config test failed, rolled back changes"
+  fi
+
+  # Reload nginx
+  if sudo systemctl reload nginx; then
+    log "Nginx reloaded successfully"
+  else
+    error "Failed to reload nginx"
+  fi
+}
+
 # Main deployment logic
 main() {
   log "=== Starting Blue/Green Deployment ==="
@@ -77,9 +116,11 @@ main() {
   if [ "$ACTIVE_ENV" = "blue" ]; then
     TARGET_ENV="green"
     TARGET_PORT=$GREEN_PORT
+    ACTIVE_PORT=$BLUE_PORT
   else
     TARGET_ENV="blue"
     TARGET_PORT=$BLUE_PORT
+    ACTIVE_PORT=$GREEN_PORT
   fi
 
   log "Active environment: $ACTIVE_ENV"
@@ -100,13 +141,12 @@ main() {
   # Wait for target to become healthy
   wait_for_health "$TARGET_ENV"
 
-  # Update nginx to point to new environment (if using nginx)
-  # This section would typically update nginx config and reload
-  # For now, we'll just log the port change
-  log "New environment is ready on port $TARGET_PORT"
-  log "Update your reverse proxy to point to port $TARGET_PORT"
+  # Switch nginx to point to new environment
+  switch_nginx "$TARGET_PORT" "$ACTIVE_PORT"
 
-  # Stop old environment (after manual verification or automated checks)
+  log "Traffic now routed to $TARGET_ENV (port $TARGET_PORT)"
+
+  # Stop old environment
   log "Stopping old environment ($ACTIVE_ENV)..."
   docker compose stop "$ACTIVE_ENV"
   docker compose rm -f "$ACTIVE_ENV"
