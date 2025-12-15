@@ -47,6 +47,7 @@ export default function GlobalError({
               >
                 Try again
               </button>
+              {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Global error boundary cannot use Next.js Link as app context may be broken */}
               <a
                 href="/"
                 className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors inline-block"
