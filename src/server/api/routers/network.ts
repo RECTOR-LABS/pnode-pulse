@@ -329,7 +329,6 @@ export const networkRouter = createTRPCRouter({
 
       // Determine which aggregate to use
       const useDaily = range === "30d" || range === "90d";
-      const tableName = useDaily ? "network_metrics_daily" : "network_metrics_hourly";
 
       const rangeMs = {
         "24h": 24 * 60 * 60 * 1000,
@@ -340,19 +339,26 @@ export const networkRouter = createTRPCRouter({
 
       const startTime = new Date(Date.now() - rangeMs[range]);
 
-      const result = await ctx.db.$queryRawUnsafe<Array<{
+      // Use separate parameterized queries for each table to avoid SQL injection patterns
+      type TrendRow = {
         bucket: Date;
         node_count: bigint;
         total_storage: bigint;
         avg_cpu: number;
         avg_ram_percent: number;
-      }>>(
-        `SELECT bucket, node_count, total_storage, avg_cpu, avg_ram_percent
-         FROM ${tableName}
-         WHERE bucket >= $1
-         ORDER BY bucket ASC`,
-        startTime
-      );
+      };
+
+      const result = useDaily
+        ? await ctx.db.$queryRaw<TrendRow[]>`
+            SELECT bucket, node_count, total_storage, avg_cpu, avg_ram_percent
+            FROM network_metrics_daily
+            WHERE bucket >= ${startTime}
+            ORDER BY bucket ASC`
+        : await ctx.db.$queryRaw<TrendRow[]>`
+            SELECT bucket, node_count, total_storage, avg_cpu, avg_ram_percent
+            FROM network_metrics_hourly
+            WHERE bucket >= ${startTime}
+            ORDER BY bucket ASC`;
 
       return result.map((r) => ({
         time: r.bucket,
@@ -420,6 +426,7 @@ export const networkRouter = createTRPCRouter({
    */
   /**
    * #36: Get network graph data for visualization
+   * Prioritizes nodes with peer connections to build a meaningful graph
    */
   peerGraph: publicProcedure
     .input(
@@ -432,21 +439,62 @@ export const networkRouter = createTRPCRouter({
       const limit = input?.limit ?? 100;
       const includeInactive = input?.includeInactive ?? false;
 
-      // Get nodes with their latest metrics for sizing
-      const nodes = await ctx.db.node.findMany({
-        where: includeInactive ? {} : { isActive: true },
-        take: limit,
-        orderBy: { lastSeen: "desc" },
-        select: {
-          id: true,
-          address: true,
-          version: true,
-          isActive: true,
-        },
-      });
+      // Get nodes that have peer connections (these form the actual graph)
+      // Prioritize nodes that are part of peer relationships
+      const nodesWithPeers = includeInactive
+        ? await ctx.db.$queryRaw<Array<{
+            id: number;
+            address: string;
+            version: string | null;
+            is_active: boolean;
+          }>>`
+            SELECT DISTINCT n.id, n.address, n.version, n.is_active
+            FROM nodes n
+            WHERE n.id IN (
+              SELECT DISTINCT node_id FROM node_peers
+              UNION
+              SELECT DISTINCT peer_node_id FROM node_peers WHERE peer_node_id IS NOT NULL
+            )
+            ORDER BY n.id
+            LIMIT ${limit}
+          `
+        : await ctx.db.$queryRaw<Array<{
+            id: number;
+            address: string;
+            version: string | null;
+            is_active: boolean;
+          }>>`
+            SELECT DISTINCT n.id, n.address, n.version, n.is_active
+            FROM nodes n
+            WHERE n.id IN (
+              SELECT DISTINCT node_id FROM node_peers
+              UNION
+              SELECT DISTINCT peer_node_id FROM node_peers WHERE peer_node_id IS NOT NULL
+            )
+            AND n.is_active = true
+            ORDER BY n.id
+            LIMIT ${limit}
+          `;
+
+      const nodes = nodesWithPeers.map(n => ({
+        id: n.id,
+        address: n.address,
+        version: n.version,
+        isActive: n.is_active,
+      }));
+
+      // Get node IDs for further queries
+      const nodeIds = nodes.map((n) => n.id);
+
+      if (nodeIds.length === 0) {
+        return {
+          nodes: [],
+          edges: [],
+          stats: { nodeCount: 0, edgeCount: 0, maxStorage: 1 },
+        };
+      }
 
       // Get latest storage metrics for each node
-      const nodeIds = nodes.map((n) => n.id);
       const metrics = await ctx.db.$queryRaw<Array<{
         node_id: number;
         file_size: bigint;
@@ -464,7 +512,7 @@ export const networkRouter = createTRPCRouter({
       // Also map IP-only (without port) to nodeId for matching
       const ipToId = new Map(nodes.map((n) => [n.address.split(":")[0], n.id]));
 
-      // Get peer connections - include both resolved (peerNodeId) and unresolved (peerAddress) matches
+      // Get peer connections between nodes in our set
       const peerData = await ctx.db.nodePeer.findMany({
         where: {
           nodeId: { in: nodeIds },
@@ -559,6 +607,70 @@ export const networkRouter = createTRPCRouter({
       city: n.city || "Unknown",
       isActive: n.isActive,
       version: n.version,
+    }));
+  }),
+
+  /**
+   * Get inter-country connections for geo map visualization
+   * Returns aggregated connections between different countries
+   */
+  geoConnections: publicProcedure.query(async ({ ctx }) => {
+    // Get inter-country connections aggregated by country pairs
+    const connections = await ctx.db.$queryRaw<Array<{
+      from_country: string;
+      from_lat: number;
+      from_lng: number;
+      to_country: string;
+      to_lat: number;
+      to_lng: number;
+      connection_count: bigint;
+    }>>`
+      SELECT
+        n1.country as from_country,
+        AVG(n1.latitude) as from_lat,
+        AVG(n1.longitude) as from_lng,
+        n2.country as to_country,
+        AVG(n2.latitude) as to_lat,
+        AVG(n2.longitude) as to_lng,
+        COUNT(*) as connection_count
+      FROM node_peers np
+      JOIN nodes n1 ON np.node_id = n1.id
+      JOIN nodes n2 ON np.peer_node_id = n2.id
+      WHERE n1.country IS NOT NULL
+        AND n2.country IS NOT NULL
+        AND n1.country != n2.country
+        AND n1.is_active = true
+        AND n2.is_active = true
+      GROUP BY n1.country, n2.country
+      ORDER BY connection_count DESC
+      LIMIT 50
+    `;
+
+    // Dedupe bidirectional connections (US→DE and DE→US become one line)
+    const seen = new Set<string>();
+    const dedupedConnections = connections.filter(conn => {
+      const key = [conn.from_country, conn.to_country].sort().join('-');
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // Find max for normalization
+    const maxCount = Math.max(...dedupedConnections.map(c => Number(c.connection_count)), 1);
+
+    return dedupedConnections.map(conn => ({
+      from: {
+        country: conn.from_country,
+        lat: conn.from_lat,
+        lng: conn.from_lng,
+      },
+      to: {
+        country: conn.to_country,
+        lat: conn.to_lat,
+        lng: conn.to_lng,
+      },
+      strength: Number(conn.connection_count),
+      normalizedStrength: Number(conn.connection_count) / maxCount,
     }));
   }),
 });

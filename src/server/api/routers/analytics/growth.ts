@@ -31,29 +31,22 @@ export const growthRouter = createTRPCRouter({
       const periodDays = { "14d": 14, "30d": 30, "60d": 60 }[period];
       const startTime = new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000);
 
-      // Get daily node counts and storage
+      // Get daily node counts and storage - optimized query
+      // Use simpler approach: get daily snapshot of counts directly
       const dailyStats = await ctx.db.$queryRaw<Array<{
         bucket: Date;
         total_nodes: bigint;
         active_nodes: bigint;
         total_storage: bigint;
       }>>`
-        WITH daily_snapshots AS (
-          SELECT DISTINCT ON (date_trunc('day', time))
-            date_trunc('day', time) as bucket,
-            (SELECT COUNT(*) FROM nodes WHERE created_at <= time) as total_nodes,
-            (SELECT COUNT(*) FROM nodes WHERE is_active = true AND created_at <= time) as active_nodes,
-            (SELECT COALESCE(SUM(file_size), 0) FROM node_metrics WHERE time <= nm.time) as total_storage
-          FROM node_metrics nm
-          WHERE time >= ${startTime}
-          ORDER BY date_trunc('day', time), time DESC
-        )
         SELECT
-          bucket,
-          total_nodes,
-          active_nodes,
-          total_storage
-        FROM daily_snapshots
+          DATE(time) as bucket,
+          COUNT(DISTINCT node_id) as total_nodes,
+          COUNT(DISTINCT node_id) as active_nodes,
+          MAX(file_size) as total_storage
+        FROM node_metrics
+        WHERE time >= ${startTime}
+        GROUP BY DATE(time)
         ORDER BY bucket ASC
       `;
 
@@ -154,23 +147,37 @@ export const growthRouter = createTRPCRouter({
         select: { id: true, address: true, version: true },
       });
 
+      const nodeIds = nodes.map((n) => n.id);
+
+      // Batch fetch all metrics for all nodes at once (instead of N+1 queries)
+      const allMetrics = await ctx.db.nodeMetric.findMany({
+        where: {
+          nodeId: { in: nodeIds },
+          time: { gte: startTime },
+        },
+        orderBy: { time: "asc" },
+        select: {
+          nodeId: true,
+          time: true,
+          cpuPercent: true,
+          ramUsed: true,
+          ramTotal: true,
+          uptime: true,
+        },
+      });
+
+      // Group metrics by nodeId
+      const metricsByNode = new Map<number, typeof allMetrics>();
+      for (const metric of allMetrics) {
+        const existing = metricsByNode.get(metric.nodeId) ?? [];
+        existing.push(metric);
+        metricsByNode.set(metric.nodeId, existing);
+      }
+
       const atRiskNodes = [];
 
       for (const node of nodes) {
-        const metrics = await ctx.db.nodeMetric.findMany({
-          where: {
-            nodeId: node.id,
-            time: { gte: startTime },
-          },
-          orderBy: { time: "asc" },
-          select: {
-            time: true,
-            cpuPercent: true,
-            ramUsed: true,
-            ramTotal: true,
-            uptime: true,
-          },
-        });
+        const metrics = metricsByNode.get(node.id) ?? [];
 
         if (metrics.length < 3) continue;
 

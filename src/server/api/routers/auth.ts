@@ -11,8 +11,9 @@ import { TRPCError } from "@trpc/server";
 import { sign } from "tweetnacl";
 import bs58 from "bs58";
 import { SignJWT, jwtVerify } from "jose";
-import { createHash, randomBytes } from "crypto";
+import { randomBytes } from "crypto";
 import { JWT_SECRET, JWT_ISSUER, JWT_AUDIENCE, JWT_VALIDITY_MS } from "@/lib/auth/jwt-config";
+import { hashToken } from "@/lib/auth/hash-token";
 
 // Challenge validity period (5 minutes)
 const CHALLENGE_VALIDITY_MS = 5 * 60 * 1000;
@@ -22,13 +23,6 @@ const CHALLENGE_VALIDITY_MS = 5 * 60 * 1000;
  */
 function generateNonce(): string {
   return randomBytes(32).toString("hex");
-}
-
-/**
- * Hash a token for storage
- */
-function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
 }
 
 /**

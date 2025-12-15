@@ -20,6 +20,24 @@ import type { Prisma } from "@prisma/client";
 const VERIFICATION_VALIDITY_MS = 24 * 60 * 60 * 1000;
 
 /**
+ * Check if an IP address is private/internal (SSRF protection)
+ */
+function isPrivateIP(ip: string): boolean {
+  // IPv4 private ranges
+  const privateRanges = [
+    /^127\./, // Loopback
+    /^10\./, // Class A private
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./, // Class B private
+    /^192\.168\./, // Class C private
+    /^169\.254\./, // Link-local
+    /^0\./, // Current network
+    /^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./, // Carrier-grade NAT
+  ];
+
+  return privateRanges.some(range => range.test(ip));
+}
+
+/**
  * Generate a random verification token
  */
 function generateVerificationToken(): string {
@@ -294,6 +312,15 @@ export const claimsRouter = createTRPCRouter({
           }
 
           const [host] = node.address.split(":");
+
+          // SSRF protection: reject private/internal IPs
+          if (isPrivateIP(host)) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Cannot verify nodes with private IP addresses. Node must have a public IP.",
+            });
+          }
+
           const verifyUrl = `http://${host}/.pnode-pulse-verify`;
 
           try {

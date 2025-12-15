@@ -1,12 +1,41 @@
 import type { NextConfig } from "next";
 import bundleAnalyzer from "@next/bundle-analyzer";
 import createNextIntlPlugin from "next-intl/plugin";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+
+// Content Security Policy configuration
+// Note: Next.js requires 'unsafe-inline' and 'unsafe-eval' for certain features
+const ContentSecurityPolicy = [
+  "default-src 'self'",
+  // Scripts: self + inline/eval for Next.js hydration and dev tools
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  // Styles: self + inline for Tailwind and component styles
+  "style-src 'self' 'unsafe-inline'",
+  // Images: self + data URIs + HTTPS sources (for external images)
+  "img-src 'self' data: https: blob:",
+  // Fonts: self only (add CDN if using external fonts)
+  "font-src 'self'",
+  // Connections: self + WebSocket for HMR + external APIs
+  "connect-src 'self' wss: https://api.sentry.io https://*.ingest.sentry.io",
+  // Frames: only allow embedding from same origin (main app)
+  "frame-ancestors 'self'",
+  // Frame sources: self for any iframes we use
+  "frame-src 'self'",
+  // Object/embed: none (no Flash/plugins)
+  "object-src 'none'",
+  // Base URI: self only
+  "base-uri 'self'",
+  // Form actions: self only
+  "form-action 'self'",
+  // Upgrade insecure requests in production
+  process.env.NODE_ENV === "production" ? "upgrade-insecure-requests" : "",
+].filter(Boolean).join("; ");
 
 const nextConfig: NextConfig = {
   // Enable standalone output for Docker deployment
@@ -65,6 +94,16 @@ const nextConfig: NextConfig = {
         destination: "/en/settings/:path*",
         permanent: false,
       },
+      {
+        source: "/privacy",
+        destination: "/en/privacy",
+        permanent: false,
+      },
+      {
+        source: "/terms",
+        destination: "/en/terms",
+        permanent: false,
+      },
     ];
   },
 
@@ -95,6 +134,7 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "X-XSS-Protection", value: "1; mode=block" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Content-Security-Policy", value: ContentSecurityPolicy },
         ],
       },
       // Static assets - aggressive caching (1 year, immutable)
@@ -157,12 +197,12 @@ const nextConfig: NextConfig = {
         ],
       },
       // Embed routes - allow iframe embedding from any origin
+      // Overrides the default CSP to allow embedding anywhere
       {
         source: "/embed/:path*",
         headers: [
           { key: "Cache-Control", value: "public, s-maxage=60, stale-while-revalidate=300" },
-          { key: "X-Frame-Options", value: "ALLOWALL" },
-          { key: "Content-Security-Policy", value: "frame-ancestors *" },
+          { key: "Content-Security-Policy", value: ContentSecurityPolicy.replace("frame-ancestors 'self'", "frame-ancestors *") },
         ],
       },
       // Real-time API - no cache
@@ -192,4 +232,32 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
 };
 
-export default withNextIntl(withBundleAnalyzer(nextConfig));
+// Compose all config wrappers
+const composedConfig = withNextIntl(withBundleAnalyzer(nextConfig));
+
+// Sentry configuration options
+const sentryWebpackPluginOptions = {
+  // Suppress source map upload logs during build
+  silent: true,
+
+  // Organization and project from environment
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+
+  // Auth token for source map uploads (from SENTRY_AUTH_TOKEN env var)
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Upload larger source maps for better stack traces
+  widenClientFileUpload: true,
+
+  // Hide source maps from browser DevTools in production
+  hideSourceMaps: true,
+
+  // Disable Sentry logger to reduce bundle size
+  disableLogger: true,
+};
+
+// Only wrap with Sentry if DSN is configured (allows builds without Sentry)
+export default process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN
+  ? withSentryConfig(composedConfig, sentryWebpackPluginOptions)
+  : composedConfig;

@@ -7,28 +7,12 @@
 
 import Redis from "ioredis";
 import { logger } from "@/lib/logger";
+import { getRedisConnectionConfig } from "@/lib/constants/redis";
 
-// Redis connection config (matches queue config)
-function getRedisHost(): string {
-  const host = process.env.REDIS_HOST;
-
-  // Development: allow localhost fallback
-  if (!host && process.env.NODE_ENV === "development") {
-    return "localhost";
-  }
-
-  // Production/Test: require explicit configuration
-  if (!host) {
-    throw new Error("REDIS_HOST environment variable is required in production");
-  }
-
-  return host;
-}
-
+// Redis connection config
 function getRedisConfig() {
   return {
-    host: getRedisHost(),
-    port: parseInt(process.env.REDIS_PORT || "6381"),
+    ...getRedisConnectionConfig(),
     maxRetriesPerRequest: 3,
     retryStrategy: (times: number) => {
       if (times > 3) return null; // Stop retrying

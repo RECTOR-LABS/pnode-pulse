@@ -1,7 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, memo } from "react";
+import Link from "next/link";
+import {
+  ComposableMap,
+  Geographies,
+  Geography,
+  Marker,
+  Line,
+} from "react-simple-maps";
 import { trpc } from "@/lib/trpc";
+
+// World map topology - using land for simpler rendering
+const GEO_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json";
 
 interface GeoNode {
   id: number;
@@ -21,25 +32,18 @@ interface ClusteredNode {
   country: string;
 }
 
-// Simple Mercator projection
-function projectPoint(lat: number, lng: number, width: number, height: number) {
-  // Clamp latitude to avoid infinity at poles
-  const clampedLat = Math.max(-85, Math.min(85, lat));
-
-  const x = ((lng + 180) / 360) * width;
-  const latRad = (clampedLat * Math.PI) / 180;
-  const mercN = Math.log(Math.tan(Math.PI / 4 + latRad / 2));
-  const y = height / 2 - (mercN * width) / (2 * Math.PI);
-
-  return { x, y };
+interface GeoConnection {
+  from: { country: string; lat: number; lng: number };
+  to: { country: string; lat: number; lng: number };
+  strength: number;
+  normalizedStrength: number;
 }
 
 // Cluster nearby nodes
-function clusterNodes(nodes: GeoNode[], gridSize: number = 30): ClusteredNode[] {
+function clusterNodes(nodes: GeoNode[], gridSize: number = 15): ClusteredNode[] {
   const clusters = new Map<string, ClusteredNode>();
 
   for (const node of nodes) {
-    // Create grid key based on position
     const gridX = Math.floor(node.longitude / gridSize);
     const gridY = Math.floor(node.latitude / gridSize);
     const key = `${gridX},${gridY}`;
@@ -48,7 +52,6 @@ function clusterNodes(nodes: GeoNode[], gridSize: number = 30): ClusteredNode[] 
       const cluster = clusters.get(key)!;
       cluster.count++;
       cluster.nodes.push(node);
-      // Update centroid
       cluster.lat = cluster.nodes.reduce((sum, n) => sum + n.latitude, 0) / cluster.nodes.length;
       cluster.lng = cluster.nodes.reduce((sum, n) => sum + n.longitude, 0) / cluster.nodes.length;
     } else {
@@ -65,66 +68,111 @@ function clusterNodes(nodes: GeoNode[], gridSize: number = 30): ClusteredNode[] 
   return Array.from(clusters.values());
 }
 
-// World map SVG path (simplified continents outline)
-const WORLD_PATH = `M 95,42 L 102,40 L 108,37 L 115,36 L 122,38 L 128,42 L 132,47 L 135,53
-L 138,47 L 145,44 L 152,42 L 160,43 L 168,47 L 175,52 L 178,58 L 175,65 L 170,70
-L 163,73 L 155,74 L 147,72 L 140,68 L 135,73 L 128,77 L 120,79 L 112,78 L 105,75
-L 98,70 L 92,64 L 88,57 L 86,50 L 88,45 Z
-M 180,45 L 188,42 L 198,40 L 210,42 L 220,48 L 225,55 L 228,63 L 225,72 L 218,78
-L 208,82 L 196,83 L 185,80 L 176,74 L 172,65 L 173,55 L 177,48 Z
-M 235,55 L 248,50 L 262,48 L 278,52 L 290,60 L 295,72 L 292,85 L 282,95 L 268,100
-L 252,98 L 240,92 L 232,82 L 230,70 L 232,60 Z
-M 145,95 L 158,92 L 172,95 L 182,102 L 185,112 L 180,122 L 170,128 L 158,130
-L 145,127 L 138,118 L 138,108 L 142,100 Z
-M 260,105 L 275,102 L 290,108 L 298,118 L 295,130 L 285,138 L 270,140 L 258,135
-L 252,125 L 255,112 Z
-M 78,108 L 95,102 L 112,105 L 125,115 L 130,128 L 122,142 L 108,150 L 90,148
-L 76,138 L 72,125 L 75,115 Z`;
+// Get version distribution for a cluster
+function getVersionDistribution(nodes: GeoNode[]): Array<{ version: string; count: number; percentage: number }> {
+  const versionMap = new Map<string, number>();
+  nodes.forEach(n => {
+    const v = n.version || "unknown";
+    versionMap.set(v, (versionMap.get(v) || 0) + 1);
+  });
+
+  return Array.from(versionMap.entries())
+    .map(([version, count]) => ({
+      version,
+      count,
+      percentage: (count / nodes.length) * 100,
+    }))
+    .sort((a, b) => b.count - a.count);
+}
+
+// Get unique cities in a cluster
+function getUniqueCities(nodes: GeoNode[]): string[] {
+  return Array.from(new Set(nodes.map(n => n.city).filter(c => c && c !== "Unknown")));
+}
+
+// Memoized geography component for performance
+const MapGeographies = memo(function MapGeographies() {
+  return (
+    <Geographies geography={GEO_URL}>
+      {({ geographies }) =>
+        geographies.map((geo) => (
+          <Geography
+            key={geo.rsmKey}
+            geography={geo}
+            fill="#374151"
+            stroke="#4b5563"
+            strokeWidth={0.5}
+            style={{
+              default: { outline: "none" },
+              hover: { outline: "none", fill: "#4b5563" },
+              pressed: { outline: "none" },
+            }}
+          />
+        ))
+      }
+    </Geographies>
+  );
+});
+
+// Connection line with animated pulse
+const ConnectionLine = memo(function ConnectionLine({
+  connection,
+  index
+}: {
+  connection: GeoConnection;
+  index: number;
+}) {
+  const strokeWidth = 1 + connection.normalizedStrength * 2;
+
+  return (
+    <g>
+      {/* Static line */}
+      <Line
+        from={[connection.from.lng, connection.from.lat]}
+        to={[connection.to.lng, connection.to.lat]}
+        stroke="#10B981"
+        strokeWidth={strokeWidth}
+        strokeOpacity={0.2}
+        strokeLinecap="round"
+      />
+      {/* Animated pulse line */}
+      <Line
+        from={[connection.from.lng, connection.from.lat]}
+        to={[connection.to.lng, connection.to.lat]}
+        stroke="#10B981"
+        strokeWidth={strokeWidth}
+        strokeOpacity={0.6}
+        strokeLinecap="round"
+        strokeDasharray="4 8"
+      >
+        <animate
+          attributeName="stroke-dashoffset"
+          values="12;0"
+          dur={`${2 + index * 0.3}s`}
+          repeatCount="indefinite"
+        />
+      </Line>
+    </g>
+  );
+});
 
 export function GeoMap() {
   const [hoveredCluster, setHoveredCluster] = useState<ClusteredNode | null>(null);
+  const [selectedCluster, setSelectedCluster] = useState<ClusteredNode | null>(null);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
 
   const { data, isLoading } = trpc.network.geoNodes.useQuery(undefined, {
     refetchInterval: 60000,
   });
 
-  const mapWidth = 400;
-  const mapHeight = 200;
+  const { data: connections } = trpc.network.geoConnections.useQuery(undefined, {
+    refetchInterval: 60000,
+  });
 
-  // Cluster nodes for display
   const clusters = useMemo(() => {
     if (!data || data.length === 0) return [];
-    return clusterNodes(data, 15); // Smaller grid for tighter clustering
+    return clusterNodes(data, 12);
   }, [data]);
-
-  // Generate connection mesh lines between nearby clusters
-  const meshLines = useMemo(() => {
-    if (clusters.length < 2) return [];
-
-    const lines: Array<{ x1: number; y1: number; x2: number; y2: number; opacity: number }> = [];
-    const maxDistance = 80; // Max pixel distance for connections
-
-    for (let i = 0; i < clusters.length; i++) {
-      const p1 = projectPoint(clusters[i].lat, clusters[i].lng, mapWidth, mapHeight);
-
-      for (let j = i + 1; j < clusters.length; j++) {
-        const p2 = projectPoint(clusters[j].lat, clusters[j].lng, mapWidth, mapHeight);
-        const distance = Math.sqrt((p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2);
-
-        if (distance < maxDistance) {
-          lines.push({
-            x1: p1.x,
-            y1: p1.y,
-            x2: p2.x,
-            y2: p2.y,
-            opacity: Math.max(0.05, 0.3 - distance / maxDistance * 0.25),
-          });
-        }
-      }
-    }
-
-    return lines;
-  }, [clusters]);
 
   if (isLoading) {
     return <GeoMapSkeleton />;
@@ -138,9 +186,9 @@ export function GeoMap() {
     );
   }
 
-  const activeCount = data.filter(n => n.isActive).length;
+  const activeCount = data.filter((n) => n.isActive).length;
   const totalCount = data.length;
-  const countryCount = new Set(data.map(n => n.country)).size;
+  const countryCount = new Set(data.map((n) => n.country)).size;
 
   return (
     <div className="space-y-4">
@@ -159,175 +207,231 @@ export function GeoMap() {
       </div>
 
       {/* Map container */}
-      <div className="relative w-full aspect-[2/1] bg-[#0d1421] rounded-lg overflow-hidden">
-        <svg
-          viewBox={`0 0 ${mapWidth} ${mapHeight}`}
-          className="w-full h-full"
-          preserveAspectRatio="xMidYMid slice"
+      <div
+        className="relative w-full aspect-[2/1] bg-[#0f172a] rounded-lg overflow-hidden"
+        onClick={() => setSelectedCluster(null)} // Click outside to close panel
+      >
+        <ComposableMap
+          projection="geoMercator"
+          projectionConfig={{
+            scale: 120,
+            center: [10, 30],
+          }}
+          style={{ width: "100%", height: "100%" }}
         >
-          {/* Background gradient */}
-          <defs>
-            <radialGradient id="geo-bg-gradient" cx="50%" cy="50%" r="70%">
-              <stop offset="0%" stopColor="#1a2332" />
-              <stop offset="100%" stopColor="#0d1421" />
-            </radialGradient>
-            <filter id="geo-glow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="1.5" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
+          {/* World map countries */}
+          <MapGeographies />
 
-          <rect width={mapWidth} height={mapHeight} fill="url(#geo-bg-gradient)" />
+          {/* Connection lines between clusters */}
+          {connections?.map((conn, i) => (
+            <ConnectionLine key={`conn-${i}`} connection={conn} index={i} />
+          ))}
 
-          {/* Simplified world outline (decorative dots pattern) */}
-          <g opacity="0.15">
-            {Array.from({ length: 40 }, (_, i) => (
-              <g key={`row-${i}`}>
-                {Array.from({ length: 80 }, (_, j) => (
+          {/* Node clusters as markers */}
+          {clusters.map((cluster, i) => {
+            const activeInCluster = cluster.nodes.filter((n) => n.isActive).length;
+            const allActive = activeInCluster === cluster.count;
+            const isSelected = selectedCluster?.country === cluster.country &&
+                               selectedCluster?.lat === cluster.lat;
+            const radius = Math.min(25, 8 + Math.sqrt(cluster.count) * 4);
+
+            return (
+              <Marker
+                key={`cluster-${i}`}
+                coordinates={[cluster.lng, cluster.lat]}
+                onMouseEnter={(e) => {
+                  if (!selectedCluster) {
+                    setHoveredCluster(cluster);
+                    const rect = (e.target as SVGElement).getBoundingClientRect();
+                    setTooltipPos({ x: rect.left + rect.width / 2, y: rect.top });
+                  }
+                }}
+                onMouseLeave={() => setHoveredCluster(null)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedCluster(isSelected ? null : cluster);
+                  setHoveredCluster(null);
+                }}
+              >
+                {/* Pulse animation for active clusters */}
+                {allActive && (
                   <circle
-                    key={`dot-${i}-${j}`}
-                    cx={j * 5 + 2.5}
-                    cy={i * 5 + 2.5}
-                    r="0.5"
-                    fill="currentColor"
+                    r={radius}
+                    fill="none"
+                    stroke="#10B981"
+                    strokeWidth={1.5}
+                    opacity={0.5}
+                  >
+                    <animate
+                      attributeName="r"
+                      values={`${radius};${radius + 8};${radius}`}
+                      dur="2s"
+                      repeatCount="indefinite"
+                    />
+                    <animate
+                      attributeName="opacity"
+                      values="0.5;0;0.5"
+                      dur="2s"
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                )}
+                {/* Selection ring */}
+                {isSelected && (
+                  <circle
+                    r={radius + 4}
+                    fill="none"
+                    stroke="#0066FF"
+                    strokeWidth={2}
                   />
-                ))}
-              </g>
-            ))}
-          </g>
-
-          {/* Connection mesh lines */}
-          <g>
-            {meshLines.map((line, i) => (
-              <line
-                key={`mesh-${i}`}
-                x1={line.x1}
-                y1={line.y1}
-                x2={line.x2}
-                y2={line.y2}
-                stroke="#64748b"
-                strokeWidth="0.5"
-                strokeOpacity={line.opacity}
-              />
-            ))}
-          </g>
-
-          {/* Node clusters */}
-          <g>
-            {clusters.map((cluster, i) => {
-              const { x, y } = projectPoint(cluster.lat, cluster.lng, mapWidth, mapHeight);
-              const isHovered = hoveredCluster === cluster;
-              const radius = Math.min(12, 4 + Math.sqrt(cluster.count) * 2);
-              const activeInCluster = cluster.nodes.filter(n => n.isActive).length;
-              const allActive = activeInCluster === cluster.count;
-
-              return (
-                <g
-                  key={`cluster-${i}`}
-                  transform={`translate(${x}, ${y})`}
-                  onMouseEnter={() => setHoveredCluster(cluster)}
-                  onMouseLeave={() => setHoveredCluster(null)}
+                )}
+                {/* Main circle */}
+                <circle
+                  r={radius}
+                  fill={allActive ? "#10B981" : "#64748b"}
+                  stroke={isSelected ? "#0066FF" : "#0f172a"}
+                  strokeWidth={2}
                   style={{ cursor: "pointer" }}
-                >
-                  {/* Pulse ring for active clusters */}
-                  {allActive && (
-                    <circle
-                      r={radius}
-                      fill="none"
-                      stroke="#10B981"
-                      strokeWidth="1"
-                      opacity="0.4"
-                    >
-                      <animate
-                        attributeName="r"
-                        values={`${radius};${radius + 6};${radius}`}
-                        dur="2s"
-                        repeatCount="indefinite"
-                      />
-                      <animate
-                        attributeName="opacity"
-                        values="0.4;0;0.4"
-                        dur="2s"
-                        repeatCount="indefinite"
-                      />
-                    </circle>
-                  )}
-
-                  {/* Main circle */}
-                  <circle
-                    r={isHovered ? radius + 2 : radius}
-                    fill={allActive ? "#10B981" : "#64748b"}
-                    filter={isHovered ? "url(#geo-glow)" : undefined}
-                    style={{ transition: "r 0.2s ease-out" }}
-                  />
-
-                  {/* Count label */}
-                  {cluster.count > 1 && (
-                    <text
-                      y="0.35em"
-                      textAnchor="middle"
-                      fill="white"
-                      fontSize={radius > 6 ? "6" : "4"}
-                      fontWeight="600"
-                    >
-                      {cluster.count}
-                    </text>
-                  )}
-                </g>
-              );
-            })}
-          </g>
-        </svg>
+                />
+                {/* Count label */}
+                {cluster.count >= 1 && (
+                  <text
+                    textAnchor="middle"
+                    y={radius > 12 ? 5 : 4}
+                    style={{
+                      fontFamily: "system-ui, sans-serif",
+                      fill: "#fff",
+                      fontSize: radius > 12 ? 12 : 10,
+                      fontWeight: 600,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    {cluster.count}
+                  </text>
+                )}
+              </Marker>
+            );
+          })}
+        </ComposableMap>
 
         {/* Hover tooltip */}
-        {hoveredCluster && (
+        {hoveredCluster && !selectedCluster && (
           <div
-            className="absolute pointer-events-none bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-xl p-3 text-xs z-10"
+            className="fixed pointer-events-none bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-xl p-3 text-xs z-50"
             style={{
-              left: `${(projectPoint(hoveredCluster.lat, hoveredCluster.lng, 100, 50).x)}%`,
-              top: `${(projectPoint(hoveredCluster.lat, hoveredCluster.lng, 100, 50).y)}%`,
-              transform: "translate(-50%, -120%)",
+              left: tooltipPos.x,
+              top: tooltipPos.y - 10,
+              transform: "translate(-50%, -100%)",
             }}
           >
             <div className="font-medium text-foreground">
               {hoveredCluster.nodes[0]?.city || "Unknown"}, {hoveredCluster.country}
             </div>
             <div className="text-muted-foreground mt-1">
-              {hoveredCluster.count} node{hoveredCluster.count > 1 ? "s" : ""}
+              {hoveredCluster.count} node{hoveredCluster.count > 1 ? "s" : ""} • Click for details
             </div>
-            {hoveredCluster.count <= 3 && (
-              <div className="mt-1 space-y-0.5">
-                {hoveredCluster.nodes.map((node, i) => (
-                  <div key={i} className="flex items-center gap-1.5">
-                    <div
-                      className={`w-1.5 h-1.5 rounded-full ${
-                        node.isActive ? "bg-emerald-500" : "bg-gray-400"
-                      }`}
-                    />
-                    <span className="text-muted-foreground">v{node.version || "?"}</span>
+          </div>
+        )}
+
+        {/* Selected cluster detail panel */}
+        {selectedCluster && (
+          <div
+            className="absolute top-4 right-4 w-64 bg-background/95 backdrop-blur-sm border border-border rounded-lg shadow-xl z-50"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between p-3 border-b border-border">
+              <div>
+                <div className="font-medium text-foreground flex items-center gap-2">
+                  <span className="text-lg">{getCountryFlag(selectedCluster.country)}</span>
+                  {selectedCluster.country}
+                </div>
+                <div className="text-xs text-muted-foreground mt-0.5">
+                  {selectedCluster.count} node{selectedCluster.count > 1 ? "s" : ""} •{" "}
+                  {selectedCluster.nodes.filter(n => n.isActive).length} active
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedCluster(null)}
+                className="p-1 hover:bg-muted rounded transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Version breakdown */}
+            <div className="p-3 border-b border-border">
+              <div className="text-xs font-medium text-muted-foreground mb-2">Versions</div>
+              <div className="space-y-1.5">
+                {getVersionDistribution(selectedCluster.nodes).slice(0, 4).map(({ version, count, percentage }) => (
+                  <div key={version} className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-500 rounded-full"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-muted-foreground w-20 text-right">
+                      v{version.split('-')[0]} ({count})
+                    </span>
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Cities */}
+            {getUniqueCities(selectedCluster.nodes).length > 0 && (
+              <div className="p-3 border-b border-border">
+                <div className="text-xs font-medium text-muted-foreground mb-1">Cities</div>
+                <div className="text-xs text-foreground">
+                  {getUniqueCities(selectedCluster.nodes).slice(0, 5).join(", ")}
+                  {getUniqueCities(selectedCluster.nodes).length > 5 && (
+                    <span className="text-muted-foreground"> +{getUniqueCities(selectedCluster.nodes).length - 5} more</span>
+                  )}
+                </div>
+              </div>
             )}
+
+            {/* View all link */}
+            <div className="p-3">
+              <Link
+                href={`/nodes?country=${selectedCluster.country}`}
+                className="block text-center text-xs text-brand-500 hover:text-brand-600 transition-colors font-medium"
+              >
+                View All Nodes →
+              </Link>
+            </div>
           </div>
         )}
 
         {/* Legend */}
+        <div className="absolute bottom-3 left-3 flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-background/80 backdrop-blur-sm border border-border">
+            <div className="w-2 h-0.5 bg-emerald-500 opacity-60" />
+            <span className="text-muted-foreground">Connections</span>
+          </div>
+        </div>
         <div className="absolute bottom-3 right-3 flex items-center gap-3 text-xs">
-          <button className="flex items-center gap-1.5 px-2 py-1 rounded bg-background/80 backdrop-blur-sm border border-border hover:bg-background transition-colors">
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <circle cx="12" cy="12" r="3" fill="currentColor" />
-            </svg>
-            <span>RPC nodes</span>
-          </button>
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded bg-background/80 backdrop-blur-sm border border-border">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+            <span className="text-muted-foreground">Active nodes</span>
+          </div>
         </div>
       </div>
     </div>
   );
+}
+
+// Simple country code to flag emoji
+function getCountryFlag(countryCode: string): string {
+  if (!countryCode || countryCode.length !== 2) return "🌍";
+  const codePoints = countryCode
+    .toUpperCase()
+    .split("")
+    .map(char => 127397 + char.charCodeAt(0));
+  return String.fromCodePoint(...codePoints);
 }
 
 function GeoMapSkeleton() {

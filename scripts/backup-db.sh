@@ -71,14 +71,63 @@ fi
 BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
 log_info "Backup completed successfully (${BACKUP_SIZE})"
 
-# Upload to S3 (optional - uncomment when configured)
-# if command -v aws &> /dev/null && [ -n "${AWS_S3_BUCKET:-}" ]; then
-#   log_info "Uploading to S3: s3://${AWS_S3_BUCKET}/backups/"
-#   aws s3 cp "$BACKUP_FILE" "s3://${AWS_S3_BUCKET}/backups/" \
-#     --storage-class STANDARD_IA \
-#     --metadata "database=${POSTGRES_DB},timestamp=${TIMESTAMP}"
-#   log_info "S3 upload completed"
-# fi
+# ==================================================================
+# Off-site Backup to S3 (or compatible: Backblaze B2, Wasabi, MinIO)
+# ==================================================================
+# Enable by setting: AWS_S3_BUCKET=your-bucket-name
+# Configure credentials: aws configure (or set AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY)
+# ==================================================================
+
+if [ -n "${AWS_S3_BUCKET:-}" ]; then
+  if ! command -v aws &> /dev/null; then
+    log_warn "AWS CLI not installed - skipping S3 upload"
+    log_warn "Install with: pip3 install awscli"
+  else
+    # Determine S3 path with date-based organization
+    S3_PATH="s3://${AWS_S3_BUCKET}/backups/$(date +%Y)/$(date +%m)/"
+    S3_FULL_PATH="${S3_PATH}$(basename "$BACKUP_FILE")"
+
+    log_info "Uploading to S3: ${S3_FULL_PATH}"
+
+    # Upload with STANDARD_IA storage class (cost-effective for backups)
+    if aws s3 cp "$BACKUP_FILE" "$S3_FULL_PATH" \
+      --storage-class "${AWS_S3_STORAGE_CLASS:-STANDARD_IA}" \
+      --metadata "database=${POSTGRES_DB},timestamp=${TIMESTAMP},host=${POSTGRES_HOST}" \
+      ${AWS_ENDPOINT_URL:+--endpoint-url "$AWS_ENDPOINT_URL"} 2>&1; then
+
+      log_info "S3 upload completed successfully"
+
+      # Create/update "latest" symlink for easy restore
+      aws s3 cp "$BACKUP_FILE" "s3://${AWS_S3_BUCKET}/backups/latest.dump" \
+        --storage-class STANDARD \
+        ${AWS_ENDPOINT_URL:+--endpoint-url "$AWS_ENDPOINT_URL"} 2>/dev/null || true
+
+      # Clean old S3 backups (retention policy)
+      S3_RETENTION_DAYS="${S3_RETENTION_DAYS:-90}"
+      if [ "$S3_RETENTION_DAYS" -gt 0 ]; then
+        log_info "Cleaning S3 backups older than ${S3_RETENTION_DAYS} days..."
+        CUTOFF_DATE=$(date -d "-${S3_RETENTION_DAYS} days" +%Y-%m-%d 2>/dev/null || date -v-${S3_RETENTION_DAYS}d +%Y-%m-%d)
+
+        # List and delete old backups
+        aws s3 ls "s3://${AWS_S3_BUCKET}/backups/" --recursive \
+          ${AWS_ENDPOINT_URL:+--endpoint-url "$AWS_ENDPOINT_URL"} 2>/dev/null | \
+        while read -r line; do
+          FILE_DATE=$(echo "$line" | awk '{print $1}')
+          FILE_PATH=$(echo "$line" | awk '{print $4}')
+          if [[ "$FILE_DATE" < "$CUTOFF_DATE" ]] && [[ "$FILE_PATH" == *".dump" ]] && [[ "$FILE_PATH" != *"latest.dump" ]]; then
+            log_info "Deleting old S3 backup: ${FILE_PATH}"
+            aws s3 rm "s3://${AWS_S3_BUCKET}/${FILE_PATH}" \
+              ${AWS_ENDPOINT_URL:+--endpoint-url "$AWS_ENDPOINT_URL"} 2>/dev/null || true
+          fi
+        done
+      fi
+    else
+      log_error "S3 upload failed - backup saved locally only"
+    fi
+  fi
+else
+  log_info "S3 backup not configured (set AWS_S3_BUCKET to enable)"
+fi
 
 # Clean old backups
 log_info "Cleaning backups older than ${RETENTION_DAYS} days..."

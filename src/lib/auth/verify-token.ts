@@ -8,6 +8,7 @@
 import { jwtVerify } from "jose";
 import { db } from "@/lib/db";
 import { JWT_SECRET } from "./jwt-config";
+import { hashToken } from "./hash-token";
 
 export interface TokenPayload {
   userId: string;
@@ -32,9 +33,14 @@ export async function verifyToken(token: string): Promise<VerifyTokenResult> {
     // Verify JWT signature and expiration
     const { payload } = await jwtVerify(token, JWT_SECRET) as { payload: TokenPayload };
 
-    // Check if session exists and is valid
+    // Hash the token to look up the specific session
+    const tokenHash = hashToken(token);
+
+    // Check if THIS SPECIFIC session exists and is valid
+    // Must match tokenHash to prevent revoked tokens from using other sessions
     const session = await db.userSession.findFirst({
       where: {
+        tokenHash,
         userId: payload.userId,
         expiresAt: { gt: new Date() },
       },

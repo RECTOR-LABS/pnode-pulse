@@ -5,7 +5,8 @@ import { Link, usePathname } from "@/i18n/navigation";
 import { useFocusTrap } from "@/lib/hooks/use-focus-trap";
 import { FavoritesDropdown } from "@/components/ui/favorites-dropdown";
 import { ExportDialog } from "@/components/export";
-import { ConnectWallet } from "@/components/auth";
+// TODO: Re-enable after auth debugging (post-bounty)
+// import { ConnectWallet } from "@/components/auth";
 import { RealtimeIndicator } from "@/components/ui/realtime-indicator";
 import { LanguageSelector } from "@/components/ui/language-selector";
 
@@ -14,7 +15,6 @@ const primaryNav = [
   { name: "Overview", href: "/" },
   { name: "Nodes", href: "/nodes" },
   { name: "Analytics", href: "/analytics" },
-  { name: "Map", href: "/map" },
 ];
 
 // Secondary navigation - in "More" dropdown
@@ -22,8 +22,8 @@ const secondaryNav = [
   { name: "Leaderboard", href: "/leaderboard" },
   { name: "Graveyard", href: "/graveyard" },
   { name: "Portfolio", href: "/portfolio" },
-  { name: "Alerts", href: "/alerts" },
   { name: "Reports", href: "/reports" },
+  // Note: Alerts hidden - requires auth refactor (see Issue #TBD)
 ];
 
 const allNavigation = [...primaryNav, ...secondaryNav];
@@ -158,9 +158,9 @@ export function Header() {
               </svg>
               Export Data
             </button>
-            <div className="px-3 pt-2">
+{/*           <div className="px-3 pt-2">
               <ConnectWallet />
-            </div>
+            </div> */}
           </div>
         </div>
       </div>
@@ -272,9 +272,11 @@ export function Header() {
               </button>
               <FavoritesDropdown />
               <LanguageSelector showLabel={false} />
+              {/* TODO: Re-enable after auth debugging (post-bounty)
               <div className="hidden md:flex items-center border-l border-border pl-2 ml-1">
                 <ConnectWallet />
               </div>
+              */}
             </div>
           </div>
         </div>

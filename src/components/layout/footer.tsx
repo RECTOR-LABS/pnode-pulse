@@ -4,7 +4,6 @@ const navigationLinks = [
   { name: "Overview", href: "/" },
   { name: "Nodes", href: "/nodes" },
   { name: "Analytics", href: "/analytics" },
-  { name: "Map", href: "/map" },
   { name: "Leaderboard", href: "/leaderboard" },
 ];
 

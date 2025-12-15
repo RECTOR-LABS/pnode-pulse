@@ -12,8 +12,9 @@
  * /help - Command list
  */
 
-import { Telegraf, Context } from "telegraf";
+import { Telegraf } from "telegraf";
 import { config } from "./config";
+import { logger } from "./logger";
 
 // Initialize bot
 const bot = new Telegraf(config.telegramToken);
@@ -297,19 +298,28 @@ bot.command("stats", async (ctx) => {
 
 // Error handler
 bot.catch((err, ctx) => {
-  console.error("Bot error:", err);
+  logger.error("Bot error", err instanceof Error ? err : new Error(String(err)));
   ctx.reply("An error occurred. Please try again.");
 });
 
 // Start bot
 async function main() {
-  console.log("Starting pNode Pulse Telegram Bot...");
+  logger.info("Starting pNode Pulse Telegram Bot...");
   await bot.launch();
-  console.log("Bot is running!");
+  logger.info("Bot is running!");
 
   // Graceful shutdown
-  process.once("SIGINT", () => bot.stop("SIGINT"));
-  process.once("SIGTERM", () => bot.stop("SIGTERM"));
+  process.once("SIGINT", () => {
+    logger.info("Received SIGINT, shutting down...");
+    bot.stop("SIGINT");
+  });
+  process.once("SIGTERM", () => {
+    logger.info("Received SIGTERM, shutting down...");
+    bot.stop("SIGTERM");
+  });
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  logger.error("Failed to start bot", err instanceof Error ? err : new Error(String(err)));
+  process.exit(1);
+});
