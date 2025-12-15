@@ -21,8 +21,8 @@ const ContentSecurityPolicy = [
   "img-src 'self' data: https: blob:",
   // Fonts: self only (add CDN if using external fonts)
   "font-src 'self'",
-  // Connections: self + WebSocket for HMR + external APIs
-  "connect-src 'self' wss: https://api.sentry.io https://*.ingest.sentry.io",
+  // Connections: self + WebSocket for HMR + external APIs + CDN for map topology
+  "connect-src 'self' wss: https://api.sentry.io https://*.ingest.sentry.io https://cdn.jsdelivr.net",
   // Frames: only allow embedding from same origin (main app)
   "frame-ancestors 'self'",
   // Frame sources: self for any iframes we use
@@ -35,7 +35,9 @@ const ContentSecurityPolicy = [
   "form-action 'self'",
   // Upgrade insecure requests in production
   process.env.NODE_ENV === "production" ? "upgrade-insecure-requests" : "",
-].filter(Boolean).join("; ");
+]
+  .filter(Boolean)
+  .join("; ");
 
 const nextConfig: NextConfig = {
   // Enable standalone output for Docker deployment
@@ -116,11 +118,7 @@ const nextConfig: NextConfig = {
 
   // Enable experimental features for better performance
   experimental: {
-    optimizePackageImports: [
-      "@tanstack/react-query",
-      "date-fns",
-      "zod",
-    ],
+    optimizePackageImports: ["@tanstack/react-query", "date-fns", "zod"],
   },
 
   // HTTP headers for caching, CORS, and security
@@ -141,23 +139,38 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*.(ico|png|jpg|jpeg|gif|svg|woff|woff2|webp|avif)",
         headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
-          { key: "CDN-Cache-Control", value: "public, max-age=31536000, immutable" },
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+          {
+            key: "CDN-Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
         ],
       },
       // Next.js static chunks - immutable (hashed filenames)
       {
         source: "/_next/static/:path*",
         headers: [
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
-          { key: "CDN-Cache-Control", value: "public, max-age=31536000, immutable" },
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+          {
+            key: "CDN-Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
         ],
       },
       // PWA manifest and service worker
       {
         source: "/manifest.json",
         headers: [
-          { key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" },
+          {
+            key: "Cache-Control",
+            value: "public, max-age=86400, stale-while-revalidate=604800",
+          },
         ],
       },
       {
@@ -172,9 +185,18 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "Access-Control-Allow-Origin", value: "*" },
           { key: "Access-Control-Allow-Methods", value: "GET, OPTIONS" },
-          { key: "Access-Control-Allow-Headers", value: "Content-Type, Authorization" },
-          { key: "Cache-Control", value: "public, s-maxage=30, stale-while-revalidate=60" },
-          { key: "CDN-Cache-Control", value: "public, max-age=30, stale-while-revalidate=60" },
+          {
+            key: "Access-Control-Allow-Headers",
+            value: "Content-Type, Authorization",
+          },
+          {
+            key: "Cache-Control",
+            value: "public, s-maxage=30, stale-while-revalidate=60",
+          },
+          {
+            key: "CDN-Cache-Control",
+            value: "public, max-age=30, stale-while-revalidate=60",
+          },
         ],
       },
       {
@@ -182,8 +204,14 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "Access-Control-Allow-Origin", value: "*" },
           { key: "Access-Control-Allow-Methods", value: "GET, OPTIONS" },
-          { key: "Cache-Control", value: "public, s-maxage=60, stale-while-revalidate=300" },
-          { key: "CDN-Cache-Control", value: "public, max-age=60, stale-while-revalidate=300" },
+          {
+            key: "Cache-Control",
+            value: "public, s-maxage=60, stale-while-revalidate=300",
+          },
+          {
+            key: "CDN-Cache-Control",
+            value: "public, max-age=60, stale-while-revalidate=300",
+          },
         ],
       },
       // Badges - CORS enabled, longer cache (less frequent updates)
@@ -192,8 +220,14 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "Access-Control-Allow-Origin", value: "*" },
           { key: "Access-Control-Allow-Methods", value: "GET, OPTIONS" },
-          { key: "Cache-Control", value: "public, s-maxage=300, stale-while-revalidate=600" },
-          { key: "CDN-Cache-Control", value: "public, max-age=300, stale-while-revalidate=600" },
+          {
+            key: "Cache-Control",
+            value: "public, s-maxage=300, stale-while-revalidate=600",
+          },
+          {
+            key: "CDN-Cache-Control",
+            value: "public, max-age=300, stale-while-revalidate=600",
+          },
         ],
       },
       // Embed routes - allow iframe embedding from any origin
@@ -201,22 +235,37 @@ const nextConfig: NextConfig = {
       {
         source: "/embed/:path*",
         headers: [
-          { key: "Cache-Control", value: "public, s-maxage=60, stale-while-revalidate=300" },
-          { key: "Content-Security-Policy", value: ContentSecurityPolicy.replace("frame-ancestors 'self'", "frame-ancestors *") },
+          {
+            key: "Cache-Control",
+            value: "public, s-maxage=60, stale-while-revalidate=300",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: ContentSecurityPolicy.replace(
+              "frame-ancestors 'self'",
+              "frame-ancestors *",
+            ),
+          },
         ],
       },
       // Real-time API - no cache
       {
         source: "/api/realtime",
         headers: [
-          { key: "Cache-Control", value: "no-store, no-cache, must-revalidate" },
+          {
+            key: "Cache-Control",
+            value: "no-store, no-cache, must-revalidate",
+          },
         ],
       },
       // tRPC - short cache for GET requests
       {
         source: "/api/trpc/:path*",
         headers: [
-          { key: "Cache-Control", value: "public, s-maxage=10, stale-while-revalidate=30" },
+          {
+            key: "Cache-Control",
+            value: "public, s-maxage=10, stale-while-revalidate=30",
+          },
         ],
       },
     ];
