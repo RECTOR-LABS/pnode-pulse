@@ -1,6 +1,6 @@
 # pNode Pulse Operations Runbook
 
-**Last Updated**: 2025-12-09  
+**Last Updated**: 2025-12-15  
 **Environment**: Production (pulse.rectorspace.com)  
 **VPS**: 176.222.53.185 (pnodepulse user)
 
@@ -48,13 +48,13 @@ docker compose restart blue
 
 ### Service Ports
 
-| Service | Port | URL |
-|---------|------|-----|
-| **Blue (Production)** | 7000 | http://pulse.rectorspace.com |
-| **Green (Production)** | 7001 | (inactive, for blue/green) |
-| **Staging** | 7002 | http://staging.pulse.rectorspace.com |
-| **PostgreSQL** | 5434 | localhost only |
-| **Redis** | 6381 | localhost only |
+| Service                | Port | URL                                  |
+| ---------------------- | ---- | ------------------------------------ |
+| **Blue (Production)**  | 7000 | http://pulse.rectorspace.com         |
+| **Green (Production)** | 7001 | (inactive, for blue/green)           |
+| **Staging**            | 7002 | http://staging.pulse.rectorspace.com |
+| **PostgreSQL**         | 5434 | localhost only                       |
+| **Redis**              | 6381 | localhost only                       |
 
 ### Contact Information
 
@@ -71,6 +71,7 @@ docker compose restart blue
 Deployment is fully automated via GitHub Actions on merge to `main` branch.
 
 **Process**:
+
 1. **Create PR** from `dev` or feature branch to `main`
 2. **CI Checks**: Wait for lint, typecheck, build to pass
 3. **Code Review**: Get approval from team member
@@ -79,6 +80,7 @@ Deployment is fully automated via GitHub Actions on merge to `main` branch.
 6. **Verify**: Check health endpoint and monitor logs
 
 **Deployment Steps** (automated):
+
 1. Build Docker image from `main` branch
 2. Push image to GHCR with `:latest` tag
 3. SSH to VPS
@@ -92,6 +94,7 @@ Deployment is fully automated via GitHub Actions on merge to `main` branch.
 ### Manual Deployment
 
 Use manual deployment when:
+
 - Automated deployment fails
 - Emergency hotfix needed
 - Testing deployment process
@@ -218,6 +221,7 @@ curl -f http://localhost:7000/api/health
 ⚠️ **WARNING**: Database rollbacks can cause data loss. Only perform if absolutely necessary.
 
 **Safe Rollback** (migration hasn't run long):
+
 ```bash
 # If migration just ran and caused immediate issues
 docker compose exec blue npx prisma migrate resolve --rolled-back 20251209_migration_name
@@ -226,6 +230,7 @@ docker compose exec blue npx prisma migrate resolve --rolled-back 20251209_migra
 ```
 
 **Full Restore** (data corruption or critical failure):
+
 ```bash
 # See DATABASE_BACKUP.md for full restore procedure
 ./scripts/restore-db.sh /backups/pnode-pulse/pnode-pulse_YYYYMMDD_HHMMSS.dump
@@ -244,6 +249,7 @@ docker compose exec blue npx prisma migrate resolve --rolled-back 20251209_migra
 **Location**: `/backups/pnode-pulse/`
 
 **Manual Backup**:
+
 ```bash
 ssh pnodepulse
 export POSTGRES_PASSWORD=<password>
@@ -253,6 +259,7 @@ export POSTGRES_PORT=5434
 ```
 
 **Verify Latest Backup**:
+
 ```bash
 ls -lh /backups/pnode-pulse/ | tail -1
 ```
@@ -269,11 +276,13 @@ See full documentation: [`docs/DATABASE_BACKUP.md`](./DATABASE_BACKUP.md)
 ### Database Maintenance
 
 **Vacuum (monthly)**:
+
 ```bash
 docker compose exec postgres psql -U pnodepulse -c "VACUUM ANALYZE;"
 ```
 
 **Check Database Size**:
+
 ```bash
 docker compose exec postgres psql -U pnodepulse -c "
   SELECT pg_size_pretty(pg_database_size('pnodepulse')) AS size;
@@ -281,6 +290,7 @@ docker compose exec postgres psql -U pnodepulse -c "
 ```
 
 **Check Table Sizes**:
+
 ```bash
 docker compose exec postgres psql -U pnodepulse -c "
   SELECT schemaname, tablename,
@@ -431,18 +441,21 @@ sudo journalctl --vacuum-time=7d
 ### Health Checks
 
 **Application Health**:
+
 ```bash
 curl http://localhost:7000/api/health
 # Expected: {"status":"ok","timestamp":"..."}
 ```
 
 **Database Health**:
+
 ```bash
 docker compose exec postgres pg_isready -U pnodepulse
 # Expected: ... - accepting connections
 ```
 
 **Redis Health**:
+
 ```bash
 docker compose exec redis redis-cli ping
 # Expected: PONG
@@ -451,6 +464,7 @@ docker compose exec redis redis-cli ping
 ### Metrics & Logs
 
 **View Live Logs**:
+
 ```bash
 # Application
 docker compose logs -f blue --tail 100
@@ -463,6 +477,7 @@ docker compose logs --since 30m blue
 ```
 
 **System Metrics**:
+
 ```bash
 # Container stats
 docker stats
@@ -477,9 +492,52 @@ iftop
 free -h && cat /proc/meminfo | grep -i available
 ```
 
+### External Uptime Monitoring
+
+External monitoring checks your site from outside, detecting when it's completely unreachable.
+
+**Service**: UptimeRobot (recommended) - Free tier with 50 monitors
+
+**Monitors to Configure**:
+| Monitor | URL | Check |
+|---------|-----|-------|
+| Homepage | https://pulse.rectorspace.com | HTTP 200 |
+| Health | https://pulse.rectorspace.com/api/health | Keyword: `"status":"healthy"` |
+| API | https://pulse.rectorspace.com/api/v1/leaderboard | Keyword: `nodes` |
+| Staging | https://staging.pulse.rectorspace.com/api/health | HTTP 200 |
+
+**Full Setup Guide**: [`docs/UPTIME_MONITORING.md`](./UPTIME_MONITORING.md)
+
+**When Alert Fires**:
+
+1. Check health endpoint: `curl -s https://pulse.rectorspace.com/api/health`
+2. SSH and check logs: `ssh pnodepulse && docker compose logs blue --tail 100`
+3. Restart if needed: `docker compose restart blue`
+4. Check Sentry for related errors
+
+### APM & Error Tracking
+
+Application Performance Monitoring tracks errors from inside the application.
+
+**Service**: Sentry (recommended) - Free tier with 5K errors/month
+
+**Configuration**: Set `SENTRY_DSN` in `.env` to activate
+**Full Setup Guide**: [`docs/APM_SETUP.md`](./APM_SETUP.md)
+
+**What Sentry Provides**:
+
+- Real-time error notifications
+- Full stack traces with source maps
+- Performance monitoring (slow API calls)
+- User context and session replay
+
 ### Alerts (To be configured)
 
 Recommended alerts:
+
+- **UptimeRobot**: Site unreachable (2+ failed checks)
+- **Sentry**: New error type (first occurrence)
+- **Sentry**: Error spike (>10 in 5 minutes)
 - Application health check fails (3 consecutive failures)
 - Database connection pool exhaustion (>80%)
 - Disk space < 20%
@@ -496,6 +554,7 @@ Recommended alerts:
 **Incident**: All services down, site unreachable
 
 1. **Assess**:
+
    ```bash
    ssh pnodepulse
    docker compose ps
@@ -504,6 +563,7 @@ Recommended alerts:
    ```
 
 2. **Quick Recovery**:
+
    ```bash
    # Restart all services
    docker compose restart
@@ -526,17 +586,20 @@ Recommended alerts:
 **Incident**: Database errors, inconsistent data
 
 1. **Stop writes immediately**:
+
    ```bash
    docker compose stop blue green staging
    ```
 
 2. **Assess damage**:
+
    ```bash
    docker compose exec postgres psql -U pnodepulse -c "\dt"
    # Check table counts, verify critical tables exist
    ```
 
 3. **Restore from backup**:
+
    ```bash
    ./scripts/restore-db.sh /backups/pnode-pulse/pnode-pulse_YYYYMMDD_HHMMSS.dump
    ```
@@ -589,6 +652,8 @@ Recommended alerts:
 
 - **GitHub Repository**: https://github.com/RECTOR-LABS/pnode-pulse
 - **Database Backup**: [`docs/DATABASE_BACKUP.md`](./DATABASE_BACKUP.md)
+- **Uptime Monitoring**: [`docs/UPTIME_MONITORING.md`](./UPTIME_MONITORING.md)
+- **APM Setup (Sentry)**: [`docs/APM_SETUP.md`](./APM_SETUP.md)
 - **CI/CD Workflows**: `.github/workflows/`
 - **Docker Compose**: `docker-compose.yml`
 - **Environment Config**: `.env.example`
