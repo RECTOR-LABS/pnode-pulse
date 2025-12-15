@@ -64,7 +64,6 @@ const badgeLabels: Record<StatusType, string> = {
 export function StatusBadge({
   status,
   label,
-  size = "md",
   className = "",
 }: StatusBadgeProps) {
   const displayLabel = label || badgeLabels[status];

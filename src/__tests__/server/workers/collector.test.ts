@@ -5,7 +5,6 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { db } from "@/lib/db";
 import { createClient } from "@/lib/prpc";
 
 type MockPRPCClient = ReturnType<typeof createClient>;
@@ -55,7 +54,9 @@ describe("Collector Worker - Node Collection", () => {
       }),
     };
 
-    vi.mocked(createClient).mockReturnValue(mockClient as unknown as MockPRPCClient);
+    vi.mocked(createClient).mockReturnValue(
+      mockClient as unknown as MockPRPCClient,
+    );
 
     // Simulate collection
     const result = await mockClient.getPodsWithStats();
@@ -69,10 +70,14 @@ describe("Collector Worker - Node Collection", () => {
     const mockClient = {
       getVersion: vi.fn().mockRejectedValue(new Error("Request timed out")),
       getStats: vi.fn().mockRejectedValue(new Error("Request timed out")),
-      getPodsWithStats: vi.fn().mockRejectedValue(new Error("Request timed out")),
+      getPodsWithStats: vi
+        .fn()
+        .mockRejectedValue(new Error("Request timed out")),
     };
 
-    vi.mocked(createClient).mockReturnValue(mockClient as unknown as MockPRPCClient);
+    vi.mocked(createClient).mockReturnValue(
+      mockClient as unknown as MockPRPCClient,
+    );
 
     // Collection should fail but not crash
     await expect(mockClient.getVersion()).rejects.toThrow("Request timed out");
@@ -97,7 +102,9 @@ describe("Collector Worker - Node Collection", () => {
       total_count: 1,
     };
 
-    const selfPod = podsResult.pods.find((p) => p.address.includes("192.168.1.1"));
+    const selfPod = podsResult.pods.find((p) =>
+      p.address.includes("192.168.1.1"),
+    );
 
     expect(selfPod).toBeDefined();
     expect(selfPod?.storage_committed).toBe(183000000000);

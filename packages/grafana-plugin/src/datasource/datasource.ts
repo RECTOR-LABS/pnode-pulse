@@ -27,7 +27,7 @@ export class PnodePulseDataSource extends DataSourceApi<
   url: string;
 
   constructor(
-    instanceSettings: DataSourceInstanceSettings<PnodePulseDataSourceOptions>
+    instanceSettings: DataSourceInstanceSettings<PnodePulseDataSourceOptions>,
   ) {
     super(instanceSettings);
     this.url = instanceSettings.url || "https://pulse.rectorspace.com";
@@ -37,7 +37,7 @@ export class PnodePulseDataSource extends DataSourceApi<
    * Main query handler - routes to specific query types
    */
   async query(
-    options: DataQueryRequest<PnodePulseQuery>
+    options: DataQueryRequest<PnodePulseQuery>,
   ): Promise<DataQueryResponse> {
     const { range } = options;
     const from = range?.from.valueOf() ?? Date.now() - 86400000;
@@ -75,7 +75,9 @@ export class PnodePulseDataSource extends DataSourceApi<
   /**
    * Query network overview
    */
-  private async queryNetwork(target: PnodePulseQuery): Promise<MutableDataFrame> {
+  private async queryNetwork(
+    target: PnodePulseQuery,
+  ): Promise<MutableDataFrame> {
     const response = await this.request<NetworkOverview>("/api/v1/network");
 
     const frame = new MutableDataFrame({
@@ -146,9 +148,10 @@ export class PnodePulseDataSource extends DataSourceApi<
   private async queryNode(
     target: PnodePulseQuery,
     _from: number,
-    _to: number
+    _to: number,
   ): Promise<MutableDataFrame[]> {
-    const nodeId = target.nodeId || getTemplateSrv().replace(target.nodeAddress || "");
+    const nodeId =
+      target.nodeId || getTemplateSrv().replace(target.nodeAddress || "");
     if (!nodeId) {
       throw new Error("Node ID or address is required");
     }
@@ -160,9 +163,6 @@ export class PnodePulseDataSource extends DataSourceApi<
 
     const url = "/api/v1/nodes/" + nodeId + "/metrics?" + params.toString();
     const response = await this.request<NodeMetrics>(url);
-
-    // Create time series frames for each metric
-    const frames: MutableDataFrame[] = [];
 
     // CPU Frame
     const cpuFrame = new MutableDataFrame({
@@ -215,7 +215,7 @@ export class PnodePulseDataSource extends DataSourceApi<
    * Query leaderboard
    */
   private async queryLeaderboard(
-    target: PnodePulseQuery
+    target: PnodePulseQuery,
   ): Promise<MutableDataFrame> {
     const params = new URLSearchParams();
     params.append("metric", target.metric || "uptime");

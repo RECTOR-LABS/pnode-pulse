@@ -41,7 +41,7 @@ export interface CapacityForecast {
  * Perform simple linear regression
  */
 export function linearRegression(
-  data: DataPoint[]
+  data: DataPoint[],
 ): LinearRegressionResult | null {
   if (data.length < 2) {
     return null;
@@ -59,14 +59,12 @@ export function linearRegression(
   let sumY = 0;
   let sumXY = 0;
   let sumXX = 0;
-  let sumYY = 0;
 
   for (const { x, y } of points) {
     sumX += x;
     sumY += y;
     sumXY += x * y;
     sumXX += x * x;
-    sumYY += y * y;
   }
 
   const denominator = n * sumXX - sumX * sumX;
@@ -93,7 +91,9 @@ export function linearRegression(
   // Generate predictions for next 180 days
   const lastDay = points[points.length - 1].x;
   const predictions = [7, 30, 90, 180].map((days) => ({
-    timestamp: new Date(firstTimestamp + (lastDay + days) * 24 * 60 * 60 * 1000),
+    timestamp: new Date(
+      firstTimestamp + (lastDay + days) * 24 * 60 * 60 * 1000,
+    ),
     value: slope * (lastDay + days) + intercept,
   }));
 
@@ -110,7 +110,7 @@ export function linearRegression(
  */
 function calculateGrowthRates(
   slope: number,
-  currentValue: number
+  currentValue: number,
 ): { daily: number; weekly: number; monthly: number } {
   if (currentValue === 0) {
     return { daily: 0, weekly: 0, monthly: 0 };
@@ -132,7 +132,7 @@ function calculateGrowthRates(
  */
 function determineTrend(
   slope: number,
-  currentValue: number
+  currentValue: number,
 ): "growing" | "stable" | "declining" {
   if (currentValue === 0) return "stable";
 
@@ -149,7 +149,7 @@ function determineTrend(
  */
 export function forecastCapacity(
   data: DataPoint[],
-  label: string = "storage"
+  label: string = "storage",
 ): CapacityForecast | null {
   if (data.length < 3) {
     return null;
@@ -157,7 +157,7 @@ export function forecastCapacity(
 
   // Sort by timestamp
   const sorted = [...data].sort(
-    (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+    (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
   );
 
   const regression = linearRegression(sorted);
@@ -213,7 +213,7 @@ export interface StorageForecast extends CapacityForecast {
 
 export function forecastStorageGrowth(
   storageHistory: DataPoint[],
-  estimatedCapacity?: number
+  estimatedCapacity?: number,
 ): StorageForecast | null {
   const forecast = forecastCapacity(storageHistory, "Storage");
   if (!forecast) return null;
@@ -227,7 +227,8 @@ export function forecastStorageGrowth(
   if (estimatedCapacity && forecast.dailyGrowthRate > 0) {
     const remainingCapacity = estimatedCapacity - forecast.currentValue;
     if (remainingCapacity > 0) {
-      const dailyGrowth = forecast.currentValue * (forecast.dailyGrowthRate / 100);
+      const dailyGrowth =
+        forecast.currentValue * (forecast.dailyGrowthRate / 100);
       if (dailyGrowth > 0) {
         result.daysUntilCapacity = Math.floor(remainingCapacity / dailyGrowth);
       }
@@ -257,15 +258,16 @@ export interface NetworkGrowthForecast {
 export function forecastNetworkGrowth(
   nodeCountHistory: DataPoint[],
   currentActive: number,
-  currentTotal: number
+  currentTotal: number,
 ): NetworkGrowthForecast | null {
   const forecast = forecastCapacity(nodeCountHistory, "Node count");
   if (!forecast) return null;
 
   // Calculate churn rate
-  const churnRate = currentTotal > 0
-    ? ((currentTotal - currentActive) / currentTotal) * 100
-    : 0;
+  const churnRate =
+    currentTotal > 0
+      ? ((currentTotal - currentActive) / currentTotal) * 100
+      : 0;
 
   return {
     currentNodeCount: currentTotal,
@@ -297,7 +299,7 @@ export interface NetworkCapacityForecast {
 
 export function generateNetworkForecastSummary(
   storageForecast: CapacityForecast | null,
-  nodeForecast: NetworkGrowthForecast | null
+  nodeForecast: NetworkGrowthForecast | null,
 ): NetworkCapacityForecast["summary"] {
   const highlights: string[] = [];
   let healthScore = 70; // Base score
@@ -306,7 +308,7 @@ export function generateNetworkForecastSummary(
     if (storageForecast.trend === "growing") {
       healthScore += 10;
       highlights.push(
-        `Storage capacity growing at ${storageForecast.monthlyGrowthRate.toFixed(1)}% monthly`
+        `Storage capacity growing at ${storageForecast.monthlyGrowthRate.toFixed(1)}% monthly`,
       );
     } else if (storageForecast.trend === "declining") {
       healthScore -= 15;
@@ -322,7 +324,7 @@ export function generateNetworkForecastSummary(
     if (nodeForecast.trend === "growing") {
       healthScore += 10;
       highlights.push(
-        `Network expanding: ${nodeForecast.predictions.nextMonth - nodeForecast.currentNodeCount} new nodes expected this month`
+        `Network expanding: ${nodeForecast.predictions.nextMonth - nodeForecast.currentNodeCount} new nodes expected this month`,
       );
     } else if (nodeForecast.trend === "declining") {
       healthScore -= 20;
@@ -331,7 +333,9 @@ export function generateNetworkForecastSummary(
 
     if (nodeForecast.churnRate > 20) {
       healthScore -= 10;
-      highlights.push(`High churn rate: ${nodeForecast.churnRate.toFixed(1)}% inactive nodes`);
+      highlights.push(
+        `High churn rate: ${nodeForecast.churnRate.toFixed(1)}% inactive nodes`,
+      );
     }
   }
 

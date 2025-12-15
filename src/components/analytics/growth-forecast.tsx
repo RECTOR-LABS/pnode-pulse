@@ -3,9 +3,21 @@
 import { trpc } from "@/lib/trpc/client";
 
 const scenarioColors = {
-  optimistic: { bg: "bg-green-500/10", text: "text-green-500", border: "border-green-500/30" },
-  baseline: { bg: "bg-blue-500/10", text: "text-blue-500", border: "border-blue-500/30" },
-  pessimistic: { bg: "bg-orange-500/10", text: "text-orange-500", border: "border-orange-500/30" },
+  optimistic: {
+    bg: "bg-green-500/10",
+    text: "text-green-500",
+    border: "border-green-500/30",
+  },
+  baseline: {
+    bg: "bg-blue-500/10",
+    text: "text-blue-500",
+    border: "border-blue-500/30",
+  },
+  pessimistic: {
+    bg: "bg-orange-500/10",
+    text: "text-orange-500",
+    border: "border-orange-500/30",
+  },
 };
 
 const trendIcons = {
@@ -23,13 +35,18 @@ const trendColors = {
 };
 
 export function GrowthForecast() {
-  const { data, isLoading, error } = trpc.analytics.networkGrowth.useQuery({ period: "30d" });
+  const { data, isLoading, error } = trpc.analytics.networkGrowth.useQuery({
+    period: "30d",
+  });
 
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="border border-border rounded-xl p-6 animate-pulse">
+          <div
+            key={i}
+            className="border border-border rounded-xl p-6 animate-pulse"
+          >
             <div className="h-6 bg-muted rounded w-2/3 mb-4" />
             <div className="h-20 bg-muted rounded" />
           </div>
@@ -51,20 +68,27 @@ export function GrowthForecast() {
       <div className="border border-border rounded-xl p-6">
         <h3 className="font-semibold mb-2">Growth Forecasting</h3>
         <p className="text-muted-foreground text-sm">
-          Not enough historical data for forecasting. Need at least 3 days of data.
+          Not enough historical data for forecasting. Need at least 3 days of
+          data.
         </p>
         {data.current && (
           <div className="mt-4 grid grid-cols-3 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold">{data.current.totalNodes}</div>
+              <div className="text-2xl font-bold">
+                {data.current.totalNodes}
+              </div>
               <div className="text-sm text-muted-foreground">Total Nodes</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold">{data.current.activeNodes}</div>
+              <div className="text-2xl font-bold">
+                {data.current.activeNodes}
+              </div>
               <div className="text-sm text-muted-foreground">Active Nodes</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold">{data.current.storageTB.toFixed(2)}</div>
+              <div className="text-2xl font-bold">
+                {data.current.storageTB.toFixed(2)}
+              </div>
               <div className="text-sm text-muted-foreground">Storage (TB)</div>
             </div>
           </div>
@@ -73,7 +97,7 @@ export function GrowthForecast() {
     );
   }
 
-  const { report, scenarioComparison } = data;
+  const { report } = data;
   const metrics = report?.metrics;
 
   return (
@@ -95,15 +119,25 @@ export function GrowthForecast() {
 
         <div className="border border-border rounded-xl p-4">
           <div className="text-sm text-muted-foreground mb-1">Active Nodes</div>
-          <div className="text-2xl font-bold">{metrics?.currentActiveNodes ?? 0}</div>
+          <div className="text-2xl font-bold">
+            {metrics?.currentActiveNodes ?? 0}
+          </div>
           <div className="text-sm text-muted-foreground mt-1">
-            {metrics?.currentNodes ? ((metrics.currentActiveNodes / metrics.currentNodes) * 100).toFixed(0) : 0}% active
+            {metrics?.currentNodes
+              ? (
+                  (metrics.currentActiveNodes / metrics.currentNodes) *
+                  100
+                ).toFixed(0)
+              : 0}
+            % active
           </div>
         </div>
 
         <div className="border border-border rounded-xl p-4">
           <div className="text-sm text-muted-foreground mb-1">Storage</div>
-          <div className="text-2xl font-bold">{metrics?.currentStorageTB?.toFixed(2) ?? 0} TB</div>
+          <div className="text-2xl font-bold">
+            {metrics?.currentStorageTB?.toFixed(2) ?? 0} TB
+          </div>
           <div className="flex items-center gap-1 mt-1">
             <span className={trendColors[metrics?.storageTrend ?? "steady"]}>
               {trendIcons[metrics?.storageTrend ?? "steady"]}
@@ -171,7 +205,8 @@ export function GrowthForecast() {
 
               <div className="mt-4 pt-3 border-t border-border/50">
                 <div className="text-xs text-muted-foreground mb-2">
-                  Confidence: {(scenario.predictions.days30.confidence * 100).toFixed(0)}%
+                  Confidence:{" "}
+                  {(scenario.predictions.days30.confidence * 100).toFixed(0)}%
                 </div>
               </div>
             </div>

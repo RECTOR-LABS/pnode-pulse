@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Inter, Geist_Mono } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
-import { locales, type Locale, isRtlLocale } from "@/i18n/config";
+import { locales, type Locale } from "@/i18n/config";
 import { TRPCProvider } from "@/lib/trpc";
 import { BookmarkProvider } from "@/components/providers/bookmark-provider";
 import { WalletContextProvider, AuthProvider } from "@/lib/auth";
@@ -33,7 +33,14 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "pNode Pulse - Xandeum Network Explorer",
   description: "Real-time analytics platform for Xandeum's pNode network",
-  keywords: ["Xandeum", "pNode", "blockchain", "storage", "analytics", "Solana"],
+  keywords: [
+    "Xandeum",
+    "pNode",
+    "blockchain",
+    "storage",
+    "analytics",
+    "Solana",
+  ],
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -59,7 +66,13 @@ export const metadata: Metadata = {
       { url: "/favicon.svg", type: "image/svg+xml" },
       { url: "/icons/icon.svg", type: "image/svg+xml" },
     ],
-    apple: [{ url: "/icons/icon-192x192.svg", sizes: "192x192", type: "image/svg+xml" }],
+    apple: [
+      {
+        url: "/icons/icon-192x192.svg",
+        sizes: "192x192",
+        type: "image/svg+xml",
+      },
+    ],
   },
 };
 
@@ -72,7 +85,10 @@ export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
 
-export default async function LocaleLayout({ children, params }: LocaleLayoutProps) {
+export default async function LocaleLayout({
+  children,
+  params,
+}: LocaleLayoutProps) {
   const { locale } = await params;
 
   // Validate locale
@@ -84,7 +100,9 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
   const messages = await getMessages();
 
   return (
-    <div className={`${inter.variable} ${geistMono.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}>
+    <div
+      className={`${inter.variable} ${geistMono.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}
+    >
       <NextIntlClientProvider messages={messages}>
         <TRPCProvider>
           <WalletContextProvider>
@@ -100,10 +118,7 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
           </WalletContextProvider>
         </TRPCProvider>
       </NextIntlClientProvider>
-      <Script
-        src="/register-sw.js"
-        strategy="afterInteractive"
-      />
+      <Script src="/register-sw.js" strategy="afterInteractive" />
     </div>
   );
 }

@@ -77,7 +77,7 @@ const THRESHOLDS = {
  */
 export function analyzeTrend(
   data: MetricTimeSeries[],
-  metricName: "cpu" | "ram"
+  metricName: "cpu" | "ram",
 ): TrendAnalysis | null {
   if (data.length < 3) {
     return null;
@@ -85,7 +85,7 @@ export function analyzeTrend(
 
   // Sort by timestamp
   const sorted = [...data].sort(
-    (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+    (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
   );
 
   const currentValue = sorted[sorted.length - 1].value;
@@ -99,7 +99,10 @@ export function analyzeTrend(
 
   // Linear regression for slope
   const n = points.length;
-  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+  let sumX = 0,
+    sumY = 0,
+    sumXY = 0,
+    sumXX = 0;
 
   for (const { x, y } of points) {
     sumX += x;
@@ -129,7 +132,6 @@ export function analyzeTrend(
   }
 
   // Predict value in 24 hours
-  const lastX = points[points.length - 1].x;
   const predictedIn24h = currentValue + slope * 24;
 
   // Determine trend direction
@@ -143,11 +145,20 @@ export function analyzeTrend(
   let concern: TrendAnalysis["concern"] = "none";
   const thresholds = THRESHOLDS[metricName];
 
-  if (currentValue >= thresholds.critical || predictedIn24h >= thresholds.critical) {
+  if (
+    currentValue >= thresholds.critical ||
+    predictedIn24h >= thresholds.critical
+  ) {
     concern = "critical";
-  } else if (currentValue >= thresholds.elevated || predictedIn24h >= thresholds.elevated) {
+  } else if (
+    currentValue >= thresholds.elevated ||
+    predictedIn24h >= thresholds.elevated
+  ) {
     concern = "high";
-  } else if (currentValue >= thresholds.warning || predictedIn24h >= thresholds.warning) {
+  } else if (
+    currentValue >= thresholds.warning ||
+    predictedIn24h >= thresholds.warning
+  ) {
     concern = "moderate";
   } else if (slope > THRESHOLDS.trend.moderate) {
     concern = "low";
@@ -167,7 +178,10 @@ function calculateSlope(points: Array<{ x: number; y: number }>): number {
   if (points.length < 2) return 0;
 
   const n = points.length;
-  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+  let sumX = 0,
+    sumY = 0,
+    sumXY = 0,
+    sumXX = 0;
 
   for (const { x, y } of points) {
     sumX += x;
@@ -186,7 +200,7 @@ function calculateSlope(points: Array<{ x: number; y: number }>): number {
  * Analyze uptime stability based on restart patterns
  */
 export function analyzeUptimeStability(
-  uptimeHistory: MetricTimeSeries[]
+  uptimeHistory: MetricTimeSeries[],
 ): UptimeStability {
   if (uptimeHistory.length < 2) {
     return {
@@ -199,7 +213,7 @@ export function analyzeUptimeStability(
 
   // Sort by timestamp
   const sorted = [...uptimeHistory].sort(
-    (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+    (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
   );
 
   // Detect restarts: when uptime decreases significantly
@@ -217,7 +231,7 @@ export function analyzeUptimeStability(
   // Filter to last 7 days
   const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const recentRestarts = restarts.filter(
-    (r) => r.getTime() > sevenDaysAgo
+    (r) => r.getTime() > sevenDaysAgo,
   ).length;
 
   // Calculate average uptime between restarts
@@ -226,7 +240,7 @@ export function analyzeUptimeStability(
     const intervals: number[] = [];
     for (let i = 1; i < restarts.length; i++) {
       intervals.push(
-        (restarts[i].getTime() - restarts[i - 1].getTime()) / (1000 * 60 * 60)
+        (restarts[i].getTime() - restarts[i - 1].getTime()) / (1000 * 60 * 60),
       );
     }
     avgUptimeBetweenRestarts =
@@ -259,7 +273,7 @@ export function analyzeUptimeStability(
 function calculateRiskLevel(
   cpuConcern: TrendAnalysis["concern"],
   ramConcern: TrendAnalysis["concern"],
-  uptimeStability: UptimeStability["stability"]
+  uptimeStability: UptimeStability["stability"],
 ): { level: RiskLevel; score: number } {
   const concernScores: Record<TrendAnalysis["concern"], number> = {
     none: 0,
@@ -295,7 +309,7 @@ function calculateRiskLevel(
 function generatePredictions(
   cpuTrend: TrendAnalysis | null,
   ramTrend: TrendAnalysis | null,
-  uptimeStability: UptimeStability
+  uptimeStability: UptimeStability,
 ): DegradationPrediction[] {
   const predictions: DegradationPrediction[] = [];
 
@@ -307,13 +321,20 @@ function generatePredictions(
         metric: "cpu",
         severity: "critical",
         confidence: 0.9,
-        timeToIssue: cpuTrend.predictedIn24h >= 95 ? calculateTimeToThreshold(cpuTrend, 95) : 0,
+        timeToIssue:
+          cpuTrend.predictedIn24h >= 95
+            ? calculateTimeToThreshold(cpuTrend, 95)
+            : 0,
         title: "CPU Critical - Immediate Action Required",
         description: `CPU at ${cpuTrend.currentValue.toFixed(1)}%, ${cpuTrend.trend === "increasing" ? "still rising" : "at critical levels"}.`,
-        recommendation: "Investigate CPU-intensive processes immediately. Consider restarting or scaling resources.",
+        recommendation:
+          "Investigate CPU-intensive processes immediately. Consider restarting or scaling resources.",
       });
     } else if (cpuTrend.concern === "high") {
-      const timeToIssue = calculateTimeToThreshold(cpuTrend, THRESHOLDS.cpu.critical);
+      const timeToIssue = calculateTimeToThreshold(
+        cpuTrend,
+        THRESHOLDS.cpu.critical,
+      );
       predictions.push({
         id: "cpu-elevated",
         metric: "cpu",
@@ -351,10 +372,14 @@ function generatePredictions(
         timeToIssue: 0,
         title: "Memory Critical - OOM Risk",
         description: `RAM at ${ramTrend.currentValue.toFixed(1)}%, risk of out-of-memory condition.`,
-        recommendation: "Free up memory immediately. Identify memory leaks or restart the service.",
+        recommendation:
+          "Free up memory immediately. Identify memory leaks or restart the service.",
       });
     } else if (ramTrend.concern === "high") {
-      const timeToIssue = calculateTimeToThreshold(ramTrend, THRESHOLDS.ram.critical);
+      const timeToIssue = calculateTimeToThreshold(
+        ramTrend,
+        THRESHOLDS.ram.critical,
+      );
       predictions.push({
         id: "ram-elevated",
         metric: "ram",
@@ -391,7 +416,8 @@ function generatePredictions(
       timeToIssue: null,
       title: "Frequent Restarts Detected",
       description: `${uptimeStability.recentRestarts} restarts in the last 7 days indicates serious instability.`,
-      recommendation: "Investigate crash logs. Check for hardware issues or software bugs.",
+      recommendation:
+        "Investigate crash logs. Check for hardware issues or software bugs.",
     });
   } else if (uptimeStability.stability === "unstable") {
     predictions.push({
@@ -414,7 +440,9 @@ function generatePredictions(
     healthy: 3,
   };
 
-  predictions.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+  predictions.sort(
+    (a, b) => severityOrder[a.severity] - severityOrder[b.severity],
+  );
 
   return predictions;
 }
@@ -424,13 +452,15 @@ function generatePredictions(
  */
 function calculateTimeToThreshold(
   trend: TrendAnalysis,
-  threshold: number
+  threshold: number,
 ): number | null {
   if (trend.slope <= 0) return null;
   if (trend.currentValue >= threshold) return 0;
 
   const hoursToThreshold = (threshold - trend.currentValue) / trend.slope;
-  return hoursToThreshold > 0 && hoursToThreshold < 168 ? hoursToThreshold : null; // Cap at 1 week
+  return hoursToThreshold > 0 && hoursToThreshold < 168
+    ? hoursToThreshold
+    : null; // Cap at 1 week
 }
 
 /**
@@ -439,7 +469,7 @@ function calculateTimeToThreshold(
 export function predictDegradation(
   cpuHistory: MetricTimeSeries[],
   ramHistory: MetricTimeSeries[],
-  uptimeHistory: MetricTimeSeries[]
+  uptimeHistory: MetricTimeSeries[],
 ): DegradationIndicators {
   const cpuTrend = analyzeTrend(cpuHistory, "cpu");
   const ramTrend = analyzeTrend(ramHistory, "ram");
@@ -448,7 +478,7 @@ export function predictDegradation(
   const { level: overallRisk, score: riskScore } = calculateRiskLevel(
     cpuTrend?.concern ?? "none",
     ramTrend?.concern ?? "none",
-    uptimeStability.stability
+    uptimeStability.stability,
   );
 
   const predictions = generatePredictions(cpuTrend, ramTrend, uptimeStability);
@@ -502,7 +532,7 @@ export function summarizeNetworkDegradation(
     nodeId: number;
     address: string;
     indicators: DegradationIndicators;
-  }>
+  }>,
 ): NetworkDegradationSummary {
   const byRiskLevel: Record<RiskLevel, number> = {
     healthy: 0,
@@ -531,9 +561,8 @@ export function summarizeNetworkDegradation(
   atRiskNodes.sort((a, b) => b.riskScore - a.riskScore);
 
   const totalNodes = nodeAnalyses.length;
-  const healthyPercentage = totalNodes > 0
-    ? (byRiskLevel.healthy / totalNodes) * 100
-    : 100;
+  const healthyPercentage =
+    totalNodes > 0 ? (byRiskLevel.healthy / totalNodes) * 100 : 100;
 
   return {
     totalNodes,

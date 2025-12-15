@@ -21,7 +21,7 @@ import nodemailer from "nodemailer";
 import type { ReportType, ReportScope } from "@prisma/client";
 import { logger } from "@/lib/logger";
 
-logger.info('Starting report processor');
+logger.info("Starting report processor");
 
 // Email transporter
 let emailTransporter: nodemailer.Transporter | null = null;
@@ -65,24 +65,11 @@ interface ReportData {
 }
 
 /**
- * Calculate uptime percentage for SLA
- */
-function calculateUptimePercentage(
-  _nodeId: number,
-  _startDate: Date,
-  _endDate: Date
-): Promise<number> {
-  // Simplified calculation - would use uptime_events in production
-  return Promise.resolve(99.5);
-}
-
-/**
  * Get report data based on scope
  */
 async function getReportData(
   scope: ReportScope,
   portfolioId: string | null,
-  _reportType: ReportType
 ): Promise<ReportData> {
   // Get nodes based on scope
   let nodeFilter = {};
@@ -115,7 +102,7 @@ async function getReportData(
     isActive: n.isActive,
     cpuPercent: n.metrics[0]?.cpuPercent ?? null,
     ramPercent: n.metrics[0]?.ramTotal
-      ? Number(n.metrics[0].ramUsed) / Number(n.metrics[0].ramTotal) * 100
+      ? (Number(n.metrics[0].ramUsed) / Number(n.metrics[0].ramTotal)) * 100
       : null,
     uptime: n.metrics[0]?.uptime ?? null,
     fileSize: n.metrics[0]?.fileSize ?? null,
@@ -133,12 +120,13 @@ async function getReportData(
     ? withRam.reduce((sum, s) => sum + (s.ramPercent || 0), 0) / withRam.length
     : 0;
   const avgUptime = withUptime.length
-    ? withUptime.reduce((sum, s) => sum + (s.uptime || 0), 0) / withUptime.length
+    ? withUptime.reduce((sum, s) => sum + (s.uptime || 0), 0) /
+      withUptime.length
     : 0;
 
   const totalStorage = stats.reduce(
     (sum, s) => sum + (s.fileSize || BigInt(0)),
-    BigInt(0)
+    BigInt(0),
   );
 
   // Version distribution
@@ -155,12 +143,14 @@ async function getReportData(
     .slice(0, 5);
 
   // Underperformers (high CPU or RAM, or offline)
-  const underperformers = stats.filter(
-    (s) =>
-      !s.isActive ||
-      (s.cpuPercent !== null && s.cpuPercent > 80) ||
-      (s.ramPercent !== null && s.ramPercent > 80)
-  ).slice(0, 10);
+  const underperformers = stats
+    .filter(
+      (s) =>
+        !s.isActive ||
+        (s.cpuPercent !== null && s.cpuPercent > 80) ||
+        (s.ramPercent !== null && s.ramPercent > 80),
+    )
+    .slice(0, 10);
 
   return {
     totalNodes: nodes.length,
@@ -208,8 +198,12 @@ function formatBytes(bytes: bigint): string {
 /**
  * Generate HTML email content for weekly summary
  */
-function generateWeeklySummaryHtml(data: ReportData, reportName: string): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pulse.rectorspace.com";
+function generateWeeklySummaryHtml(
+  data: ReportData,
+  reportName: string,
+): string {
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL || "https://pulse.rectorspace.com";
 
   return `
 <!DOCTYPE html>
@@ -268,36 +262,51 @@ function generateWeeklySummaryHtml(data: ReportData, reportName: string): string
         </tr>
       </table>
 
-      ${data.underperformers.length > 0 ? `
+      ${
+        data.underperformers.length > 0
+          ? `
       <!-- Nodes Needing Attention -->
       <h3 style="margin: 0 0 16px 0; color: #374151; font-size: 16px; font-weight: 600;">Nodes Needing Attention</h3>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 32px;">
-        ${data.underperformers.slice(0, 5).map((node) => `
+        ${data.underperformers
+          .slice(0, 5)
+          .map(
+            (node) => `
         <tr>
           <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
             <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 13px;">${node.address}</code>
           </td>
           <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">
-            ${!node.isActive ? '<span style="color: #dc2626;">Offline</span>' : ''}
-            ${node.cpuPercent !== null && node.cpuPercent > 80 ? `<span style="color: #d97706;">CPU ${node.cpuPercent.toFixed(0)}%</span>` : ''}
-            ${node.ramPercent !== null && node.ramPercent > 80 ? `<span style="color: #d97706;">RAM ${node.ramPercent.toFixed(0)}%</span>` : ''}
+            ${!node.isActive ? '<span style="color: #dc2626;">Offline</span>' : ""}
+            ${node.cpuPercent !== null && node.cpuPercent > 80 ? `<span style="color: #d97706;">CPU ${node.cpuPercent.toFixed(0)}%</span>` : ""}
+            ${node.ramPercent !== null && node.ramPercent > 80 ? `<span style="color: #d97706;">RAM ${node.ramPercent.toFixed(0)}%</span>` : ""}
           </td>
         </tr>
-        `).join('')}
+        `,
+          )
+          .join("")}
       </table>
-      ` : ''}
+      `
+          : ""
+      }
 
       <!-- Version Distribution -->
       <h3 style="margin: 0 0 16px 0; color: #374151; font-size: 16px; font-weight: 600;">Version Distribution</h3>
       <table style="width: 100%; border-collapse: collapse; margin-bottom: 32px;">
-        ${Object.entries(data.versionDistribution).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([version, count]) => `
+        ${Object.entries(data.versionDistribution)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(
+            ([version, count]) => `
         <tr>
           <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">
             <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px; font-size: 13px;">${version}</code>
           </td>
           <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; text-align: right;">${count} nodes</td>
         </tr>
-        `).join('')}
+        `,
+          )
+          .join("")}
       </table>
 
       <!-- CTA -->
@@ -322,8 +331,12 @@ function generateWeeklySummaryHtml(data: ReportData, reportName: string): string
 /**
  * Generate HTML email content for daily digest
  */
-function generateDailyDigestHtml(data: ReportData, reportName: string): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pulse.rectorspace.com";
+function generateDailyDigestHtml(
+  data: ReportData,
+  _reportName: string,
+): string {
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL || "https://pulse.rectorspace.com";
 
   return `
 <!DOCTYPE html>
@@ -336,7 +349,7 @@ function generateDailyDigestHtml(data: ReportData, reportName: string): string {
   <div style="max-width: 600px; margin: 0 auto; padding: 24px;">
     <div style="background: white; border-radius: 12px; padding: 32px;">
       <h1 style="margin: 0 0 8px 0; color: #111827; font-size: 22px;">Daily Network Digest</h1>
-      <p style="color: #6b7280; margin: 0 0 24px 0; font-size: 14px;">${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      <p style="color: #6b7280; margin: 0 0 24px 0; font-size: 14px;">${new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</p>
 
       <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 24px;">
         <tr>
@@ -362,18 +375,27 @@ function generateDailyDigestHtml(data: ReportData, reportName: string): string {
         </tr>
       </table>
 
-      ${data.underperformers.length > 0 ? `
+      ${
+        data.underperformers.length > 0
+          ? `
       <div style="background: #fef2f2; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
         <strong style="color: #dc2626;">${data.underperformers.length} node(s) need attention</strong>
         <p style="color: #374151; margin: 8px 0 0 0; font-size: 14px;">
-          ${data.underperformers.slice(0, 3).map(n => n.address).join(', ')}${data.underperformers.length > 3 ? ` and ${data.underperformers.length - 3} more` : ''}
+          ${data.underperformers
+            .slice(0, 3)
+            .map((n) => n.address)
+            .join(
+              ", ",
+            )}${data.underperformers.length > 3 ? ` and ${data.underperformers.length - 3} more` : ""}
         </p>
       </div>
-      ` : `
+      `
+          : `
       <div style="background: #f0fdf4; border-radius: 8px; padding: 16px; margin-bottom: 24px;">
         <strong style="color: #16a34a;">All nodes operating normally</strong>
       </div>
-      `}
+      `
+      }
 
       <div style="text-align: center;">
         <a href="${appUrl}" style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 500;">View Dashboard</a>
@@ -392,11 +414,13 @@ function generateDailyDigestHtml(data: ReportData, reportName: string): string {
 /**
  * Generate HTML email content for monthly SLA report
  */
-function generateMonthlySlaHtml(data: ReportData, reportName: string): string {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://pulse.rectorspace.com";
-  const slaPercent = data.totalNodes > 0
-    ? ((data.activeNodes / data.totalNodes) * 100).toFixed(2)
-    : "N/A";
+function generateMonthlySlaHtml(data: ReportData, _reportName: string): string {
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL || "https://pulse.rectorspace.com";
+  const slaPercent =
+    data.totalNodes > 0
+      ? ((data.activeNodes / data.totalNodes) * 100).toFixed(2)
+      : "N/A";
 
   return `
 <!DOCTYPE html>
@@ -409,7 +433,7 @@ function generateMonthlySlaHtml(data: ReportData, reportName: string): string {
   <div style="max-width: 600px; margin: 0 auto; padding: 24px;">
     <div style="background: white; border-radius: 12px; padding: 32px;">
       <h1 style="margin: 0 0 8px 0; color: #111827; font-size: 22px;">Monthly SLA Report</h1>
-      <p style="color: #6b7280; margin: 0 0 24px 0; font-size: 14px;">${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long' })}</p>
+      <p style="color: #6b7280; margin: 0 0 24px 0; font-size: 14px;">${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long" })}</p>
 
       <div style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); border-radius: 12px; padding: 32px; text-align: center; margin-bottom: 24px;">
         <div style="font-size: 48px; font-weight: bold; color: white;">${slaPercent}%</div>
@@ -472,7 +496,7 @@ function generateMonthlySlaHtml(data: ReportData, reportName: string): string {
 function generateReportHtml(
   reportType: ReportType,
   data: ReportData,
-  reportName: string
+  reportName: string,
 ): string {
   switch (reportType) {
     case "DAILY_DIGEST":
@@ -492,7 +516,7 @@ function generateReportHtml(
 function generateReportText(
   reportType: ReportType,
   data: ReportData,
-  reportName: string
+  reportName: string,
 ): string {
   return `
 ${reportName}
@@ -504,12 +528,19 @@ Network Status:
 - Average RAM: ${data.avgRamPercent.toFixed(1)}%
 - Total Storage: ${formatBytes(data.totalStorage)}
 
-${data.underperformers.length > 0 ? `
+${
+  data.underperformers.length > 0
+    ? `
 Nodes Needing Attention:
-${data.underperformers.slice(0, 5).map(n => `- ${n.address}${!n.isActive ? ' (Offline)' : ''}`).join('\n')}
-` : 'All nodes operating normally.'}
+${data.underperformers
+  .slice(0, 5)
+  .map((n) => `- ${n.address}${!n.isActive ? " (Offline)" : ""}`)
+  .join("\n")}
+`
+    : "All nodes operating normally."
+}
 
-View full dashboard: ${process.env.NEXT_PUBLIC_APP_URL || 'https://pulse.rectorspace.com'}
+View full dashboard: ${process.env.NEXT_PUBLIC_APP_URL || "https://pulse.rectorspace.com"}
   `.trim();
 }
 
@@ -520,7 +551,7 @@ function calculateNextSendAt(
   schedule: "DAILY" | "WEEKLY" | "MONTHLY" | "CUSTOM",
   hour: number,
   dayOfWeek?: number | null,
-  dayOfMonth?: number | null
+  dayOfMonth?: number | null,
 ): Date {
   const now = new Date();
   const next = new Date(now);
@@ -554,7 +585,9 @@ function calculateNextSendAt(
  * Check for due reports and queue them
  */
 async function checkScheduledReports(): Promise<void> {
-  logger.info(`[${new Date().toISOString()}] Checking for scheduled reports...`);
+  logger.info(
+    `[${new Date().toISOString()}] Checking for scheduled reports...`,
+  );
 
   const now = new Date();
 
@@ -629,11 +662,7 @@ async function generateAndSendReport(reportId: string): Promise<void> {
 
   try {
     // Generate report data
-    const data = await getReportData(
-      report.scope,
-      report.portfolioId,
-      report.reportType
-    );
+    const data = await getReportData(report.scope, report.portfolioId);
 
     // Generate email content
     const html = generateReportHtml(report.reportType, data, report.name);
@@ -673,7 +702,7 @@ async function generateAndSendReport(reportId: string): Promise<void> {
       report.schedule,
       report.sendHour,
       report.sendDayOfWeek,
-      report.sendDayOfMonth
+      report.sendDayOfMonth,
     );
 
     await db.scheduledReport.update({
@@ -686,7 +715,10 @@ async function generateAndSendReport(reportId: string): Promise<void> {
 
     logger.info(`Next send scheduled for: ${nextSendAt.toISOString()}`);
   } catch (error) {
-    logger.error(`Error generating report:`, error instanceof Error ? error : new Error(String(error)));
+    logger.error(
+      `Error generating report:`,
+      error instanceof Error ? error : new Error(String(error)),
+    );
 
     // Update delivery with error
     if (delivery) {
@@ -716,7 +748,7 @@ async function main(): Promise<void> {
           await generateAndSendReport(job.data.reportId);
         }
       },
-      2 // Low concurrency for report generation
+      2, // Low concurrency for report generation
     );
 
     // Schedule repeating check jobs
@@ -739,7 +771,10 @@ async function main(): Promise<void> {
     // Keep the process running
     await new Promise(() => {});
   } catch (error) {
-    logger.error("Fatal error in report processor:", error instanceof Error ? error : new Error(String(error)));
+    logger.error(
+      "Fatal error in report processor:",
+      error instanceof Error ? error : new Error(String(error)),
+    );
     process.exit(1);
   }
 }

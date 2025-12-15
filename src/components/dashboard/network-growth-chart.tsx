@@ -8,7 +8,8 @@ type Range = "24h" | "7d" | "30d" | "90d";
 type TrendDataPoint = { time: Date; value: number | bigint };
 
 // Helper to ensure valid number for SVG paths (returns fallback for NaN/Infinity)
-const safeNum = (n: number, fallback = 0): number => (Number.isFinite(n) ? n : fallback);
+const safeNum = (n: number, fallback = 0): number =>
+  Number.isFinite(n) ? n : fallback;
 
 // Convert value to safe number, handling bigint and null/undefined
 const toSafeNumber = (value: number | bigint | null | undefined): number => {
@@ -23,7 +24,7 @@ export function NetworkGrowthChart() {
 
   const { data, isLoading } = trpc.network.trends.useQuery(
     { range, metric },
-    { refetchInterval: 60000 }
+    { refetchInterval: 60000 },
   );
 
   // Prepare and validate chart data
@@ -86,7 +87,7 @@ export function NetworkGrowthChart() {
     );
   }
 
-  const { values, minValue, maxValue, displayMin, valueRange, isFlat } = chartData;
+  const { values, minValue, maxValue, displayMin, valueRange } = chartData;
 
   return (
     <div className="space-y-4">
@@ -108,7 +109,11 @@ export function NetworkGrowthChart() {
         </div>
         <div className="flex gap-1">
           {(["24h", "7d", "30d", "90d"] as const).map((r) => (
-            <RangeButton key={r} active={range === r} onClick={() => setRange(r)}>
+            <RangeButton
+              key={r}
+              active={range === r}
+              onClick={() => setRange(r)}
+            >
               {r}
             </RangeButton>
           ))}
@@ -140,8 +145,13 @@ export function NetworkGrowthChart() {
             d={(() => {
               // Calculate points using pre-validated values
               const points = values.map((value, i) => {
-                const x = safeNum(values.length > 1 ? (i / (values.length - 1)) * 400 : 200);
-                const y = safeNum(140 - ((value - displayMin) / valueRange) * 130, 75);
+                const x = safeNum(
+                  values.length > 1 ? (i / (values.length - 1)) * 400 : 200,
+                );
+                const y = safeNum(
+                  140 - ((value - displayMin) / valueRange) * 130,
+                  75,
+                );
                 return { x, y };
               });
 
@@ -172,8 +182,13 @@ export function NetworkGrowthChart() {
           <path
             d={(() => {
               const points = values.map((value, i) => {
-                const x = safeNum(values.length > 1 ? (i / (values.length - 1)) * 400 : 200);
-                const y = safeNum(140 - ((value - displayMin) / valueRange) * 130, 75);
+                const x = safeNum(
+                  values.length > 1 ? (i / (values.length - 1)) * 400 : 200,
+                );
+                const y = safeNum(
+                  140 - ((value - displayMin) / valueRange) * 130,
+                  75,
+                );
                 return { x, y };
               });
 
@@ -186,7 +201,10 @@ export function NetworkGrowthChart() {
               }
 
               // Build line path: start at first point x=0, line through all points
-              return [`M 0,${points[0].y}`, ...points.map((p) => `L ${p.x},${p.y}`)].join(" ");
+              return [
+                `M 0,${points[0].y}`,
+                ...points.map((p) => `L ${p.x},${p.y}`),
+              ].join(" ");
             })()}
             fill="none"
             stroke="#06B6D4"
@@ -195,7 +213,13 @@ export function NetworkGrowthChart() {
 
           {/* Gradient definition - unique ID to avoid conflicts */}
           <defs>
-            <linearGradient id="network-growth-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <linearGradient
+              id="network-growth-gradient"
+              x1="0%"
+              y1="0%"
+              x2="0%"
+              y2="100%"
+            >
               <stop offset="0%" stopColor="#06B6D4" />
               <stop offset="100%" stopColor="#06B6D4" stopOpacity="0" />
             </linearGradient>
@@ -216,7 +240,7 @@ export function NetworkGrowthChart() {
           <span className="font-medium">
             {metric === "storage"
               ? formatBytes(values[values.length - 1] ?? 0)
-              : values[values.length - 1] ?? 0}
+              : (values[values.length - 1] ?? 0)}
           </span>
         </div>
         <div>

@@ -58,7 +58,7 @@ if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
     ],
 
     // Add custom context before sending
-    beforeSend(event, hint) {
+    beforeSend(event) {
       // Filter out sensitive data
       if (event.request) {
         // Remove auth headers

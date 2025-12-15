@@ -2,7 +2,11 @@
 
 import { trpc } from "@/lib/trpc";
 import { formatBytes } from "@/lib/utils/format";
-import { linearRegression, projectValues, projectMilestone } from "@/lib/utils/projections";
+import {
+  linearRegression,
+  projectValues,
+  projectMilestone,
+} from "@/lib/utils/projections";
 
 // Helper to ensure valid number for SVG paths (returns 0 for NaN/Infinity)
 const safeNum = (n: number): number => (Number.isFinite(n) ? n : 0);
@@ -18,7 +22,7 @@ const MILESTONES = [
 export function CapacityProjection() {
   const { data: trends, isLoading } = trpc.network.trends.useQuery(
     { range: "30d", metric: "storage" },
-    { refetchInterval: 60000 }
+    { refetchInterval: 60000 },
   );
 
   if (isLoading) {
@@ -28,16 +32,19 @@ export function CapacityProjection() {
   if (!trends || trends.length < 5) {
     return (
       <div className="text-muted-foreground text-sm text-center py-8">
-        Need more historical data for projections. Check back after collecting data for a few days.
+        Need more historical data for projections. Check back after collecting
+        data for a few days.
       </div>
     );
   }
 
   // Convert to data points
-  const dataPoints = trends.map((t: { time: Date; value: number | bigint }) => ({
-    time: new Date(t.time),
-    value: Number(t.value),
-  }));
+  const dataPoints = trends.map(
+    (t: { time: Date; value: number | bigint }) => ({
+      time: new Date(t.time),
+      value: Number(t.value),
+    }),
+  );
 
   const { slope, r2 } = linearRegression(dataPoints);
   const projections = projectValues(dataPoints, 30, 10);
@@ -45,7 +52,8 @@ export function CapacityProjection() {
 
   // Calculate daily growth rate
   const dailyGrowthBytes = slope;
-  const dailyGrowthPercent = currentValue > 0 ? (slope / currentValue) * 100 : 0;
+  const _dailyGrowthPercent =
+    currentValue > 0 ? (slope / currentValue) * 100 : 0;
 
   // Find next milestone
   const nextMilestone = MILESTONES.find((m) => m.value > currentValue);
@@ -64,7 +72,11 @@ export function CapacityProjection() {
     <div className="space-y-4">
       {/* Chart */}
       <div className="h-48 relative">
-        <svg viewBox="0 0 400 150" className="w-full h-full" preserveAspectRatio="none">
+        <svg
+          viewBox="0 0 400 150"
+          className="w-full h-full"
+          preserveAspectRatio="none"
+        >
           {/* Grid lines */}
           {[0, 0.25, 0.5, 0.75, 1].map((y) => (
             <line
@@ -82,11 +94,19 @@ export function CapacityProjection() {
           <path
             d={`
               M 0,${safeNum(140 - ((dataPoints[0].value - minValue) / valueRange) * 130)}
-              ${dataPoints.map((d, i) => {
-                const x = safeNum(allPoints.length > 1 ? (i / (allPoints.length - 1)) * 400 : 200);
-                const y = safeNum(140 - ((d.value - minValue) / valueRange) * 130);
-                return `L ${x},${y}`;
-              }).join(" ")}
+              ${dataPoints
+                .map((d, i) => {
+                  const x = safeNum(
+                    allPoints.length > 1
+                      ? (i / (allPoints.length - 1)) * 400
+                      : 200,
+                  );
+                  const y = safeNum(
+                    140 - ((d.value - minValue) / valueRange) * 130,
+                  );
+                  return `L ${x},${y}`;
+                })
+                .join(" ")}
               L ${safeNum(allPoints.length > 1 ? ((dataPoints.length - 1) / (allPoints.length - 1)) * 400 : 200)},140
               L 0,140
               Z
@@ -99,11 +119,19 @@ export function CapacityProjection() {
           <path
             d={`
               M 0,${safeNum(140 - ((dataPoints[0].value - minValue) / valueRange) * 130)}
-              ${dataPoints.map((d, i) => {
-                const x = safeNum(allPoints.length > 1 ? (i / (allPoints.length - 1)) * 400 : 200);
-                const y = safeNum(140 - ((d.value - minValue) / valueRange) * 130);
-                return `L ${x},${y}`;
-              }).join(" ")}
+              ${dataPoints
+                .map((d, i) => {
+                  const x = safeNum(
+                    allPoints.length > 1
+                      ? (i / (allPoints.length - 1)) * 400
+                      : 200,
+                  );
+                  const y = safeNum(
+                    140 - ((d.value - minValue) / valueRange) * 130,
+                  );
+                  return `L ${x},${y}`;
+                })
+                .join(" ")}
             `}
             fill="none"
             stroke="hsl(var(--brand-500))"
@@ -113,14 +141,25 @@ export function CapacityProjection() {
           {/* Projection line (dashed) */}
           <path
             d={`
-              M ${safeNum(allPoints.length > 1 ? ((dataPoints.length - 1) / (allPoints.length - 1)) * 400 : 200)},${
-                safeNum(140 - ((dataPoints[dataPoints.length - 1].value - minValue) / valueRange) * 130)
-              }
-              ${projections.map((d, i) => {
-                const x = safeNum(allPoints.length > 1 ? ((dataPoints.length + i) / (allPoints.length - 1)) * 400 : 200);
-                const y = safeNum(140 - ((d.value - minValue) / valueRange) * 130);
-                return `L ${x},${y}`;
-              }).join(" ")}
+              M ${safeNum(allPoints.length > 1 ? ((dataPoints.length - 1) / (allPoints.length - 1)) * 400 : 200)},${safeNum(
+                140 -
+                  ((dataPoints[dataPoints.length - 1].value - minValue) /
+                    valueRange) *
+                    130,
+              )}
+              ${projections
+                .map((d, i) => {
+                  const x = safeNum(
+                    allPoints.length > 1
+                      ? ((dataPoints.length + i) / (allPoints.length - 1)) * 400
+                      : 200,
+                  );
+                  const y = safeNum(
+                    140 - ((d.value - minValue) / valueRange) * 130,
+                  );
+                  return `L ${x},${y}`;
+                })
+                .join(" ")}
             `}
             fill="none"
             stroke="hsl(var(--brand-500))"
@@ -132,14 +171,25 @@ export function CapacityProjection() {
           {/* Projection area */}
           <path
             d={`
-              M ${safeNum(allPoints.length > 1 ? ((dataPoints.length - 1) / (allPoints.length - 1)) * 400 : 200)},${
-                safeNum(140 - ((dataPoints[dataPoints.length - 1].value - minValue) / valueRange) * 130)
-              }
-              ${projections.map((d, i) => {
-                const x = safeNum(allPoints.length > 1 ? ((dataPoints.length + i) / (allPoints.length - 1)) * 400 : 200);
-                const y = safeNum(140 - ((d.value - minValue) / valueRange) * 130);
-                return `L ${x},${y}`;
-              }).join(" ")}
+              M ${safeNum(allPoints.length > 1 ? ((dataPoints.length - 1) / (allPoints.length - 1)) * 400 : 200)},${safeNum(
+                140 -
+                  ((dataPoints[dataPoints.length - 1].value - minValue) /
+                    valueRange) *
+                    130,
+              )}
+              ${projections
+                .map((d, i) => {
+                  const x = safeNum(
+                    allPoints.length > 1
+                      ? ((dataPoints.length + i) / (allPoints.length - 1)) * 400
+                      : 200,
+                  );
+                  const y = safeNum(
+                    140 - ((d.value - minValue) / valueRange) * 130,
+                  );
+                  return `L ${x},${y}`;
+                })
+                .join(" ")}
               L 400,140
               L ${safeNum(allPoints.length > 1 ? ((dataPoints.length - 1) / (allPoints.length - 1)) * 400 : 200)},140
               Z
@@ -163,8 +213,11 @@ export function CapacityProjection() {
           <div className="text-xs text-muted-foreground">Current Storage</div>
         </div>
         <div className="text-center p-3 bg-muted/50 rounded-lg">
-          <div className={`text-lg font-bold ${dailyGrowthBytes >= 0 ? "text-status-active" : "text-status-inactive"}`}>
-            {dailyGrowthBytes >= 0 ? "+" : ""}{formatBytes(Math.abs(dailyGrowthBytes))}/day
+          <div
+            className={`text-lg font-bold ${dailyGrowthBytes >= 0 ? "text-status-active" : "text-status-inactive"}`}
+          >
+            {dailyGrowthBytes >= 0 ? "+" : ""}
+            {formatBytes(Math.abs(dailyGrowthBytes))}/day
           </div>
           <div className="text-xs text-muted-foreground">Growth Rate</div>
         </div>
@@ -174,8 +227,11 @@ export function CapacityProjection() {
       {nextMilestone && milestoneProjection?.daysFromNow && (
         <div className="p-3 bg-brand-500/10 rounded-lg text-center">
           <div className="text-sm">
-            <span className="font-bold">{nextMilestone.label}</span> milestone projected in{" "}
-            <span className="font-bold">{milestoneProjection.daysFromNow} days</span>
+            <span className="font-bold">{nextMilestone.label}</span> milestone
+            projected in{" "}
+            <span className="font-bold">
+              {milestoneProjection.daysFromNow} days
+            </span>
           </div>
           <div className="text-xs text-muted-foreground mt-1">
             ~{milestoneProjection.date?.toLocaleDateString()}
@@ -186,7 +242,9 @@ export function CapacityProjection() {
       {/* Confidence indicator */}
       <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
         <span>Projection confidence:</span>
-        <span className={`font-medium ${r2 > 0.8 ? "text-status-active" : r2 > 0.5 ? "text-status-warning" : "text-status-inactive"}`}>
+        <span
+          className={`font-medium ${r2 > 0.8 ? "text-status-active" : r2 > 0.5 ? "text-status-warning" : "text-status-inactive"}`}
+        >
           {r2 > 0.8 ? "High" : r2 > 0.5 ? "Medium" : "Low"} (R²={r2.toFixed(2)})
         </span>
       </div>

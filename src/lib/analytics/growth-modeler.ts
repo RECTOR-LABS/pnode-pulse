@@ -98,17 +98,27 @@ const MILESTONE_DEFINITIONS = [
   { id: "nodes-100", name: "100 Nodes", target: 100, unit: "nodes" as const },
   { id: "nodes-250", name: "250 Nodes", target: 250, unit: "nodes" as const },
   { id: "nodes-500", name: "500 Nodes", target: 500, unit: "nodes" as const },
-  { id: "nodes-1000", name: "1,000 Nodes", target: 1000, unit: "nodes" as const },
+  {
+    id: "nodes-1000",
+    name: "1,000 Nodes",
+    target: 1000,
+    unit: "nodes" as const,
+  },
   { id: "storage-1pb", name: "1 PB Storage", target: 1, unit: "PB" as const },
   { id: "storage-5pb", name: "5 PB Storage", target: 5, unit: "PB" as const },
-  { id: "storage-10pb", name: "10 PB Storage", target: 10, unit: "PB" as const },
+  {
+    id: "storage-10pb",
+    name: "10 PB Storage",
+    target: 10,
+    unit: "PB" as const,
+  },
 ];
 
 /**
  * Calculate growth metrics from historical data
  */
 export function calculateGrowthMetrics(
-  history: GrowthDataPoint[]
+  history: GrowthDataPoint[],
 ): GrowthMetrics | null {
   if (history.length < 2) {
     return null;
@@ -116,29 +126,34 @@ export function calculateGrowthMetrics(
 
   // Sort by timestamp
   const sorted = [...history].sort(
-    (a, b) => a.timestamp.getTime() - b.timestamp.getTime()
+    (a, b) => a.timestamp.getTime() - b.timestamp.getTime(),
   );
 
   const latest = sorted[sorted.length - 1];
   const currentNodes = latest.totalNodes;
   const currentActiveNodes = latest.activeNodes;
-  const currentStorageTB = latest.totalStorageBytes / (1024 ** 4);
+  const currentStorageTB = latest.totalStorageBytes / 1024 ** 4;
 
   // Calculate daily growth rates using linear regression
-  const nodeGrowth = calculateDailyGrowth(sorted.map(d => ({
-    timestamp: d.timestamp,
-    value: d.totalNodes,
-  })));
+  const nodeGrowth = calculateDailyGrowth(
+    sorted.map((d) => ({
+      timestamp: d.timestamp,
+      value: d.totalNodes,
+    })),
+  );
 
-  const storageGrowth = calculateDailyGrowth(sorted.map(d => ({
-    timestamp: d.timestamp,
-    value: d.totalStorageBytes / (1024 ** 4),
-  })));
+  const storageGrowth = calculateDailyGrowth(
+    sorted.map((d) => ({
+      timestamp: d.timestamp,
+      value: d.totalStorageBytes / 1024 ** 4,
+    })),
+  );
 
   // Calculate churn rate
-  const churnRate = currentNodes > 0
-    ? ((currentNodes - currentActiveNodes) / currentNodes) * 100
-    : 0;
+  const churnRate =
+    currentNodes > 0
+      ? ((currentNodes - currentActiveNodes) / currentNodes) * 100
+      : 0;
 
   // Net growth (accounting for churn - simplified)
   const netGrowthRate = nodeGrowth.dailyRate * (1 - churnRate / 100);
@@ -163,28 +178,30 @@ interface GrowthRate {
 }
 
 function calculateDailyGrowth(
-  data: Array<{ timestamp: Date; value: number }>
+  data: Array<{ timestamp: Date; value: number }>,
 ): GrowthRate {
   if (data.length < 2) {
     return { dailyRate: 0, acceleration: 0, rSquared: 0 };
   }
 
   const firstTimestamp = data[0].timestamp.getTime();
-  const points = data.map(d => ({
+  const points = data.map((d) => ({
     x: (d.timestamp.getTime() - firstTimestamp) / (1000 * 60 * 60 * 24), // days
     y: d.value,
   }));
 
   // Linear regression
   const n = points.length;
-  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0, sumYY = 0;
+  let sumX = 0,
+    sumY = 0,
+    sumXY = 0,
+    sumXX = 0;
 
   for (const { x, y } of points) {
     sumX += x;
     sumY += y;
     sumXY += x * y;
     sumXX += x * x;
-    sumYY += y * y;
   }
 
   const denominator = n * sumXX - sumX * sumX;
@@ -196,7 +213,8 @@ function calculateDailyGrowth(
 
   // R-squared
   const yMean = sumY / n;
-  let ssRes = 0, ssTot = 0;
+  let ssRes = 0,
+    ssTot = 0;
   for (const { x, y } of points) {
     const predicted = slope * x + (sumY - slope * sumX) / n;
     ssRes += Math.pow(y - predicted, 2);
@@ -221,7 +239,10 @@ function calculateSimpleSlope(points: Array<{ x: number; y: number }>): number {
   if (points.length < 2) return 0;
 
   const n = points.length;
-  let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+  let sumX = 0,
+    sumY = 0,
+    sumXY = 0,
+    sumXX = 0;
 
   for (const { x, y } of points) {
     sumX += x;
@@ -247,29 +268,48 @@ function determineTrend(growth: GrowthRate): GrowthMetrics["nodeTrend"] {
  * Generate scenario forecasts
  */
 export function generateScenarioForecasts(
-  metrics: GrowthMetrics
+  metrics: GrowthMetrics,
 ): ScenarioForecast[] {
   const scenarios: ScenarioForecast[] = [];
-  const now = new Date();
 
   for (const [scenarioName, config] of Object.entries(SCENARIO_CONFIG)) {
     const scenario = scenarioName as keyof typeof SCENARIO_CONFIG;
-    const adjustedNodeGrowth = metrics.dailyNodeGrowth * config.growthMultiplier;
-    const adjustedStorageGrowth = metrics.dailyStorageGrowthTB * config.growthMultiplier;
+    const adjustedNodeGrowth =
+      metrics.dailyNodeGrowth * config.growthMultiplier;
+    const adjustedStorageGrowth =
+      metrics.dailyStorageGrowthTB * config.growthMultiplier;
     const adjustedChurn = metrics.churnRate * config.churnReduction;
 
     // Generate predictions
     const predictions = {
-      days30: generateForecastPoint(30, metrics, adjustedNodeGrowth, adjustedStorageGrowth, adjustedChurn),
-      days60: generateForecastPoint(60, metrics, adjustedNodeGrowth, adjustedStorageGrowth, adjustedChurn),
-      days90: generateForecastPoint(90, metrics, adjustedNodeGrowth, adjustedStorageGrowth, adjustedChurn),
+      days30: generateForecastPoint(
+        30,
+        metrics,
+        adjustedNodeGrowth,
+        adjustedStorageGrowth,
+        adjustedChurn,
+      ),
+      days60: generateForecastPoint(
+        60,
+        metrics,
+        adjustedNodeGrowth,
+        adjustedStorageGrowth,
+        adjustedChurn,
+      ),
+      days90: generateForecastPoint(
+        90,
+        metrics,
+        adjustedNodeGrowth,
+        adjustedStorageGrowth,
+        adjustedChurn,
+      ),
     };
 
     // Calculate milestones
     const milestones = calculateMilestones(
       metrics,
       adjustedNodeGrowth,
-      adjustedStorageGrowth
+      adjustedStorageGrowth,
     );
 
     scenarios.push({
@@ -289,19 +329,20 @@ function generateForecastPoint(
   metrics: GrowthMetrics,
   dailyNodeGrowth: number,
   dailyStorageGrowth: number,
-  churnRate: number
+  churnRate: number,
 ): ForecastPoint {
   const futureDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
   const predictedNodes = Math.round(
-    metrics.currentNodes + dailyNodeGrowth * days
+    metrics.currentNodes + dailyNodeGrowth * days,
   );
 
   // Active nodes accounting for churn
   const activeRatio = 1 - churnRate / 100;
   const predictedActiveNodes = Math.round(predictedNodes * activeRatio);
 
-  const predictedStorageTB = metrics.currentStorageTB + dailyStorageGrowth * days;
+  const predictedStorageTB =
+    metrics.currentStorageTB + dailyStorageGrowth * days;
 
   // Confidence decreases with time
   const confidence = Math.max(0.3, 1 - days * 0.005);
@@ -318,7 +359,7 @@ function generateForecastPoint(
 function calculateMilestones(
   metrics: GrowthMetrics,
   dailyNodeGrowth: number,
-  dailyStorageGrowth: number
+  dailyStorageGrowth: number,
 ): Milestone[] {
   const milestones: Milestone[] = [];
 
@@ -334,8 +375,11 @@ function calculateMilestones(
 
       if (!achieved && dailyNodeGrowth > 0) {
         daysUntil = Math.ceil((def.target - currentProgress) / dailyNodeGrowth);
-        if (daysUntil > 0 && daysUntil < 365 * 3) { // Cap at 3 years
-          estimatedDate = new Date(Date.now() + daysUntil * 24 * 60 * 60 * 1000);
+        if (daysUntil > 0 && daysUntil < 365 * 3) {
+          // Cap at 3 years
+          estimatedDate = new Date(
+            Date.now() + daysUntil * 24 * 60 * 60 * 1000,
+          );
         }
       }
     } else if (def.unit === "PB") {
@@ -347,7 +391,9 @@ function calculateMilestones(
         const dailyGrowthPB = dailyStorageGrowth / 1024;
         daysUntil = Math.ceil((def.target - currentPB) / dailyGrowthPB);
         if (daysUntil > 0 && daysUntil < 365 * 3) {
-          estimatedDate = new Date(Date.now() + daysUntil * 24 * 60 * 60 * 1000);
+          estimatedDate = new Date(
+            Date.now() + daysUntil * 24 * 60 * 60 * 1000,
+          );
         }
       }
     }
@@ -372,7 +418,7 @@ function calculateMilestones(
  */
 export function generateGrowthReport(
   history: GrowthDataPoint[],
-  periodDays: number = 30
+  periodDays: number = 30,
 ): GrowthReport | null {
   const metrics = calculateGrowthMetrics(history);
   if (!metrics) {
@@ -381,35 +427,43 @@ export function generateGrowthReport(
 
   const scenarios = generateScenarioForecasts(metrics);
   const now = new Date();
-  const periodStart = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
+  const periodStart = new Date(
+    now.getTime() - periodDays * 24 * 60 * 60 * 1000,
+  );
 
   // Generate highlights
   const highlights: string[] = [];
 
   if (metrics.nodeTrend === "accelerating") {
-    highlights.push(`Network growth is accelerating at ${metrics.dailyNodeGrowth.toFixed(1)} nodes/day`);
+    highlights.push(
+      `Network growth is accelerating at ${metrics.dailyNodeGrowth.toFixed(1)} nodes/day`,
+    );
   } else if (metrics.nodeTrend === "declining") {
     highlights.push("Warning: Network is shrinking");
   }
 
   if (metrics.churnRate > 20) {
-    highlights.push(`High churn rate: ${metrics.churnRate.toFixed(1)}% of nodes inactive`);
+    highlights.push(
+      `High churn rate: ${metrics.churnRate.toFixed(1)}% of nodes inactive`,
+    );
   } else if (metrics.churnRate < 5) {
     highlights.push("Excellent node retention");
   }
 
   // Check for upcoming milestones
   const upcomingMilestones = scenarios[1].milestones // baseline scenario
-    .filter(m => !m.achieved && m.daysUntil !== null && m.daysUntil <= 90)
+    .filter((m) => !m.achieved && m.daysUntil !== null && m.daysUntil <= 90)
     .sort((a, b) => (a.daysUntil ?? Infinity) - (b.daysUntil ?? Infinity));
 
   if (upcomingMilestones.length > 0) {
     const next = upcomingMilestones[0];
-    highlights.push(`${next.name} milestone expected in ~${next.daysUntil} days`);
+    highlights.push(
+      `${next.name} milestone expected in ~${next.daysUntil} days`,
+    );
   }
 
   // Recently achieved milestones
-  const achievedMilestones = scenarios[1].milestones.filter(m => m.achieved);
+  const achievedMilestones = scenarios[1].milestones.filter((m) => m.achieved);
   if (achievedMilestones.length > 0) {
     const latest = achievedMilestones[achievedMilestones.length - 1];
     highlights.push(`Achieved: ${latest.name}`);
@@ -444,18 +498,21 @@ export interface ScenarioComparison {
 }
 
 export function compareScenarios(
-  scenarios: ScenarioForecast[]
+  scenarios: ScenarioForecast[],
 ): ScenarioComparison[] {
-  const timeframes: Array<{ key: "30d" | "60d" | "90d"; days: "days30" | "days60" | "days90" }> = [
+  const timeframes: Array<{
+    key: "30d" | "60d" | "90d";
+    days: "days30" | "days60" | "days90";
+  }> = [
     { key: "30d", days: "days30" },
     { key: "60d", days: "days60" },
     { key: "90d", days: "days90" },
   ];
 
   return timeframes.map(({ key, days }) => {
-    const optimistic = scenarios.find(s => s.scenario === "optimistic")!;
-    const baseline = scenarios.find(s => s.scenario === "baseline")!;
-    const pessimistic = scenarios.find(s => s.scenario === "pessimistic")!;
+    const optimistic = scenarios.find((s) => s.scenario === "optimistic")!;
+    const baseline = scenarios.find((s) => s.scenario === "baseline")!;
+    const pessimistic = scenarios.find((s) => s.scenario === "pessimistic")!;
 
     const optPred = optimistic.predictions[days];
     const basePred = baseline.predictions[days];

@@ -7,14 +7,15 @@ import { trpc } from "@/lib/trpc/client";
 import { formatRelativeTime, formatAddress } from "@/lib/utils/format";
 
 export default function MyNodesPage() {
-  const { user, token, isAuthenticated } = useAuth();
+  const { token, isAuthenticated } = useAuth();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("");
 
-  const { data: claims, isLoading, refetch } = trpc.claims.list.useQuery(
-    { token: token || "" },
-    { enabled: !!token }
-  );
+  const {
+    data: claims,
+    isLoading,
+    refetch,
+  } = trpc.claims.list.useQuery({ token: token || "" }, { enabled: !!token });
 
   const updateMutation = trpc.claims.updateDisplayName.useMutation({
     onSuccess: () => {
@@ -41,7 +42,7 @@ export default function MyNodesPage() {
   const verifiedClaims = claims?.filter((c) => c.status === "VERIFIED") || [];
   const pendingClaims = claims?.filter((c) => c.status === "PENDING") || [];
 
-  const startEditing = (claim: typeof verifiedClaims[0]) => {
+  const startEditing = (claim: (typeof verifiedClaims)[0]) => {
     setEditingId(claim.id);
     setDisplayName(claim.displayName || "");
   };
@@ -57,7 +58,11 @@ export default function MyNodesPage() {
 
   const handleRelease = (claimId: string) => {
     if (!token) return;
-    if (!confirm("Are you sure you want to release this claim? You will need to verify again to reclaim.")) {
+    if (
+      !confirm(
+        "Are you sure you want to release this claim? You will need to verify again to reclaim.",
+      )
+    ) {
       return;
     }
     releaseMutation.mutate({ token, claimId });
@@ -83,7 +88,10 @@ export default function MyNodesPage() {
       {isLoading ? (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="border border-border rounded-xl p-4 animate-pulse">
+            <div
+              key={i}
+              className="border border-border rounded-xl p-4 animate-pulse"
+            >
               <div className="h-5 bg-muted rounded w-1/3 mb-2" />
               <div className="h-4 bg-muted rounded w-1/2" />
             </div>
@@ -100,7 +108,10 @@ export default function MyNodesPage() {
               </h2>
               <div className="space-y-4">
                 {verifiedClaims.map((claim) => (
-                  <div key={claim.id} className="border border-border rounded-xl p-4">
+                  <div
+                    key={claim.id}
+                    className="border border-border rounded-xl p-4"
+                  >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         {editingId === claim.id ? (
@@ -133,15 +144,28 @@ export default function MyNodesPage() {
                               href={`/nodes/${claim.nodeId}`}
                               className="font-medium hover:text-brand-500 transition-colors"
                             >
-                              {claim.displayName || (claim.node ? formatAddress(claim.node.address) : `Node #${claim.nodeId}`)}
+                              {claim.displayName ||
+                                (claim.node
+                                  ? formatAddress(claim.node.address)
+                                  : `Node #${claim.nodeId}`)}
                             </Link>
                             <button
                               onClick={() => startEditing(claim)}
                               className="p-1 text-muted-foreground hover:text-foreground"
                               title="Edit display name"
                             >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                                />
                               </svg>
                             </button>
                           </div>
@@ -149,7 +173,9 @@ export default function MyNodesPage() {
 
                         <div className="text-sm text-muted-foreground">
                           {claim.node && (
-                            <span className="font-mono">{claim.node.address}</span>
+                            <span className="font-mono">
+                              {claim.node.address}
+                            </span>
                           )}
                           {claim.node?.version && (
                             <span className="ml-2 px-1.5 py-0.5 text-xs bg-muted rounded">
@@ -159,17 +185,26 @@ export default function MyNodesPage() {
                         </div>
 
                         <div className="text-xs text-muted-foreground mt-2">
-                          Claimed {claim.claimedAt ? formatRelativeTime(new Date(claim.claimedAt)) : "recently"}
+                          Claimed{" "}
+                          {claim.claimedAt
+                            ? formatRelativeTime(new Date(claim.claimedAt))
+                            : "recently"}
                           {" • "}
-                          {claim.verificationMethod.replace(/_/g, " ").toLowerCase()}
+                          {claim.verificationMethod
+                            .replace(/_/g, " ")
+                            .toLowerCase()}
                         </div>
                       </div>
 
                       <div className="flex items-center gap-3">
                         {claim.node?.isActive ? (
-                          <span className="status-badge status-badge-active">Active</span>
+                          <span className="status-badge status-badge-active">
+                            Active
+                          </span>
                         ) : (
-                          <span className="status-badge status-badge-inactive">Inactive</span>
+                          <span className="status-badge status-badge-inactive">
+                            Inactive
+                          </span>
                         )}
                         <button
                           onClick={() => handleRelease(claim.id)}
@@ -194,17 +229,25 @@ export default function MyNodesPage() {
               </h2>
               <div className="space-y-4">
                 {pendingClaims.map((claim) => (
-                  <div key={claim.id} className="border border-yellow-500/30 bg-yellow-500/5 rounded-xl p-4">
+                  <div
+                    key={claim.id}
+                    className="border border-yellow-500/30 bg-yellow-500/5 rounded-xl p-4"
+                  >
                     <div className="flex items-start justify-between">
                       <div>
                         <Link
                           href={`/nodes/${claim.nodeId}`}
                           className="font-medium hover:text-brand-500 transition-colors"
                         >
-                          {claim.node ? formatAddress(claim.node.address) : `Node #${claim.nodeId}`}
+                          {claim.node
+                            ? formatAddress(claim.node.address)
+                            : `Node #${claim.nodeId}`}
                         </Link>
                         <div className="text-sm text-muted-foreground mt-1">
-                          Verification pending • {claim.verificationMethod.replace(/_/g, " ").toLowerCase()}
+                          Verification pending •{" "}
+                          {claim.verificationMethod
+                            .replace(/_/g, " ")
+                            .toLowerCase()}
                         </div>
                       </div>
                       <Link
@@ -224,20 +267,41 @@ export default function MyNodesPage() {
           {verifiedClaims.length === 0 && pendingClaims.length === 0 && (
             <div className="text-center py-16 border border-dashed border-border rounded-xl">
               <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
-                <svg className="w-8 h-8 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
+                <svg
+                  className="w-8 h-8 text-muted-foreground"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 12h14M12 5l7 7-7 7"
+                  />
                 </svg>
               </div>
               <h3 className="text-lg font-medium mb-2">No Claimed Nodes</h3>
               <p className="text-muted-foreground mb-4">
-                Claim ownership of your pNodes to manage them from your dashboard
+                Claim ownership of your pNodes to manage them from your
+                dashboard
               </p>
               <Link
                 href="/nodes"
                 className="inline-flex items-center gap-2 px-4 py-2 bg-brand-500 text-white rounded-lg hover:bg-brand-600 transition-colors"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
                 </svg>
                 Browse Nodes
               </Link>

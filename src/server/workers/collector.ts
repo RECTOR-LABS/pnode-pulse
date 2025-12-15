@@ -12,7 +12,11 @@ import { db } from "@/lib/db";
 import { createClient, PUBLIC_PNODES, PRPCError } from "@/lib/prpc";
 import { publishNetworkUpdate, publishMetricsUpdate } from "@/lib/redis/pubsub";
 import { fetchGeolocationBatch } from "@/lib/geolocation";
-import type { PNodeStats, PodsWithStatsResult, PNodeVersion } from "@/types/prpc";
+import type {
+  PNodeStats,
+  PodsWithStatsResult,
+  PNodeVersion,
+} from "@/types/prpc";
 import { logger } from "@/lib/logger";
 
 const COLLECTION_INTERVAL = 30 * 1000; // 30 seconds
@@ -51,11 +55,12 @@ async function collectFromNode(address: string): Promise<CollectionResult> {
       pods,
     };
   } catch (error) {
-    const message = error instanceof PRPCError
-      ? `${error.code}: ${error.message}`
-      : error instanceof Error
-        ? error.message
-        : "Unknown error";
+    const message =
+      error instanceof PRPCError
+        ? `${error.code}: ${error.message}`
+        : error instanceof Error
+          ? error.message
+          : "Unknown error";
 
     return {
       address: `${ip}:${PRPC_PORT}`,
@@ -79,7 +84,7 @@ async function getOrCreateNode(
   pubkey?: string | null,
   version?: string,
   isPublic?: boolean | null,
-  rpcPort?: number | null
+  rpcPort?: number | null,
 ) {
   // Strategy 1: Try to find by pubkey first (preferred - pubkey is immutable)
   if (pubkey) {
@@ -111,7 +116,8 @@ async function getOrCreateNode(
           address, // Update to new address
           gossipAddress: address.replace(`:${PRPC_PORT}`, ":9001"),
           version: version ?? existingByPubkey.version,
-          isPublic: isPublic !== undefined ? isPublic : existingByPubkey.isPublic,
+          isPublic:
+            isPublic !== undefined ? isPublic : existingByPubkey.isPublic,
           rpcPort: rpcPort !== undefined ? rpcPort : existingByPubkey.rpcPort,
         },
       });
@@ -136,7 +142,8 @@ async function getOrCreateNode(
           version: version ?? existingByAddress.version,
           // Only set pubkey if it doesn't already exist (first time seeing it)
           pubkey: existingByAddress.pubkey ?? pubkey,
-          isPublic: isPublic !== undefined ? isPublic : existingByAddress.isPublic,
+          isPublic:
+            isPublic !== undefined ? isPublic : existingByAddress.isPublic,
           rpcPort: rpcPort !== undefined ? rpcPort : existingByAddress.rpcPort,
         },
       });
@@ -164,7 +171,7 @@ async function saveMetrics(
   nodeId: number,
   stats: PNodeStats,
   storageCommitted?: bigint | null,
-  storageUsagePercent?: number | null
+  storageUsagePercent?: number | null,
 ) {
   await db.nodeMetric.create({
     data: {
@@ -181,8 +188,10 @@ async function saveMetrics(
       packetsSent: stats.packets_sent,
       activeStreams: stats.active_streams,
       // v0.7.0+ fields from get-pods-with-stats
-      storageCommitted: storageCommitted !== undefined ? storageCommitted : null,
-      storageUsagePercent: storageUsagePercent !== undefined ? storageUsagePercent : null,
+      storageCommitted:
+        storageCommitted !== undefined ? storageCommitted : null,
+      storageUsagePercent:
+        storageUsagePercent !== undefined ? storageUsagePercent : null,
     },
   });
 }
@@ -205,7 +214,7 @@ async function savePartialMetrics(
   uptime: number,
   storageCommitted: bigint | null,
   storageUsed: bigint | null,
-  storageUsagePercent: number | null
+  storageUsagePercent: number | null,
 ) {
   await db.nodeMetric.create({
     data: {
@@ -233,7 +242,11 @@ async function savePartialMetrics(
 /**
  * Update node status
  */
-async function updateNodeStatus(nodeId: number, isActive: boolean, version?: string) {
+async function updateNodeStatus(
+  nodeId: number,
+  isActive: boolean,
+  version?: string,
+) {
   await db.node.update({
     where: { id: nodeId },
     data: {
@@ -313,7 +326,10 @@ async function discoverNodes(results: CollectionResult[]) {
           // Update our local tracking
           knownAddresses.delete(existing.address);
           knownAddresses.add(rpcAddress);
-          knownPubkeys.set(pod.pubkey, { id: existing.id, address: rpcAddress });
+          knownPubkeys.set(pod.pubkey, {
+            id: existing.id,
+            address: rpcAddress,
+          });
         }
         continue; // Node already exists
       }
@@ -341,7 +357,9 @@ async function discoverNodes(results: CollectionResult[]) {
 
   // Process IP changes
   if (ipChanges.length > 0) {
-    logger.info("Detected IP address changes during discovery", { count: ipChanges.length });
+    logger.info("Detected IP address changes during discovery", {
+      count: ipChanges.length,
+    });
 
     for (const change of ipChanges) {
       try {
@@ -426,20 +444,23 @@ async function discoverNodes(results: CollectionResult[]) {
  */
 async function processPrivateNodeMetrics(
   results: CollectionResult[],
-  successfulAddresses: Set<string>
+  successfulAddresses: Set<string>,
 ) {
   // Collect all pod data from successful queries, deduplicated by pubkey/address
-  const podDataMap = new Map<string, {
-    nodeId?: number;
-    address: string;
-    pubkey: string | null;
-    uptime: number;
-    storageCommitted: bigint | null;
-    storageUsed: bigint | null;
-    storageUsagePercent: number | null;
-    isPublic: boolean | null;
-    version: string;
-  }>();
+  const podDataMap = new Map<
+    string,
+    {
+      nodeId?: number;
+      address: string;
+      pubkey: string | null;
+      uptime: number;
+      storageCommitted: bigint | null;
+      storageUsed: bigint | null;
+      storageUsagePercent: number | null;
+      isPublic: boolean | null;
+      version: string;
+    }
+  >();
 
   for (const result of results) {
     if (!result.success || !result.pods) continue;
@@ -459,8 +480,10 @@ async function processPrivateNodeMetrics(
         address: rpcAddress,
         pubkey: pod.pubkey,
         uptime: pod.uptime,
-        storageCommitted: pod.storage_committed !== null ? BigInt(pod.storage_committed) : null,
-        storageUsed: pod.storage_used !== null ? BigInt(pod.storage_used) : null,
+        storageCommitted:
+          pod.storage_committed !== null ? BigInt(pod.storage_committed) : null,
+        storageUsed:
+          pod.storage_used !== null ? BigInt(pod.storage_used) : null,
         storageUsagePercent: pod.storage_usage_percent,
         isPublic: pod.is_public,
         version: pod.version,
@@ -489,7 +512,7 @@ async function processPrivateNodeMetrics(
 
   // Save partial metrics and update node status
   let savedCount = 0;
-  for (const [key, podData] of podDataMap) {
+  for (const [, podData] of podDataMap) {
     // Find node ID by pubkey first, then address
     let nodeId = podData.pubkey ? pubkeyToId.get(podData.pubkey) : undefined;
     if (!nodeId) {
@@ -507,7 +530,7 @@ async function processPrivateNodeMetrics(
       podData.uptime,
       podData.storageCommitted,
       podData.storageUsed,
-      podData.storageUsagePercent
+      podData.storageUsagePercent,
     );
 
     // Update node status - mark as active since we see it in gossip
@@ -526,7 +549,9 @@ async function processPrivateNodeMetrics(
   }
 
   if (savedCount > 0) {
-    logger.info("Saved partial metrics for private nodes", { count: savedCount });
+    logger.info("Saved partial metrics for private nodes", {
+      count: savedCount,
+    });
   }
 }
 
@@ -619,7 +644,10 @@ async function updateNodeGeolocation() {
   }
 
   if (updated > 0) {
-    logger.info("Updated node geolocation", { updated, total: nodesWithoutGeo.length });
+    logger.info("Updated node geolocation", {
+      updated,
+      total: nodesWithoutGeo.length,
+    });
   }
 }
 
@@ -627,15 +655,17 @@ async function updateNodeGeolocation() {
  * Compute and store network stats
  */
 async function computeNetworkStats() {
-  const result = await db.$queryRaw<Array<{
-    total_nodes: bigint;
-    active_nodes: bigint;
-    total_storage: bigint;
-    avg_cpu: number;
-    avg_ram_percent: number;
-    avg_uptime: number;
-    total_peers: bigint;
-  }>>`
+  const result = await db.$queryRaw<
+    Array<{
+      total_nodes: bigint;
+      active_nodes: bigint;
+      total_storage: bigint;
+      avg_cpu: number;
+      avg_ram_percent: number;
+      avg_uptime: number;
+      total_peers: bigint;
+    }>
+  >`
     WITH latest_metrics AS (
       SELECT DISTINCT ON (node_id) *
       FROM node_metrics
@@ -689,8 +719,8 @@ async function computeNetworkStats() {
     await publishNetworkUpdate(
       Number(stats.total_nodes),
       Number(stats.active_nodes),
-      Number(stats.total_nodes) - Number(stats.active_nodes)
-    ).catch((err) => logger.error('Failed to publish network update', err));
+      Number(stats.total_nodes) - Number(stats.active_nodes),
+    ).catch((err) => logger.error("Failed to publish network update", err));
   }
 }
 
@@ -704,7 +734,7 @@ export async function runCollection(): Promise<{
   discovered: number;
 }> {
   const startTime = Date.now();
-  logger.info('Starting collection cycle');
+  logger.info("Starting collection cycle");
 
   // Create job record
   const job = await db.collectionJob.create({
@@ -729,7 +759,7 @@ export async function runCollection(): Promise<{
     }
 
     const addresses = Array.from(allAddresses);
-    logger.info('Collecting from nodes', { count: addresses.length });
+    logger.info("Collecting from nodes", { count: addresses.length });
 
     // Collect from all nodes in parallel
     const results = await Promise.all(addresses.map(collectFromNode));
@@ -768,24 +798,30 @@ export async function runCollection(): Promise<{
         undefined,
         result.version?.version,
         isPublic,
-        rpcPort
+        rpcPort,
       );
 
       if (result.success && result.stats) {
-        await saveMetrics(node.id, result.stats, storageCommitted, storageUsagePercent);
+        await saveMetrics(
+          node.id,
+          result.stats,
+          storageCommitted,
+          storageUsagePercent,
+        );
         await updateNodeStatus(node.id, true, result.version?.version);
         successfulAddresses.add(result.address); // Track successful query
 
         // Publish real-time metrics update
-        const ramPercent = result.stats.ram_total > 0
-          ? (result.stats.ram_used / result.stats.ram_total) * 100
-          : 0;
+        const ramPercent =
+          result.stats.ram_total > 0
+            ? (result.stats.ram_used / result.stats.ram_total) * 100
+            : 0;
         await publishMetricsUpdate(
           node.id,
           result.stats.cpu_percent,
           ramPercent,
           result.stats.uptime,
-          Number(result.stats.file_size)
+          Number(result.stats.file_size),
         ).catch(() => {}); // Silently ignore publish errors
 
         if (result.pods) {
@@ -796,7 +832,10 @@ export async function runCollection(): Promise<{
       } else {
         await updateNodeStatus(node.id, false);
         failedCount++;
-        logger.warn('Collection failed for node', { address: result.address, error: result.error });
+        logger.warn("Collection failed for node", {
+          address: result.address,
+          error: result.error,
+        });
       }
     }
 
@@ -831,15 +870,16 @@ export async function runCollection(): Promise<{
     const duration = Date.now() - startTime;
 
     // Count v0.7.0+ nodes with rich stats
-    const nodesWithStorageStats = results.filter((r) =>
-      r.success && r.pods?.pods.some((p) => p.storage_committed !== null)
+    const nodesWithStorageStats = results.filter(
+      (r) =>
+        r.success && r.pods?.pods.some((p) => p.storage_committed !== null),
     ).length;
 
-    const v070Nodes = results.filter((r) =>
-      r.success && r.version?.version.startsWith('0.7')
+    const v070Nodes = results.filter(
+      (r) => r.success && r.version?.version.startsWith("0.7"),
     ).length;
 
-    logger.info('Collection cycle completed', {
+    logger.info("Collection cycle completed", {
       durationMs: duration,
       total: addresses.length,
       success: successCount,
@@ -856,7 +896,10 @@ export async function runCollection(): Promise<{
       discovered,
     };
   } catch (error) {
-    logger.error('Collection cycle failed', error instanceof Error ? error : new Error(String(error)));
+    logger.error(
+      "Collection cycle failed",
+      error instanceof Error ? error : new Error(String(error)),
+    );
 
     await db.collectionJob.update({
       where: { id: job.id },
@@ -875,7 +918,7 @@ export async function runCollection(): Promise<{
  * Start the collector worker
  */
 export function startCollector() {
-  logger.info('Starting collector worker', { intervalMs: COLLECTION_INTERVAL });
+  logger.info("Starting collector worker", { intervalMs: COLLECTION_INTERVAL });
 
   let currentCollection: Promise<void> | null = null;
   let isShuttingDown = false;
@@ -883,38 +926,42 @@ export function startCollector() {
   // Run immediately
   currentCollection = runCollection()
     .then(() => {})
-    .catch((err) => logger.error('Collection failed', err))
-    .finally(() => { currentCollection = null; });
+    .catch((err) => logger.error("Collection failed", err))
+    .finally(() => {
+      currentCollection = null;
+    });
 
   // Then run on interval
   const interval = setInterval(() => {
     // Skip if already running or shutting down
     if (currentCollection || isShuttingDown) {
-      logger.debug('Skipping collection (already running or shutting down)');
+      logger.debug("Skipping collection (already running or shutting down)");
       return;
     }
 
     currentCollection = runCollection()
       .then(() => {})
-      .catch((err) => logger.error('Collection failed', err))
-      .finally(() => { currentCollection = null; });
+      .catch((err) => logger.error("Collection failed", err))
+      .finally(() => {
+        currentCollection = null;
+      });
   }, COLLECTION_INTERVAL);
 
   // Return cleanup function with verification
   return async () => {
-    logger.info('Stopping collector worker');
+    logger.info("Stopping collector worker");
     isShuttingDown = true;
 
     // Clear interval
     clearInterval(interval);
-    logger.debug('Interval cleared');
+    logger.debug("Interval cleared");
 
     // Wait for any in-flight collection to complete
     if (currentCollection) {
-      logger.info('Waiting for in-flight collection to complete');
+      logger.info("Waiting for in-flight collection to complete");
       await currentCollection;
     }
 
-    logger.info('Collector cleanup complete');
+    logger.info("Collector cleanup complete");
   };
 }

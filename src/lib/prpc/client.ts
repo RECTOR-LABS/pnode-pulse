@@ -13,7 +13,6 @@
  */
 
 import { request } from "undici";
-import { logger } from "@/lib/logger";
 import {
   type JsonRpcRequest,
   type JsonRpcResponse,
@@ -105,7 +104,10 @@ export class PRPCClient {
         lastError = error instanceof Error ? error : new Error(String(error));
 
         // Don't retry on RPC errors (they're deterministic)
-        if (error instanceof PRPCError && error.code === PRPCErrorCode.RPC_ERROR) {
+        if (
+          error instanceof PRPCError &&
+          error.code === PRPCErrorCode.RPC_ERROR
+        ) {
           throw error;
         }
 
@@ -139,26 +141,21 @@ export class PRPCClient {
       });
 
       if (statusCode !== 200) {
-        throw new PRPCError(
-          `HTTP ${statusCode}`,
-          PRPCErrorCode.NETWORK_ERROR
-        );
+        throw new PRPCError(`HTTP ${statusCode}`, PRPCErrorCode.NETWORK_ERROR);
       }
 
-      const data: JsonRpcResponse<T> = await body.json() as JsonRpcResponse<T>;
+      const data: JsonRpcResponse<T> =
+        (await body.json()) as JsonRpcResponse<T>;
 
       if (data.error) {
         throw new PRPCError(
           data.error.message || "RPC error",
-          PRPCErrorCode.RPC_ERROR
+          PRPCErrorCode.RPC_ERROR,
         );
       }
 
       if (data.result === undefined) {
-        throw new PRPCError(
-          "No result in response",
-          PRPCErrorCode.PARSE_ERROR
-        );
+        throw new PRPCError("No result in response", PRPCErrorCode.PARSE_ERROR);
       }
 
       return data.result;
@@ -172,21 +169,14 @@ export class PRPCClient {
           throw new PRPCError(
             `Request timed out after ${this.timeout}ms`,
             PRPCErrorCode.TIMEOUT,
-            error
+            error,
           );
         }
 
-        throw new PRPCError(
-          error.message,
-          PRPCErrorCode.NETWORK_ERROR,
-          error
-        );
+        throw new PRPCError(error.message, PRPCErrorCode.NETWORK_ERROR, error);
       }
 
-      throw new PRPCError(
-        "Unknown error",
-        PRPCErrorCode.NETWORK_ERROR
-      );
+      throw new PRPCError("Unknown error", PRPCErrorCode.NETWORK_ERROR);
     } finally {
       clearTimeout(timeoutId);
     }
@@ -222,7 +212,10 @@ export class PRPCClient {
 /**
  * Create a PRPCClient instance from an IP address
  */
-export function createClient(ip: string, options?: Partial<PRPCClientConfig>): PRPCClient {
+export function createClient(
+  ip: string,
+  options?: Partial<PRPCClientConfig>,
+): PRPCClient {
   return new PRPCClient({
     baseUrl: `http://${ip}:6000`,
     ...options,
@@ -252,7 +245,10 @@ function getSeedNodes(): string[] {
   const envNodes = process.env.PRPC_SEED_NODES;
 
   if (envNodes) {
-    const nodes = envNodes.split(',').map((ip) => ip.trim()).filter(Boolean);
+    const nodes = envNodes
+      .split(",")
+      .map((ip) => ip.trim())
+      .filter(Boolean);
     if (nodes.length > 0) {
       return nodes;
     }

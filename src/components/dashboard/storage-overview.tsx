@@ -1,15 +1,21 @@
 "use client";
 
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Database, HardDrive } from "lucide-react";
+import { Database } from "lucide-react";
 import { formatBytes, formatPercent } from "@/lib/utils/format";
 
 export function StorageOverview() {
   const { data, isLoading } = trpc.analytics.storageStats.useQuery(
     undefined,
-    { refetchInterval: 30000 } // Refresh every 30s
+    { refetchInterval: 30000 }, // Refresh every 30s
   );
 
   if (isLoading) {
@@ -47,7 +53,9 @@ export function StorageOverview() {
         {/* Total Committed */}
         <div>
           <div className="flex justify-between items-baseline mb-2">
-            <span className="text-sm text-muted-foreground">Total Committed</span>
+            <span className="text-sm text-muted-foreground">
+              Total Committed
+            </span>
             <span className="text-2xl font-bold">
               {formatBytes(data.totalCommitted)}
             </span>
@@ -64,9 +72,10 @@ export function StorageOverview() {
             </span>
           </div>
           <Progress
-            value={data.totalCommitted > 0
-              ? (data.totalUsed / data.totalCommitted) * 100
-              : 0
+            value={
+              data.totalCommitted > 0
+                ? (data.totalUsed / data.totalCommitted) * 100
+                : 0
             }
             className="h-2"
           />
@@ -87,13 +96,17 @@ export function StorageOverview() {
         <div className="grid grid-cols-2 gap-4 pt-4 border-t">
           <div className="text-center">
             <div className="text-2xl font-bold">{data.nodesWithStats}</div>
-            <div className="text-xs text-muted-foreground">With Storage Data</div>
+            <div className="text-xs text-muted-foreground">
+              With Storage Data
+            </div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold">
               {((data.nodesWithStats / data.totalNodes) * 100).toFixed(0)}%
             </div>
-            <div className="text-xs text-muted-foreground">v0.7.0+ Adoption</div>
+            <div className="text-xs text-muted-foreground">
+              v0.7.0+ Adoption
+            </div>
           </div>
         </div>
       </CardContent>

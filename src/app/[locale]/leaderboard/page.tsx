@@ -3,14 +3,23 @@
 import { useState } from "react";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc/client";
-import { formatBytes, formatUptime, formatPercent, formatAddress } from "@/lib/utils/format";
+import {
+  formatBytes,
+  formatUptime,
+  formatPercent,
+  formatAddress,
+} from "@/lib/utils/format";
 
 type Metric = "uptime" | "cpu" | "ram" | "storage";
 type Order = "top" | "bottom";
 
 const METRICS: { value: Metric; label: string; description: string }[] = [
   { value: "uptime", label: "Uptime", description: "Longest running nodes" },
-  { value: "storage", label: "Storage", description: "Highest storage capacity" },
+  {
+    value: "storage",
+    label: "Storage",
+    description: "Highest storage capacity",
+  },
   { value: "cpu", label: "CPU Efficiency", description: "Lowest CPU usage" },
   { value: "ram", label: "RAM Efficiency", description: "Lowest RAM usage" },
 ];
@@ -29,10 +38,19 @@ export default function LeaderboardPage() {
 
   const { data, isLoading } = trpc.nodes.leaderboard.useQuery(
     { metric, order, limit: 20 },
-    { refetchInterval: 60000 }
+    { refetchInterval: 60000 },
   );
 
-  const formatValue = (m: Metric, value: number, metrics: { uptimeSeconds?: number; cpuPercent?: number; ramPercent?: number; storageBytes?: number }) => {
+  const formatValue = (
+    m: Metric,
+    value: number,
+    metrics: {
+      uptimeSeconds?: number;
+      cpuPercent?: number;
+      ramPercent?: number;
+      storageBytes?: number;
+    },
+  ) => {
     switch (m) {
       case "uptime":
         return formatUptime(metrics.uptimeSeconds || 0);
@@ -89,7 +107,9 @@ export default function LeaderboardPage() {
                   }`}
                 >
                   <div className="font-medium text-sm">{m.label}</div>
-                  <div className="text-xs text-muted-foreground">{m.description}</div>
+                  <div className="text-xs text-muted-foreground">
+                    {m.description}
+                  </div>
                 </button>
               ))}
             </div>
@@ -153,7 +173,10 @@ export default function LeaderboardPage() {
         {isLoading ? (
           <div className="divide-y divide-border">
             {Array.from({ length: 10 }).map((_, i) => (
-              <div key={i} className="p-4 flex items-center gap-4 animate-pulse">
+              <div
+                key={i}
+                className="p-4 flex items-center gap-4 animate-pulse"
+              >
                 <div className="w-8 h-8 bg-muted rounded-full" />
                 <div className="flex-1">
                   <div className="h-5 bg-muted rounded w-1/3 mb-2" />
@@ -256,9 +279,14 @@ export default function LeaderboardPage() {
           Add these badges to your README or website:
         </p>
 
+        {/* eslint-disable @next/next/no-img-element -- SVG badges from API routes */}
         <div className="space-y-4">
           <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
-            <img src="/api/badge/network.svg" alt="Network Status" className="h-5" />
+            <img
+              src="/api/badge/network.svg"
+              alt="Network Status"
+              className="h-5"
+            />
             <code className="text-xs text-muted-foreground flex-1 truncate">
               ![Network](https://pulse.rectorspace.com/api/badge/network.svg)
             </code>
@@ -276,6 +304,7 @@ export default function LeaderboardPage() {
             </code>
           </div>
         </div>
+        {/* eslint-enable @next/next/no-img-element */}
       </div>
 
       {/* API Link */}

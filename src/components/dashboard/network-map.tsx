@@ -37,7 +37,7 @@ export function NetworkMap() {
 
   const { data, isLoading } = trpc.network.peerGraph.useQuery(
     { limit: 100 },
-    { refetchInterval: 60000 }
+    { refetchInterval: 60000 },
   );
 
   // Initialize node positions using force simulation
@@ -69,7 +69,7 @@ export function NetworkMap() {
     const centerY = height / 2;
 
     // Initialize nodes with random positions
-    const initialNodes: GraphNode[] = data.nodes.map((n, i) => ({
+    const initialNodes: GraphNode[] = data.nodes.map((n) => ({
       ...n,
       x: centerX + (Math.random() - 0.5) * width * 0.8,
       y: centerY + (Math.random() - 0.5) * height * 0.8,
@@ -187,7 +187,8 @@ export function NetworkMap() {
   if (!data || data.nodes.length === 0) {
     return (
       <div className="text-muted-foreground text-sm text-center py-8">
-        No network data available yet. Data will appear after nodes discover peers.
+        No network data available yet. Data will appear after nodes discover
+        peers.
       </div>
     );
   }
@@ -197,14 +198,19 @@ export function NetworkMap() {
       {/* Controls & Legend */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4 text-xs">
-          <span className="text-muted-foreground">{data.stats.nodeCount} nodes, {data.stats.edgeCount} connections</span>
+          <span className="text-muted-foreground">
+            {data.stats.nodeCount} nodes, {data.stats.edgeCount} connections
+          </span>
         </div>
         <div className="flex items-center gap-3">
           {versions.slice(0, 4).map((version) => (
             <div key={version} className="flex items-center gap-1.5 text-xs">
               <div
                 className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: VERSION_COLORS[version || ""] || DEFAULT_COLOR }}
+                style={{
+                  backgroundColor:
+                    VERSION_COLORS[version || ""] || DEFAULT_COLOR,
+                }}
               />
               <span>v{version}</span>
             </div>
@@ -229,15 +235,36 @@ export function NetworkMap() {
         >
           {/* Definitions for animations */}
           <defs>
-            <linearGradient id="edge-pulse-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <linearGradient
+              id="edge-pulse-gradient"
+              x1="0%"
+              y1="0%"
+              x2="100%"
+              y2="0%"
+            >
               <stop offset="0%" stopColor="#0066FF" stopOpacity="0">
-                <animate attributeName="offset" values="-0.5;1" dur="2s" repeatCount="indefinite" />
+                <animate
+                  attributeName="offset"
+                  values="-0.5;1"
+                  dur="2s"
+                  repeatCount="indefinite"
+                />
               </stop>
               <stop offset="50%" stopColor="#06B6D4" stopOpacity="0.8">
-                <animate attributeName="offset" values="0;1.5" dur="2s" repeatCount="indefinite" />
+                <animate
+                  attributeName="offset"
+                  values="0;1.5"
+                  dur="2s"
+                  repeatCount="indefinite"
+                />
               </stop>
               <stop offset="100%" stopColor="#0066FF" stopOpacity="0">
-                <animate attributeName="offset" values="0.5;2" dur="2s" repeatCount="indefinite" />
+                <animate
+                  attributeName="offset"
+                  values="0.5;2"
+                  dur="2s"
+                  repeatCount="indefinite"
+                />
               </stop>
             </linearGradient>
             <filter id="node-glow" x="-50%" y="-50%" width="200%" height="200%">
@@ -249,7 +276,6 @@ export function NetworkMap() {
             </filter>
           </defs>
           <g>
-
             {/* Edges */}
             {data.edges.map((edge, i) => {
               const sourceNode = nodes.find((n) => n.id === edge.source);
@@ -257,7 +283,8 @@ export function NetworkMap() {
               if (!sourceNode || !targetNode) return null;
               const isHighlighted =
                 hoveredNode &&
-                (hoveredNode.id === edge.source || hoveredNode.id === edge.target);
+                (hoveredNode.id === edge.source ||
+                  hoveredNode.id === edge.target);
               return (
                 <line
                   key={`edge-${i}`}
@@ -265,7 +292,9 @@ export function NetworkMap() {
                   y1={sourceNode.y}
                   x2={targetNode.x}
                   y2={targetNode.y}
-                  stroke={isHighlighted ? "hsl(var(--brand-500))" : "currentColor"}
+                  stroke={
+                    isHighlighted ? "hsl(var(--brand-500))" : "currentColor"
+                  }
                   strokeOpacity={isHighlighted ? 0.8 : 0.15}
                   strokeWidth={isHighlighted ? 2 : 1}
                 />
@@ -313,16 +342,28 @@ export function NetworkMap() {
                     cy={node.y}
                     r={radius + (isSelected || isHovered ? 3 : 0)}
                     fill={color}
-                    stroke={isSelected ? "#0f172a" : isHovered ? "#0066FF" : "transparent"}
+                    stroke={
+                      isSelected
+                        ? "#0f172a"
+                        : isHovered
+                          ? "#0066FF"
+                          : "transparent"
+                    }
                     strokeWidth={2}
-                    filter={isHovered || isSelected ? "url(#node-glow)" : undefined}
+                    filter={
+                      isHovered || isSelected ? "url(#node-glow)" : undefined
+                    }
                     className="cursor-pointer transition-all"
-                    style={{ transition: "r 0.2s ease-out, stroke 0.2s ease-out" }}
+                    style={{
+                      transition: "r 0.2s ease-out, stroke 0.2s ease-out",
+                    }}
                     onMouseEnter={() => setHoveredNode(node)}
                     onMouseLeave={() => setHoveredNode(null)}
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSelectedNode(selectedNode?.id === node.id ? null : node);
+                      setSelectedNode(
+                        selectedNode?.id === node.id ? null : node,
+                      );
                     }}
                   />
                 </g>
@@ -340,9 +381,15 @@ export function NetworkMap() {
               top: hoveredNode.y! - 20,
             }}
           >
-            <div className="font-medium text-foreground">{hoveredNode.label}</div>
-            <div className="text-muted-foreground">v{hoveredNode.version || "unknown"}</div>
-            <div className="text-muted-foreground">{formatBytes(hoveredNode.storage)}</div>
+            <div className="font-medium text-foreground">
+              {hoveredNode.label}
+            </div>
+            <div className="text-muted-foreground">
+              v{hoveredNode.version || "unknown"}
+            </div>
+            <div className="text-muted-foreground">
+              {formatBytes(hoveredNode.storage)}
+            </div>
           </div>
         )}
 
@@ -360,15 +407,31 @@ export function NetworkMap() {
                 onClick={() => setSelectedNode(null)}
                 className="p-1 hover:bg-muted rounded"
               >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                <svg
+                  className="w-4 h-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
                 </svg>
               </button>
             </div>
             <div className="space-y-1 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Status:</span>
-                <span className={selectedNode.isActive ? "text-status-active" : "text-status-inactive"}>
+                <span
+                  className={
+                    selectedNode.isActive
+                      ? "text-status-active"
+                      : "text-status-inactive"
+                  }
+                >
                   {selectedNode.isActive ? "Active" : "Inactive"}
                 </span>
               </div>

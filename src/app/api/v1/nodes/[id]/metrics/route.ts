@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import {  checkRateLimit,
+import {
+  checkRateLimit,
   createRateLimitHeaders,
   rateLimitExceededResponse,
   trackApiUsage,
@@ -11,7 +12,6 @@ import {  checkRateLimit,
 export const dynamic = "force-dynamic";
 
 type TimeRange = "1h" | "24h" | "7d" | "30d";
-type Aggregation = "raw" | "hourly" | "daily";
 
 // Query parameter validation schema
 const QueryParamsSchema = z.object({
@@ -32,7 +32,7 @@ const RANGE_HOURS: Record<TimeRange, number> = {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   const startTime = Date.now();
   const rateLimitResult = await checkRateLimit(request);
@@ -49,7 +49,7 @@ export async function GET(
     if (isNaN(nodeId)) {
       return NextResponse.json(
         { error: { code: "BAD_REQUEST", message: "Invalid node ID" } },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -58,7 +58,7 @@ export async function GET(
     if (!node) {
       return NextResponse.json(
         { error: { code: "NOT_FOUND", message: "Node not found" } },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -77,7 +77,7 @@ export async function GET(
             details: queryResult.error.flatten(),
           },
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -200,7 +200,13 @@ export async function GET(
     const rateLimitHeaders = createRateLimitHeaders(rateLimitResult);
     const responseTime = Date.now() - startTime;
 
-    trackApiUsage(rateLimitResult.apiKeyId, "/api/v1/nodes/:id/metrics", "GET", responseTime, false);
+    trackApiUsage(
+      rateLimitResult.apiKeyId,
+      "/api/v1/nodes/:id/metrics",
+      "GET",
+      responseTime,
+      false,
+    );
 
     return NextResponse.json(response, {
       headers: {
@@ -209,14 +215,28 @@ export async function GET(
       },
     });
   } catch (error) {
-    logger.error("API Error:", error instanceof Error ? error : new Error(String(error)));
+    logger.error(
+      "API Error:",
+      error instanceof Error ? error : new Error(String(error)),
+    );
 
     const responseTime = Date.now() - startTime;
-    trackApiUsage(rateLimitResult.apiKeyId, "/api/v1/nodes/:id/metrics", "GET", responseTime, true);
+    trackApiUsage(
+      rateLimitResult.apiKeyId,
+      "/api/v1/nodes/:id/metrics",
+      "GET",
+      responseTime,
+      true,
+    );
 
     return NextResponse.json(
-      { error: { code: "INTERNAL_ERROR", message: "An unexpected error occurred" } },
-      { status: 500 }
+      {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "An unexpected error occurred",
+        },
+      },
+      { status: 500 },
     );
   }
 }
