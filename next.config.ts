@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import bundleAnalyzer from "@next/bundle-analyzer";
 import createNextIntlPlugin from "next-intl/plugin";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
@@ -231,4 +232,32 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
 };
 
-export default withNextIntl(withBundleAnalyzer(nextConfig));
+// Compose all config wrappers
+const composedConfig = withNextIntl(withBundleAnalyzer(nextConfig));
+
+// Sentry configuration options
+const sentryWebpackPluginOptions = {
+  // Suppress source map upload logs during build
+  silent: true,
+
+  // Organization and project from environment
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+
+  // Auth token for source map uploads (from SENTRY_AUTH_TOKEN env var)
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  // Upload larger source maps for better stack traces
+  widenClientFileUpload: true,
+
+  // Hide source maps from browser DevTools in production
+  hideSourceMaps: true,
+
+  // Disable Sentry logger to reduce bundle size
+  disableLogger: true,
+};
+
+// Only wrap with Sentry if DSN is configured (allows builds without Sentry)
+export default process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN
+  ? withSentryConfig(composedConfig, sentryWebpackPluginOptions)
+  : composedConfig;
