@@ -43,68 +43,19 @@ const nextConfig: NextConfig = {
   // Enable standalone output for Docker deployment
   output: "standalone",
 
-  // Redirects for non-locale paths to default locale
+  // Redirect /en/* to /* for SEO (avoid duplicate content)
+  // The middleware serves default locale content at / without prefix
   async redirects() {
     return [
       {
-        source: "/leaderboard",
-        destination: "/en/leaderboard",
-        permanent: false,
+        source: "/en",
+        destination: "/",
+        permanent: true,
       },
       {
-        source: "/analytics",
-        destination: "/en/analytics",
-        permanent: false,
-      },
-      {
-        source: "/graveyard",
-        destination: "/en/graveyard",
-        permanent: false,
-      },
-      {
-        source: "/portfolio",
-        destination: "/en/portfolio",
-        permanent: false,
-      },
-      {
-        source: "/map",
-        destination: "/en/map",
-        permanent: false,
-      },
-      {
-        source: "/alerts",
-        destination: "/en/alerts",
-        permanent: false,
-      },
-      {
-        source: "/reports",
-        destination: "/en/reports",
-        permanent: false,
-      },
-      {
-        source: "/nodes",
-        destination: "/en/nodes",
-        permanent: false,
-      },
-      {
-        source: "/nodes/:path*",
-        destination: "/en/nodes/:path*",
-        permanent: false,
-      },
-      {
-        source: "/settings/:path*",
-        destination: "/en/settings/:path*",
-        permanent: false,
-      },
-      {
-        source: "/privacy",
-        destination: "/en/privacy",
-        permanent: false,
-      },
-      {
-        source: "/terms",
-        destination: "/en/terms",
-        permanent: false,
+        source: "/en/:path*",
+        destination: "/:path*",
+        permanent: true,
       },
     ];
   },
