@@ -8,6 +8,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue?style=for-the-badge)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Next.js](https://img.shields.io/badge/Next.js-14-000000?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org/)
+[![Superteam Winner](https://img.shields.io/badge/Superteam-3rd_Place_$1K-F9C846?style=for-the-badge)](https://superteam.fun/earn/listing/develop-analytics-platform-for-xandeum-pnodes)
 
 <br/>
 
@@ -32,7 +33,7 @@
 
 **pNode Pulse** is a comprehensive analytics platform for monitoring Xandeum's decentralized storage network. Track node performance, storage capacity, network health, and growth trends in real-time.
 
-> Built for the [Superteam Bounty: Build Analytics Platform for Xandeum pNodes](https://earn.superteam.fun/listing/build-analytics-platform-for-xandeum-pnodes/)
+> 🏆 **Winner** of the [Superteam Bounty: Build Analytics Platform for Xandeum pNodes](https://superteam.fun/earn/listing/develop-analytics-platform-for-xandeum-pnodes) — 3rd Place ($1,000 USDC)
 
 ---
 

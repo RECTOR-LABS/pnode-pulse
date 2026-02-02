@@ -1,5 +1,11 @@
 # Superteam Bounty Submission
 
+> ## 🏆 RESULT: 3rd Place - $1,000 USDC
+>
+> Winners announced February 2026. Thank you Xandeum Labs and Superteam!
+
+---
+
 ## Build Analytics Platform for Xandeum pNodes
 
 **Prize Pool**: $5,000 USDC ($2,500 / $1,500 / $1,000)
