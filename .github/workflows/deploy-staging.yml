@@ -68,6 +68,9 @@ jobs:
             # Start staging with new image
             docker compose up -d staging
 
+            # Clean up old images
+            docker image prune -f
+
             # Verify deployment
             sleep 5
             docker compose ps staging
