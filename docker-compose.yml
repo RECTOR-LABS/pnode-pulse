@@ -7,7 +7,7 @@ services:
     container_name: pnode-pulse-postgres
     restart: unless-stopped
     ports:
-      - "5434:5432"
+      - "127.0.0.1:5434:5432"
     environment:
       POSTGRES_USER: pnodepulse
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -28,7 +28,7 @@ services:
     container_name: pnode-pulse-redis
     restart: unless-stopped
     ports:
-      - "6381:6379"
+      - "127.0.0.1:6381:6379"
     volumes:
       - redis_data:/data
     networks:
