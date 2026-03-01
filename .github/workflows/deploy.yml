@@ -55,4 +55,4 @@ jobs:
             cd ${{ secrets.VPS_APP_PATH }}
             docker compose pull
             docker compose up -d
-            docker system prune -f
+            docker image prune -f
