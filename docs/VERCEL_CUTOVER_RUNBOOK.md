@@ -256,7 +256,6 @@ environments** (Production, Preview, Development) unless noted:
 | ------------------------------ | -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `NEXT_PUBLIC_APP_URL`          | `https://pulse.rectorspace.com`              | Production only                                                                                                               |
 | `NEXT_PUBLIC_APP_URL`          | `$VERCEL_URL`                                | Preview / Development — auto-set per deploy                                                                                   |
-| `PULSE_API_URL`                | `https://api.pulse.rectorspace.com`          | All; rewrite target per `vercel.ts`                                                                                           |
 | `DATABASE_URL`                 | `postgresql://stub:stub@127.0.0.1:5432/stub` | **Stub** — Vercel never connects. Needed only so `prisma generate` succeeds during build                                      |
 | `JWT_SECRET`                   | `$(openssl rand -base64 32)`                 | Build-time module load needs SOME value; runtime auth happens on the VPS so the actual secret value doesn't matter for Vercel |
 | `JWT_ISSUER`                   | `pnode-pulse`                                | Match VPS                                                                                                                     |
@@ -268,11 +267,13 @@ environments** (Production, Preview, Development) unless noted:
 Or with the CLI (faster):
 
 ```bash
-echo "https://api.pulse.rectorspace.com" | npx vercel env add PULSE_API_URL production
-echo "https://api.pulse.rectorspace.com" | npx vercel env add PULSE_API_URL preview
 echo "postgresql://stub:stub@127.0.0.1:5432/stub" | npx vercel env add DATABASE_URL production
 # … etc.
 ```
+
+The rewrite target lives in `vercel.json` (committed). If it ever needs to
+vary per environment, replace `vercel.json` with a `vercel.ts` that reads
+`process.env.PULSE_API_URL` and add the variable here — but only then.
 
 ### Step 8: First preview deploy
 
@@ -295,8 +296,7 @@ Open the preview URL in a browser:
 
 **Checkpoint**: if pages render but tRPC errors, check:
 
-- `PULSE_API_URL` is set correctly in Vercel
-- `vercel.json` / `vercel.ts` rewrites are present (check the Vercel build log "Detected rewrites")
+- `vercel.json` rewrites are present (check the Vercel build log "Detected rewrites")
 - `api.pulse.rectorspace.com` is reachable from outside
 
 ### Step 9: First production deploy (not live yet — Vercel domain only)
@@ -384,7 +384,7 @@ Monitor:
 ### After Step 5 but before Step 12
 
 Just remove the Cloudflare DNS record for `api.pulse.rectorspace.com`.
-Everything else (Vercel project, env vars, vercel.ts) is dormant.
+Everything else (Vercel project, env vars, vercel.json) is dormant.
 
 ### After Step 12 (DNS cutover)
 
