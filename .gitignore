@@ -2,8 +2,14 @@
 
 # dependencies
 /node_modules
+**/node_modules
 /.pnp
 .pnp.*
+
+# package build outputs
+packages/*/dist
+packages/*/.cache
+packages/*/coverage
 .yarn/*
 !.yarn/patches
 !.yarn/plugins
