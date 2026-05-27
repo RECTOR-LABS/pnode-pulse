@@ -7,6 +7,8 @@
  * - Development: Allows placeholder with warning
  */
 
+import { createHash } from "node:crypto";
+
 const BUILD_PLACEHOLDER = "build-time-placeholder-only";
 
 /**
@@ -45,6 +47,21 @@ export const JWT_VALIDITY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
  * - JWT_SECRET is the build placeholder
  * - In production without a real secret
  */
+/**
+ * SHA-256 fingerprint (first 8 hex chars) of the configured JWT_SECRET.
+ *
+ * Used at startup so operators can confirm pulse-api and the monolith share
+ * the same key without exposing the secret in logs. Returns "unset" when
+ * JWT_SECRET is missing, "placeholder" when the build-phase placeholder is
+ * in use.
+ */
+export function jwtSecretFingerprint(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return "unset";
+  if (secret === BUILD_PLACEHOLDER) return "placeholder";
+  return createHash("sha256").update(secret).digest("hex").slice(0, 8);
+}
+
 export function ensureJWTSecret(): void {
   // Skip validation during build phase
   if (isBuildPhase()) {

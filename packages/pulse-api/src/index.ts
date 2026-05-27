@@ -3,9 +3,15 @@ import { createApp } from "./app";
 import { loadConfig } from "./config";
 import { logger } from "./lib/logger";
 import { disconnectDb } from "./lib/db";
+import { jwtSecretFingerprint } from "./lib/auth/jwt-config";
 
 const env = loadConfig();
 const app = createApp();
+
+logger.info("JWT_SECRET fingerprint", {
+  fingerprint: jwtSecretFingerprint(),
+  note: "must match monolith fingerprint for tokens to validate",
+});
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) =>
   logger.info("pulse-api listening", { port: info.port }),
