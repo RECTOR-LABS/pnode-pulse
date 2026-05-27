@@ -3,20 +3,18 @@ import { createApp } from "./app";
 import { loadConfig } from "./config";
 import { logger } from "./lib/logger";
 import { disconnectDb } from "./lib/db";
-import { disconnectRedis } from "./lib/redis";
 
 const env = loadConfig();
 const app = createApp();
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) =>
-  logger.info({ port: info.port }, "pulse-api listening"),
+  logger.info("pulse-api listening", { port: info.port }),
 );
 
 async function shutdown(signal: string) {
-  logger.info({ signal }, "shutting down");
+  logger.info("shutting down", { signal });
   server.close(async () => {
     await disconnectDb();
-    await disconnectRedis();
     logger.info("shutdown complete");
     process.exit(0);
   });

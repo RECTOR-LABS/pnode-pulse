@@ -120,6 +120,41 @@ services:
     profiles:
       - green
 
+  # pulse-api (lean Hono service hosting the tRPC server)
+  # Tier 2 of the Vercel migration — see docs/VERCEL_CUTOVER_RUNBOOK.md.
+  # Bound to 127.0.0.1 so nginx is the only public ingress.
+  pulse-api:
+    image: ghcr.io/rector-labs/pulse-api:latest
+    container_name: pnode-pulse-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:7004:7004"
+    environment:
+      NODE_ENV: production
+      PORT: 7004
+      DATABASE_URL: postgresql://pnodepulse:${POSTGRES_PASSWORD}@postgres:5432/pnodepulse
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ISSUER: pnode-pulse
+      JWT_AUDIENCE: pnode-pulse-app
+      ALLOWED_ORIGINS: https://pulse.rectorspace.com,https://staging.pulse.rectorspace.com
+      LOG_LEVEL: info
+    networks:
+      - pnode-pulse-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:7004/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    profiles:
+      - pulse-api
+
 volumes:
   postgres_data:
     name: pnode-pulse-postgres-data

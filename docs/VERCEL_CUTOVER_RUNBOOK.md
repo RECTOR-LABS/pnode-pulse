@@ -406,31 +406,171 @@ nginx still has the original vhost — they will serve traffic again immediately
 
 ---
 
-## Tier 2 follow-on (NOT part of this runbook)
+## Tier 2 — pulse-api as a dedicated service (already lifted on this branch)
 
-The `packages/pulse-api/` and `packages/pulse-types/` packages on this branch
-are scaffolding for a future dedicated API service that:
+The `packages/pulse-api/` package on this branch is a **ready-to-deploy
+Hono service** that hosts the lifted tRPC server. Tier 2 is OPTIONAL —
+Tier 1 alone gets us to Vercel. Tier 2 splits the tRPC traffic onto a
+separate process so the monolith can eventually be decommissioned.
 
-- Replaces the Next.js-as-API-host pattern with a lean Hono service
-- Lets the Vercel build skip Prisma generation entirely
-- Enables clean REST contract for external SDKs
+**Scope of what was lifted into pulse-api**:
 
-That is a multi-session follow-on (see `VERCEL_MIGRATION_HANDOFF.md` Phase
-2+). It is NOT required for today's Vercel migration — Tier 1 above is the
-shipping path.
+- `src/server/api/*` (trpc.ts, root.ts, all routers) → `packages/pulse-api/src/server/`
+- `src/lib/{db,auth,redis,constants,logger,notifications,queue,analytics}/*` → `packages/pulse-api/src/lib/`
+- New: tRPC fetch-adapter mount at `/api/trpc/*`, healthz at `/healthz`
+- The monolith files remain in place (additive lift) — Tier 2 cutover doesn't
+  touch them. After cutover stabilizes, they can be deleted in a follow-up.
 
-If/when proceeding with Tier 2:
+**What's STILL on the monolith (not lifted)**:
 
-1. Move `src/server/api/*`, `src/lib/db`, `src/lib/auth` (server-only files),
-   `src/lib/api`, `src/lib/redis`, `src/lib/constants`, `src/lib/logger.ts`,
-   `src/lib/queue`, `src/lib/notifications` into `packages/pulse-api/src/`
-2. Mount the tRPC server in pulse-api using `@trpc/server/adapters/fetch` +
-   Hono adapter
-3. Add `pulse-api` service to `docker-compose.yml` on port 7004
-4. Update the nginx `proxy_pass` from `127.0.0.1:7000` to `127.0.0.1:7004`
-5. Remove the lifted server code from the Next.js project (FE becomes lean)
-6. Re-test Vercel deploy — bundle is much smaller, no DB-related env vars
-   needed
+- REST routes (`/api/v1/*`, `/api/badge/*`, `/api/health`, `/api/metrics`,
+  `/api/realtime`, `/api/admin/*`) — these stay on the existing Next.js
+  container. nginx will path-split tRPC vs REST.
+- All FE pages.
+- Workers (collector, alert-processor, report-processor, pruner) — these
+  run on the VPS as systemd or separate compose services today.
+
+### Step T2.1: Build + push the pulse-api image
+
+The GitHub Actions workflow `.github/workflows/deploy-pulse-api.yml`
+auto-runs on push to `main` when anything under `packages/pulse-api/`,
+`packages/pulse-types/`, or `prisma/schema.prisma` changes. To trigger it
+manually:
+
+```bash
+gh workflow run deploy-pulse-api.yml
+gh run watch
+```
+
+The workflow:
+
+1. Builds `ghcr.io/rector-labs/pulse-api:latest`
+2. SSHes to VPS as `pnodepulse`
+3. `docker compose --profile pulse-api up -d pulse-api`
+4. Health-polls `127.0.0.1:7004/healthz` until green
+5. Runs `docker image prune -f`
+
+The `pulse-api` service in `docker-compose.yml` is behind a profile so it
+does NOT start by accident — only `--profile pulse-api` brings it up.
+
+### Step T2.2: Add JWT_SECRET to VPS env
+
+pulse-api needs `JWT_SECRET` matching whatever the monolith uses (so
+tokens issued by the monolith are accepted by pulse-api during the
+transition).
+
+```bash
+ssh pnodepulse
+cd ~/pnode-pulse
+# Reuse whatever JWT_SECRET the monolith was built with (check existing .env)
+echo "JWT_SECRET=<paste from existing app .env>" >> .env
+```
+
+### Step T2.3: Verify pulse-api locally on VPS
+
+```bash
+ssh pnodepulse
+curl -fsS http://127.0.0.1:7004/healthz | jq
+# Expect: {"status":"healthy","checks":{"database":true,"redis":true},...}
+
+# tRPC smoke test — same procedure as `curl http://127.0.0.1:7000/api/trpc/nodes.versions`
+curl -fsS 'http://127.0.0.1:7004/api/trpc/nodes.versions' | jq
+```
+
+If both succeed, pulse-api is serving the same data as the monolith — just
+on a different port.
+
+### Step T2.4: Path-split nginx vhost — route tRPC to pulse-api
+
+Edit `/etc/nginx/sites-available/api.pulse.rectorspace.com` on the VPS:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name api.pulse.rectorspace.com;
+    # … (ssl, logs, buffers — unchanged) …
+
+    # tRPC traffic to the lean pulse-api on :7004
+    location /api/trpc/ {
+        proxy_pass http://127.0.0.1:7004;
+        proxy_http_version 1.1;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 60s;
+    }
+
+    # Healthz on pulse-api for monitoring
+    location /healthz {
+        proxy_pass http://127.0.0.1:7004;
+    }
+
+    # Everything else (REST, badges, metrics, realtime) → monolith :7000
+    location / {
+        proxy_pass http://127.0.0.1:7000;
+        proxy_http_version 1.1;
+        proxy_set_header Host              api.pulse.rectorspace.com;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}
+```
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### Step T2.5: Smoke test the split
+
+```bash
+# tRPC — should now hit pulse-api
+curl -fsS 'https://api.pulse.rectorspace.com/api/trpc/nodes.versions' | jq
+
+# REST — should still hit monolith
+curl -fsS 'https://api.pulse.rectorspace.com/api/v1/nodes?limit=1' | jq
+
+# Both should return the same data they did before T2.4.
+```
+
+In the FE (live at `pulse.rectorspace.com`):
+
+- Open dev tools network tab
+- Trigger a tRPC call (any dashboard page does this)
+- Confirm the response arrives normally; latency should be similar or better
+
+### Step T2.6: Watch + rollback if needed
+
+Monitor for 1 hour:
+
+```bash
+ssh reclabs3
+tail -f /var/log/nginx/api.pulse.access.log     # confirm tRPC routes hit pulse-api
+docker logs --tail 200 -f pnode-pulse-api
+```
+
+**Rollback**: revert the `location /api/trpc/` block in nginx and reload.
+All traffic returns to the monolith. The pulse-api container can keep
+running idle.
+
+### Step T2.7 (eventual): Decommission monolith server code
+
+Only after pulse-api has been serving tRPC for 14+ days without issues:
+
+1. Delete `src/server/api/`, `src/server/workers/`, `src/lib/db/`,
+   `src/lib/auth/{verify-token,jwt-config,hash-token,index}.ts`,
+   `src/lib/api/`, `src/lib/redis/`, `src/lib/queue/`,
+   `src/lib/notifications/`, `src/lib/analytics/` from the monolith repo
+2. Delete `src/app/api/trpc/[trpc]/route.ts` (no longer used — pulse-api owns tRPC)
+3. Move workers (`scripts/start-collector.ts` etc.) to their own packages
+   or run them out of `packages/pulse-api/` directly
+4. Update the FE Vercel deploy — Prisma schema is no longer needed for the
+   build; remove `npx prisma generate` from `vercel.json` buildCommand and
+   drop `DATABASE_URL` / `JWT_SECRET` Vercel env vars
+5. The monolith `blue`/`green` Docker containers can also be stopped once
+   nothing depends on them (all paths in the nginx vhost would already
+   point at pulse-api or a static handler by then)
 
 ---
 

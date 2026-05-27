@@ -32,7 +32,10 @@ export const errorHandler: ErrorHandler = (err, c) => {
     return c.json(body, 400);
   }
 
-  logger.error({ err, requestId }, "Unhandled error");
+  logger.error("Unhandled error", {
+    err: err instanceof Error ? err.message : String(err),
+    requestId,
+  });
   const body: ErrorBody = {
     error: {
       code: "INTERNAL_ERROR",
