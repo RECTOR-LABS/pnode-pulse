@@ -25,6 +25,7 @@ const envSchema = z.object({
     .default(
       "https://pulse.rectorspace.com,https://staging.pulse.rectorspace.com,http://localhost:3000",
     ),
+  ALLOWED_ORIGIN_REGEX: z.string().optional(),
 
   LOG_LEVEL: z
     .enum(["trace", "debug", "info", "warn", "error", "fatal", "silent"])
@@ -52,4 +53,17 @@ export function allowedOrigins(env: Env): string[] {
   return env.ALLOWED_ORIGINS.split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+export function allowedOriginRegex(env: Env): RegExp | null {
+  if (!env.ALLOWED_ORIGIN_REGEX) return null;
+  try {
+    return new RegExp(env.ALLOWED_ORIGIN_REGEX);
+  } catch (err) {
+    throw new Error(
+      `Invalid ALLOWED_ORIGIN_REGEX (${env.ALLOWED_ORIGIN_REGEX}): ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
 }

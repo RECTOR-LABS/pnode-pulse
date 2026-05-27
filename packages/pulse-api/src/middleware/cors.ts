@@ -1,13 +1,16 @@
 import { cors as honoCors } from "hono/cors";
-import { allowedOrigins, loadConfig } from "../config";
+import { allowedOriginRegex, allowedOrigins, loadConfig } from "../config";
 
 export const cors = () => {
   const env = loadConfig();
   const origins = allowedOrigins(env);
+  const originRegex = allowedOriginRegex(env);
   return honoCors({
     origin: (origin) => {
       if (!origin) return null;
-      return origins.includes(origin) ? origin : null;
+      if (origins.includes(origin)) return origin;
+      if (originRegex && originRegex.test(origin)) return origin;
+      return null;
     },
     allowMethods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: [
