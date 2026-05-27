@@ -14,7 +14,7 @@
     "test:watch": "vitest",
     "lint": "eslint src tests",
     "prisma:generate": "prisma generate --schema=../../prisma/schema.prisma",
-    "postinstall": "prisma generate --schema=../../prisma/schema.prisma || true"
+    "postinstall": "prisma generate --schema=../../prisma/schema.prisma"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
