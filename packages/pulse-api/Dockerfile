@@ -47,7 +47,7 @@ RUN addgroup --system --gid 1001 nodejs && \
 # Production deps only
 COPY --from=builder /app/packages/pulse-api/package.json ./package.json
 COPY --from=builder /app/packages/pulse-types ./packages/pulse-types
-RUN npm install --ignore-scripts --omit=dev --legacy-peer-deps
+RUN npm install --ignore-scripts --omit=dev
 
 # Generated Prisma client + schema
 COPY --from=builder /app/prisma ./prisma
