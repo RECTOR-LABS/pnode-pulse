@@ -417,7 +417,8 @@ separate process so the monolith can eventually be decommissioned.
 
 - `src/server/api/*` (trpc.ts, root.ts, all routers) → `packages/pulse-api/src/server/`
 - `src/lib/{db,auth,redis,constants,logger,notifications,queue,analytics}/*` → `packages/pulse-api/src/lib/`
-- New: tRPC fetch-adapter mount at `/api/trpc/*`, healthz at `/healthz`
+- New: tRPC fetch-adapter mount at `/api/trpc/*`, liveness at `/healthz`,
+  readiness/dep-breakdown at `/readyz` (internal-only — keep behind nginx)
 - The monolith files remain in place (additive lift) — Tier 2 cutover doesn't
   touch them. After cutover stabilizes, they can be deleted in a follow-up.
 
@@ -470,8 +471,14 @@ echo "JWT_SECRET=<paste from existing app .env>" >> .env
 
 ```bash
 ssh pnodepulse
+# Liveness — minimal, public-safe; container healthcheck targets this.
 curl -fsS http://127.0.0.1:7004/healthz | jq
-# Expect: {"status":"healthy","checks":{"database":true,"redis":true},...}
+# Expect: {"status":"ok"}
+
+# Readiness — full dependency breakdown; keep internal.
+curl -fsS http://127.0.0.1:7004/readyz | jq
+# Expect: {"status":"ok","checks":{"database":true,"redis":true},...}
+# (status is "degraded" if only Redis is down — DB unreachable returns 503.)
 
 # tRPC smoke test — same procedure as `curl http://127.0.0.1:7000/api/trpc/nodes.versions`
 curl -fsS 'http://127.0.0.1:7004/api/trpc/nodes.versions' | jq
