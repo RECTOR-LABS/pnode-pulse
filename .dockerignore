@@ -11,6 +11,19 @@ dist
 
 # Testing
 coverage
+tests
+playwright-report
+test-results
+
+# CI / hooks
+.github
+.husky
+
+# Browser-driven dev artifacts
+.playwright-mcp
+
+# Vercel CLI
+.vercel
 
 # Misc
 .DS_Store
@@ -44,6 +57,7 @@ docker-compose*
 # Documentation
 *.md
 !README.md
+docs
 
 # Scripts
 scripts/

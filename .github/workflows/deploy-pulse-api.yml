@@ -1,0 +1,99 @@
+name: Deploy pulse-api
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "packages/pulse-api/**"
+      - "packages/pulse-types/**"
+      - "prisma/schema.prisma"
+      - ".github/workflows/deploy-pulse-api.yml"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: rector-labs/pulse-api
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build and push pulse-api image
+        uses: docker/build-push-action@v5
+        with:
+          # Build context is the REPO ROOT so the Dockerfile can pick up
+          # both packages/pulse-api/ and the shared prisma/ schema.
+          context: .
+          file: packages/pulse-api/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=pulse-api
+          cache-to: type=gha,mode=max,scope=pulse-api
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: 176.222.53.185
+          username: pnodepulse
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd ~/pnode-pulse
+
+            git fetch origin main
+            git pull --ff-only origin main
+
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            docker pull ghcr.io/rector-labs/pulse-api:latest
+
+            # `pulse-api` is behind a docker-compose profile so it doesn't start by accident.
+            # Use --profile to bring it up alongside postgres/redis.
+            docker compose --profile pulse-api up -d pulse-api
+
+            # Wait for healthz to report green
+            for i in {1..20}; do
+              if curl -fsS http://127.0.0.1:7004/healthz >/dev/null; then
+                echo "pulse-api healthy"; break
+              fi
+              echo "waiting for pulse-api… ($i/20)"; sleep 2
+            done
+
+            # Free disk
+            docker image prune -f
+
+      - name: Verify deployment
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: 176.222.53.185
+          username: pnodepulse
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd ~/pnode-pulse
+            docker compose ps pulse-api
+            docker compose logs --tail 30 pulse-api
+            curl -fsS http://127.0.0.1:7004/healthz | head
