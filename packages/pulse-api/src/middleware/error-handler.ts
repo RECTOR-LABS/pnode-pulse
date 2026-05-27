@@ -34,6 +34,7 @@ export const errorHandler: ErrorHandler = (err, c) => {
 
   logger.error("Unhandled error", {
     err: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
     requestId,
   });
   const body: ErrorBody = {
