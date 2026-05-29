@@ -393,9 +393,14 @@ export const nodesRouter = createTRPCRouter({
         COALESCE(AVG(ram_used::float / NULLIF(ram_total, 0) * 100), 0) as avg_ram_percent,
         COALESCE(AVG(uptime), 0) as avg_uptime
       FROM (
-        SELECT DISTINCT ON (node_id) *
-        FROM node_metrics
-        ORDER BY node_id, time DESC
+        SELECT m.*
+        FROM nodes n
+        JOIN LATERAL (
+          SELECT * FROM node_metrics nm
+          WHERE nm.node_id = n.id
+          ORDER BY nm.time DESC
+          LIMIT 1
+        ) m ON true
       ) latest
     `;
 
@@ -451,27 +456,23 @@ export const nodesRouter = createTRPCRouter({
         result =
           order === "top"
             ? await ctx.db.$queryRaw<LeaderboardRow[]>`
-              WITH latest_metrics AS (
-                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN LATERAL (
+                SELECT nm.cpu_percent,
                   CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
                   nm.file_size, nm.uptime
-                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
-                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
-              )
-              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
-              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+                FROM node_metrics nm WHERE nm.node_id = n.id ORDER BY nm.time DESC LIMIT 1
+              ) lm ON true
               WHERE n.is_active = true
               ORDER BY lm.uptime DESC NULLS LAST LIMIT ${limit}`
             : await ctx.db.$queryRaw<LeaderboardRow[]>`
-              WITH latest_metrics AS (
-                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN LATERAL (
+                SELECT nm.cpu_percent,
                   CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
                   nm.file_size, nm.uptime
-                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
-                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
-              )
-              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
-              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+                FROM node_metrics nm WHERE nm.node_id = n.id ORDER BY nm.time DESC LIMIT 1
+              ) lm ON true
               WHERE n.is_active = true
               ORDER BY lm.uptime ASC NULLS LAST LIMIT ${limit}`;
       } else if (metric === "cpu") {
@@ -479,27 +480,23 @@ export const nodesRouter = createTRPCRouter({
         result =
           order === "top"
             ? await ctx.db.$queryRaw<LeaderboardRow[]>`
-              WITH latest_metrics AS (
-                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN LATERAL (
+                SELECT nm.cpu_percent,
                   CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
                   nm.file_size, nm.uptime
-                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
-                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
-              )
-              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
-              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+                FROM node_metrics nm WHERE nm.node_id = n.id ORDER BY nm.time DESC LIMIT 1
+              ) lm ON true
               WHERE n.is_active = true
               ORDER BY lm.cpu_percent ASC NULLS LAST LIMIT ${limit}`
             : await ctx.db.$queryRaw<LeaderboardRow[]>`
-              WITH latest_metrics AS (
-                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN LATERAL (
+                SELECT nm.cpu_percent,
                   CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
                   nm.file_size, nm.uptime
-                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
-                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
-              )
-              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
-              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+                FROM node_metrics nm WHERE nm.node_id = n.id ORDER BY nm.time DESC LIMIT 1
+              ) lm ON true
               WHERE n.is_active = true
               ORDER BY lm.cpu_percent DESC NULLS LAST LIMIT ${limit}`;
       } else if (metric === "ram") {
@@ -507,27 +504,23 @@ export const nodesRouter = createTRPCRouter({
         result =
           order === "top"
             ? await ctx.db.$queryRaw<LeaderboardRow[]>`
-              WITH latest_metrics AS (
-                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN LATERAL (
+                SELECT nm.cpu_percent,
                   CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
                   nm.file_size, nm.uptime
-                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
-                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
-              )
-              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
-              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+                FROM node_metrics nm WHERE nm.node_id = n.id ORDER BY nm.time DESC LIMIT 1
+              ) lm ON true
               WHERE n.is_active = true
               ORDER BY lm.ram_percent ASC NULLS LAST LIMIT ${limit}`
             : await ctx.db.$queryRaw<LeaderboardRow[]>`
-              WITH latest_metrics AS (
-                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN LATERAL (
+                SELECT nm.cpu_percent,
                   CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
                   nm.file_size, nm.uptime
-                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
-                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
-              )
-              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
-              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+                FROM node_metrics nm WHERE nm.node_id = n.id ORDER BY nm.time DESC LIMIT 1
+              ) lm ON true
               WHERE n.is_active = true
               ORDER BY lm.ram_percent DESC NULLS LAST LIMIT ${limit}`;
       } else {
@@ -535,27 +528,23 @@ export const nodesRouter = createTRPCRouter({
         result =
           order === "top"
             ? await ctx.db.$queryRaw<LeaderboardRow[]>`
-              WITH latest_metrics AS (
-                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN LATERAL (
+                SELECT nm.cpu_percent,
                   CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
                   nm.file_size, nm.uptime
-                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
-                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
-              )
-              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
-              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+                FROM node_metrics nm WHERE nm.node_id = n.id ORDER BY nm.time DESC LIMIT 1
+              ) lm ON true
               WHERE n.is_active = true
               ORDER BY lm.file_size DESC NULLS LAST LIMIT ${limit}`
             : await ctx.db.$queryRaw<LeaderboardRow[]>`
-              WITH latest_metrics AS (
-                SELECT DISTINCT ON (nm.node_id) nm.node_id, nm.cpu_percent,
+              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
+              FROM nodes n JOIN LATERAL (
+                SELECT nm.cpu_percent,
                   CASE WHEN nm.ram_total > 0 THEN (nm.ram_used::float / nm.ram_total * 100) ELSE 0 END as ram_percent,
                   nm.file_size, nm.uptime
-                FROM node_metrics nm JOIN nodes n ON n.id = nm.node_id
-                WHERE n.is_active = true ORDER BY nm.node_id, nm.time DESC
-              )
-              SELECT n.id as node_id, n.address, n.version, lm.cpu_percent, lm.ram_percent, lm.file_size, lm.uptime
-              FROM nodes n JOIN latest_metrics lm ON lm.node_id = n.id
+                FROM node_metrics nm WHERE nm.node_id = n.id ORDER BY nm.time DESC LIMIT 1
+              ) lm ON true
               WHERE n.is_active = true
               ORDER BY lm.file_size ASC NULLS LAST LIMIT ${limit}`;
       }
