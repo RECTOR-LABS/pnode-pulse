@@ -10,6 +10,7 @@ on:
       - "src/lib/**"
       - "prisma/schema.prisma"
       - "Dockerfile"
+      - ".dockerignore"
       - "package.json"
       - ".github/workflows/deploy-collector.yml"
 
@@ -93,12 +94,14 @@ jobs:
           # --no-deps leaves postgres/redis untouched.
           docker rm -f pnode-pulse-collector 2>/dev/null || true
           docker compose up -d --no-deps collector
-          # A worker has no HTTP healthcheck; confirm it stays up (not crash-looping).
-          sleep 8
+          # A worker has no HTTP healthcheck; give it time to boot, then confirm it is
+          # running AND has not crash-looped (RestartCount must stay 0).
+          sleep 15
           state=$(docker inspect -f '{{.State.Status}}' pnode-pulse-collector)
-          echo "collector state: $state"
-          if [ "$state" != "running" ]; then
-            echo "ERROR: collector is not running"; docker logs --tail 50 pnode-pulse-collector; exit 1
+          restarts=$(docker inspect -f '{{.RestartCount}}' pnode-pulse-collector)
+          echo "collector state=$state restarts=$restarts"
+          if [ "$state" != "running" ] || [ "$restarts" -gt 0 ]; then
+            echo "ERROR: collector unhealthy (state=$state restarts=$restarts)"; docker logs --tail 50 pnode-pulse-collector; exit 1
           fi
           docker image prune -f
           REMOTE

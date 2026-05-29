@@ -59,5 +59,6 @@ docker-compose*
 !README.md
 docs
 
-# Scripts
-scripts/
+# Scripts — only the collector entrypoint is needed inside images
+scripts/*
+!scripts/start-collector.ts
