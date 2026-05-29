@@ -358,7 +358,14 @@ ${payload.message}
       },
     );
 
-    const result = await response.json();
+    // Telegram Bot API sendMessage response — only the fields we read.
+    // See https://core.telegram.org/bots/api#making-requests
+    interface TelegramSendMessageResponse {
+      ok: boolean;
+      description?: string;
+      result?: { message_id: number };
+    }
+    const result = (await response.json()) as TelegramSendMessageResponse;
 
     if (!result.ok) {
       throw new Error(result.description || "Telegram API error");
@@ -368,7 +375,7 @@ ${payload.message}
       success: true,
       channelType: "telegram",
       channelId,
-      messageId: String(result.result.message_id),
+      messageId: String(result.result?.message_id),
     };
   } catch (error) {
     return {
