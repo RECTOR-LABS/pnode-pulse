@@ -1,4 +1,4 @@
-name: Deploy Production (Blue/Green)
+name: Deploy Production
 
 on:
   workflow_dispatch:  # Manual trigger available
@@ -60,7 +60,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
 
-      - name: Deploy to VPS (Blue/Green Production via CF Tunnel)
+      - name: Deploy to VPS (Production via CF Tunnel)
         run: |
           ssh -o StrictHostKeyChecking=accept-new \
               -o ProxyCommand="cloudflared access ssh --hostname=ssh.rectorspace.com" \
@@ -69,8 +69,7 @@ jobs:
           cd ~/pnode-pulse
           git pull origin main
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-          docker pull ghcr.io/rector-labs/pnode-pulse:latest
-          bash scripts/blue-green-deploy.sh
+          bash scripts/deploy.sh
           docker image prune -f
           REMOTE
 
@@ -81,6 +80,6 @@ jobs:
               pnodepulse@ssh.rectorspace.com bash -s <<'REMOTE'
           set -euo pipefail
           cd ~/pnode-pulse
-          docker compose ps blue green
-          docker compose logs --tail 20 blue green
+          docker compose ps green
+          docker compose logs --tail 20 green
           REMOTE

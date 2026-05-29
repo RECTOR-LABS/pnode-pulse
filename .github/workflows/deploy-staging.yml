@@ -71,7 +71,7 @@ jobs:
           docker pull ghcr.io/rector-labs/pnode-pulse:dev
           docker compose stop staging
           docker compose rm -f staging
-          docker compose up -d staging
+          docker compose up -d --no-deps staging
           docker image prune -f
           sleep 5
           docker compose ps staging

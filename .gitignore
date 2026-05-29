@@ -43,6 +43,12 @@ yarn-error.log*
 .env.*.local
 !.env.example
 
+# docker compose local overrides (auto-loaded by `docker compose`).
+# Keep these untracked so a dev convenience (e.g. exposing DB/redis host ports
+# for local tooling) can never leak into production. See .github/workflows/README.md.
+docker-compose.override.yml
+docker-compose.override.yaml
+
 # vercel
 .vercel
 
