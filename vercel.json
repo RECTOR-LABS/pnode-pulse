@@ -3,12 +3,6 @@
   "buildCommand": "npx prisma generate && next build",
   "framework": "nextjs",
   "regions": ["fra1"],
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://api.pulse.rectorspace.com/api/:path*"
-    }
-  ],
   "github": {
     "silent": true
   }

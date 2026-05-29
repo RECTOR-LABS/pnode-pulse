@@ -60,6 +60,23 @@ const nextConfig: NextConfig = {
     ];
   },
 
+  // Tier-1 Vercel migration: when running as the Vercel front-end (PULSE_API_URL
+  // set), proxy every /api/* request to the VPS backend so the browser stays
+  // same-origin (no CORS, no client changes). beforeFiles => precedence over the
+  // locally-built API route handlers (an afterFiles/vercel.json rewrite is
+  // shadowed by static routes like /api/health). Gated on PULSE_API_URL so the
+  // VPS monolith and local dev (var unset) serve /api/* themselves and never
+  // proxy to themselves (which would infinite-loop).
+  async rewrites() {
+    const apiUrl = process.env.PULSE_API_URL;
+    if (!apiUrl) return [];
+    return {
+      beforeFiles: [
+        { source: "/api/:path*", destination: `${apiUrl}/api/:path*` },
+      ],
+    };
+  },
+
   // Optimize images
   images: {
     formats: ["image/avif", "image/webp"],
