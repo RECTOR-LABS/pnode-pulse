@@ -364,7 +364,9 @@ export const nodesRouter = createTRPCRouter({
       orderBy: { lastSeenAt: "desc" },
     });
 
-    return peers;
+    // NodePeer.id is BigInt in the DB; coerce to number to keep the API
+    // response contract (and avoid leaking bigint to clients).
+    return peers.map((p) => ({ ...p, id: Number(p.id) }));
   }),
 
   /**

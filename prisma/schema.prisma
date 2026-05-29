@@ -248,7 +248,7 @@ model NodeMetric {
 
 /// Peer relationships between nodes (from get-pods)
 model NodePeer {
-  id            Int      @id @default(autoincrement())
+  id            BigInt   @id @default(autoincrement())
   nodeId        Int      @map("node_id")
   peerNodeId    Int?     @map("peer_node_id")
   /// Peer address if not yet registered as a node
