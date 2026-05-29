@@ -60,45 +60,65 @@ jobs:
           cache-from: type=gha,scope=pulse-api
           cache-to: type=gha,mode=max,scope=pulse-api
 
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: 176.222.53.185
-          username: pnodepulse
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            set -euo pipefail
-            cd ~/pnode-pulse
+      # Direct SSH to the VPS public IP is blocked by the firewall. Operators
+      # SSH via the Cloudflare Tunnel (`ssh.rectorspace.com` → VPS:22), so CI
+      # uses the same path. Tunnel is a public route; SSH key auth (VPS_SSH_KEY)
+      # remains the only authentication.
+      - name: Install cloudflared
+        run: |
+          curl -fsSL https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o /tmp/cloudflared.deb
+          sudo dpkg -i /tmp/cloudflared.deb
+          cloudflared --version
 
-            git fetch origin main
-            git pull --ff-only origin main
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
 
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker pull ghcr.io/rector-labs/pulse-api:latest
+      - name: Deploy pulse-api to VPS (via CF Tunnel)
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              -o ProxyCommand="cloudflared access ssh --hostname=ssh.rectorspace.com" \
+              -i ~/.ssh/id_ed25519 \
+              pnodepulse@ssh.rectorspace.com bash -s <<'REMOTE'
+          set -euo pipefail
+          cd ~/pnode-pulse
 
-            # `pulse-api` is behind a docker-compose profile so it doesn't start by accident.
-            # Use --profile to bring it up alongside postgres/redis.
-            docker compose --profile pulse-api up -d pulse-api
+          git fetch origin main
+          git pull --ff-only origin main
 
-            # Wait for healthz to report green
-            for i in {1..20}; do
-              if curl -fsS http://127.0.0.1:7004/healthz >/dev/null; then
-                echo "pulse-api healthy"; break
-              fi
-              echo "waiting for pulse-api… ($i/20)"; sleep 2
-            done
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker pull ghcr.io/rector-labs/pulse-api:latest
 
-            # Free disk
-            docker image prune -f
+          # `pulse-api` is behind a docker-compose profile so it doesn't start by accident.
+          # Use --profile to bring it up alongside postgres/redis.
+          docker compose --profile pulse-api up -d pulse-api
+
+          # Wait for healthz to report green
+          for i in {1..20}; do
+            if curl -fsS http://127.0.0.1:7004/healthz >/dev/null; then
+              echo "pulse-api healthy"; break
+            fi
+            echo "waiting for pulse-api… ($i/20)"; sleep 2
+          done
+
+          # Free disk
+          docker image prune -f
+          REMOTE
 
       - name: Verify deployment
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: 176.222.53.185
-          username: pnodepulse
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            cd ~/pnode-pulse
-            docker compose ps pulse-api
-            docker compose logs --tail 30 pulse-api
-            curl -fsS http://127.0.0.1:7004/healthz | head
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new \
+              -o UserKnownHostsFile=~/.ssh/known_hosts \
+              -o ProxyCommand="cloudflared access ssh --hostname=ssh.rectorspace.com" \
+              -i ~/.ssh/id_ed25519 \
+              pnodepulse@ssh.rectorspace.com bash -s <<'REMOTE'
+          set -euo pipefail
+          cd ~/pnode-pulse
+          docker compose ps pulse-api
+          docker compose logs --tail 30 pulse-api
+          curl -fsS http://127.0.0.1:7004/healthz | head
+          REMOTE
