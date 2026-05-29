@@ -2,7 +2,7 @@
 
 **Last Updated**: 2025-12-15  
 **Environment**: Production (pulse.rectorspace.com)  
-**VPS**: 176.222.53.185 (pnodepulse user)
+**VPS**: 151.245.137.75 (pnodepulse user)
 
 ---
 

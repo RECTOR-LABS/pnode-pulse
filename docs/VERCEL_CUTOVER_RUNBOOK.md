@@ -61,7 +61,7 @@ clashes while the new vhost is being set up.
 > **7004** — _reserved_ for pulse-api dedicated service (Tier 2 follow-on; not in use today)
 
 Today's Tier 1 cutover proxies through nginx straight to the existing
-`pnode-pulse-web-blue` container on port 7000. No new container is needed.
+`pnode-pulse-web-green` container on port 7001. No new container is needed.
 
 ---
 
@@ -136,10 +136,10 @@ server {
     proxy_buffers 8 16k;
     client_max_body_size 4m;
 
-    # Same upstream as pulse.rectorspace.com — the existing blue container.
+    # Same upstream as pulse.rectorspace.com — the existing green container.
     # When we want isolation later, this becomes a dedicated pulse-api on :7004.
     location / {
-        proxy_pass http://127.0.0.1:7000;
+        proxy_pass http://127.0.0.1:7001;
         proxy_http_version 1.1;
         proxy_set_header Host              api.pulse.rectorspace.com;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -370,7 +370,7 @@ Browser test:
 
 Monitor:
 
-- `ssh reclabs3 'docker logs --tail 200 -f pnode-pulse-web-blue'` — request volume should look normal
+- `ssh reclabs3 'docker logs --tail 200 -f pnode-pulse-web-green'` — request volume should look normal
 - Vercel dashboard → Project → Analytics — request count + errors
 - Sentry (if configured) — error rate
 - nginx access log on VPS: `tail -f /var/log/nginx/api.pulse.access.log`
@@ -401,8 +401,8 @@ dig +short pulse.rectorspace.com
 # Expect: 151.245.137.75 within the TTL window (~1 min if you lowered it in Step 11)
 ```
 
-Existing VPS containers (blue/green) are still running on port 7000/7001 and
-nginx still has the original vhost — they will serve traffic again immediately.
+The single `green` container is still running on port 7001 and nginx still has
+the original vhost — it will serve traffic again immediately.
 
 ---
 
@@ -480,7 +480,7 @@ curl -fsS http://127.0.0.1:7004/readyz | jq
 # Expect: {"status":"ok","checks":{"database":true,"redis":true},...}
 # (status is "degraded" if only Redis is down — DB unreachable returns 503.)
 
-# tRPC smoke test — same procedure as `curl http://127.0.0.1:7000/api/trpc/nodes.versions`
+# tRPC smoke test — same procedure as `curl http://127.0.0.1:7001/api/trpc/nodes.versions`
 curl -fsS 'http://127.0.0.1:7004/api/trpc/nodes.versions' | jq
 ```
 
@@ -513,9 +513,9 @@ server {
         proxy_pass http://127.0.0.1:7004;
     }
 
-    # Everything else (REST, badges, metrics, realtime) → monolith :7000
+    # Everything else (REST, badges, metrics, realtime) → monolith :7001
     location / {
-        proxy_pass http://127.0.0.1:7000;
+        proxy_pass http://127.0.0.1:7001;
         proxy_http_version 1.1;
         proxy_set_header Host              api.pulse.rectorspace.com;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -575,25 +575,25 @@ Only after pulse-api has been serving tRPC for 14+ days without issues:
 4. Update the FE Vercel deploy — Prisma schema is no longer needed for the
    build; remove `npx prisma generate` from `vercel.json` buildCommand and
    drop `DATABASE_URL` / `JWT_SECRET` Vercel env vars
-5. The monolith `blue`/`green` Docker containers can also be stopped once
-   nothing depends on them (all paths in the nginx vhost would already
+5. The monolith `green` Docker container can also be stopped once
+   nothing depends on it (all paths in the nginx vhost would already
    point at pulse-api or a static handler by then)
 
 ---
 
 ## What lives where after Tier 1 cutover
 
-| Component                                      | Location                                          | Talks to                  |
-| ---------------------------------------------- | ------------------------------------------------- | ------------------------- |
-| FE pages                                       | Vercel (`pulse.rectorspace.com`)                  | rewritten `/api/*` → VPS  |
-| tRPC server, REST API                          | VPS Docker `pnode-pulse-web-blue:7000` (existing) | local DB + Redis          |
-| TimescaleDB                                    | VPS Docker `pnode-pulse-postgres:5434` (existing) | —                         |
-| Redis                                          | VPS Docker `pnode-pulse-redis:6381` (existing)    | —                         |
-| Collector worker                               | VPS systemd / docker (existing)                   | local DB                  |
-| Alert processor                                | VPS (existing)                                    | local DB + Redis          |
-| Report processor                               | VPS (existing)                                    | local DB + email channels |
-| nginx vhost: `pulse.rectorspace.com`           | VPS — can be left in place as standby             | —                         |
-| nginx vhost: `api.pulse.rectorspace.com` (new) | VPS                                               | `127.0.0.1:7000`          |
+| Component                                      | Location                                               | Talks to                  |
+| ---------------------------------------------- | ------------------------------------------------------ | ------------------------- |
+| FE pages                                       | Vercel (`pulse.rectorspace.com`)                       | rewritten `/api/*` → VPS  |
+| tRPC server, REST API                          | VPS Docker `pnode-pulse-web-green:7001` (existing)     | local DB + Redis          |
+| TimescaleDB                                    | VPS Docker `pnode-pulse-postgres` (existing, internal) | —                         |
+| Redis                                          | VPS Docker `pnode-pulse-redis` (existing, internal)    | —                         |
+| Collector worker                               | VPS systemd / docker (existing)                        | local DB                  |
+| Alert processor                                | VPS (existing)                                         | local DB + Redis          |
+| Report processor                               | VPS (existing)                                         | local DB + email channels |
+| nginx vhost: `pulse.rectorspace.com`           | VPS — can be left in place as standby                  | —                         |
+| nginx vhost: `api.pulse.rectorspace.com` (new) | VPS                                                    | `127.0.0.1:7001`          |
 
 ---
 

@@ -214,26 +214,25 @@ curl -X POST http://<ip-address>:6000/rpc \
 
 ## Deployment
 
-**VPS**: 176.222.53.185 (rectorspace.com)
+**VPS**: 151.245.137.75 (rectorspace.com)
 **User**: pnodepulse
 **Domain**: pulse.rectorspace.com
 
-| Service     | Port |
-| ----------- | ---- |
-| Web (Blue)  | 7000 |
-| Web (Green) | 7001 |
-| Staging     | 7002 |
-| PostgreSQL  | 5434 |
-| Redis       | 6381 |
+| Service          | Port          |
+| ---------------- | ------------- |
+| Web (Production) | 7001          |
+| Staging          | 7002          |
+| PostgreSQL       | internal only |
+| Redis            | internal only |
 
 ### Push-to-Deploy Workflow
 
 **Automated deployment** triggers on every push to main/dev branches:
 
-| Branch | Environment             | Port      | URL                           |
-| ------ | ----------------------- | --------- | ----------------------------- |
-| `dev`  | Staging                 | 7002      | staging.pulse.rectorspace.com |
-| `main` | Production (Blue/Green) | 7000/7001 | pulse.rectorspace.com         |
+| Branch | Environment                   | Port | URL                           |
+| ------ | ----------------------------- | ---- | ----------------------------- |
+| `dev`  | Staging                       | 7002 | staging.pulse.rectorspace.com |
+| `main` | Production (single container) | 7001 | pulse.rectorspace.com         |
 
 #### Deployment Flow
 
@@ -250,15 +249,13 @@ curl -X POST http://<ip-address>:6000/rpc \
 
 1. Push to `main` branch
 2. GitHub Actions builds Docker image
-3. Pushes image to GHCR with `:latest` tag
+3. Pushes image to GHCR with `:latest` tag (plus a `:prod-<sha>` tag for rollback)
 4. SSH to VPS, pulls new image
-5. Runs blue/green deployment script:
-   - Detects active environment (blue/green)
-   - Starts inactive environment with new image
-   - Waits for healthcheck to pass
-   - Manual/automated switch to new environment
-   - Stops old environment
-6. Zero-downtime deployment
+5. Runs `scripts/deploy.sh`:
+   - `docker compose pull green` to fetch the new image
+   - `docker compose up -d --no-deps green` to recreate ONLY the `green` web container (`--no-deps` leaves postgres/redis/collector untouched)
+   - Health-gates the new container before considering the deploy successful
+6. Single-container deploy with a brief ~5-15s restart blip (no longer zero-downtime); nginx points permanently at `localhost:7001`
 
 #### Required GitHub Secrets
 
@@ -266,7 +263,7 @@ Configure these in repository settings (Settings → Secrets and variables → A
 
 | Secret              | Value             | Description                           |
 | ------------------- | ----------------- | ------------------------------------- |
-| `VPS_SSH_KEY`       | Private SSH key   | SSH key for pnodepulse@176.222.53.185 |
+| `VPS_SSH_KEY`       | Private SSH key   | SSH key for pnodepulse@151.245.137.75 |
 | `POSTGRES_PASSWORD` | Database password | PostgreSQL password for production    |
 
 #### Deployment Commands
@@ -278,29 +275,29 @@ cd ~/pnode-pulse
 docker compose pull staging
 docker compose up -d staging
 
-# Manual blue/green deployment
+# Manual production deployment (single container)
 ssh pnodepulse
 cd ~/pnode-pulse
-bash scripts/blue-green-deploy.sh
+bash scripts/deploy.sh
 
 # Check deployment status
 docker compose ps
-docker compose logs -f blue green staging
+docker compose logs -f green staging
 
 # Rollback (if needed)
-# Simply switch back to previous environment
-docker compose up -d blue  # or green
+# Re-deploy a known-good image by its :prod-<sha> tag, then recreate green
+docker compose pull green
+docker compose up -d --no-deps green
 ```
 
 #### Health Checks
 
 All services have health endpoints for monitoring:
 
-| Endpoint | URL                              | Checks            |
-| -------- | -------------------------------- | ----------------- |
-| Staging  | http://localhost:7002/api/health | DB, Redis, uptime |
-| Blue     | http://localhost:7000/api/health | DB, Redis, uptime |
-| Green    | http://localhost:7001/api/health | DB, Redis, uptime |
+| Endpoint           | URL                              | Checks            |
+| ------------------ | -------------------------------- | ----------------- |
+| Staging            | http://localhost:7002/api/health | DB, Redis, uptime |
+| Green (Production) | http://localhost:7001/api/health | DB, Redis, uptime |
 
 Health check response:
 
@@ -330,11 +327,11 @@ server {
   }
 }
 
-# Production (point to active blue/green port)
+# Production (single container, green)
 server {
   server_name pulse.rectorspace.com;
   location / {
-    proxy_pass http://localhost:7000;  # or 7001 for green
+    proxy_pass http://localhost:7001;  # green container (permanent, no switching)
   }
 }
 ```
@@ -362,8 +359,8 @@ docker compose ps
 # Run database migrations
 docker compose exec postgres psql -U pnodepulse -d pnodepulse -f /path/to/migration.sql
 
-# Start initial deployment (blue)
-docker compose up -d blue
+# Start initial deployment (green, single production container)
+docker compose up -d green
 ```
 
 ## Project Structure
@@ -718,9 +715,9 @@ console.log(pods);
 **Deployment Infrastructure** ✅ COMPLETE
 
 - [x] GitHub Actions workflow for staging (dev branch)
-- [x] GitHub Actions workflow for production (main branch with blue/green)
+- [x] GitHub Actions workflow for production (main branch, single-container deploy)
 - [x] Docker Compose configuration with multi-environment support
-- [x] Blue/green deployment script with zero-downtime
+- [x] Single-container deploy script (`scripts/deploy.sh`) with `--no-deps` + health-gate (brief restart blip)
 - [x] Health check endpoints for all services
 - [x] VPS setup complete (user, ports, SSH config)
 

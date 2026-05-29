@@ -64,7 +64,7 @@ docker compose up -d
 docker compose ps
 ```
 
-Access at `http://localhost:7000`
+Access at `http://localhost:7001`
 
 ---
 
@@ -119,8 +119,8 @@ docker run --rm \
   node:20-alpine \
   sh -c "npx prisma migrate deploy"
 
-# Start web application
-docker compose up -d blue
+# Start web application (single always-on container)
+docker compose up -d green
 ```
 
 ### 5. Verify Deployment
@@ -130,7 +130,7 @@ docker compose up -d blue
 docker compose ps
 
 # Test health endpoint
-curl http://localhost:7000/api/health
+curl http://localhost:7001/api/health
 ```
 
 ---
@@ -231,7 +231,7 @@ PRPC_SEED_NODES=192.190.136.36,173.212.203.145
 
 ```bash
 # Check application logs for collection activity
-docker compose logs blue --tail 50 | grep -i collect
+docker compose logs green --tail 50 | grep -i collect
 
 # Check database for recent metrics
 docker exec pnode-pulse-postgres psql -U pnodepulse -c \
@@ -269,7 +269,7 @@ server {
     server_name pulse.yourdomain.com;
 
     location / {
-        proxy_pass http://localhost:7000;
+        proxy_pass http://localhost:7001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -322,10 +322,10 @@ pNode Pulse includes automated deployment workflows.
 
 ### Workflows
 
-| Workflow                | Trigger        | Target                  |
-| ----------------------- | -------------- | ----------------------- |
-| `deploy-staging.yml`    | Push to `dev`  | Staging (port 7002)     |
-| `deploy-production.yml` | Push to `main` | Production (blue/green) |
+| Workflow                | Trigger        | Target                                   |
+| ----------------------- | -------------- | ---------------------------------------- |
+| `deploy-staging.yml`    | Push to `dev`  | Staging (port 7002)                      |
+| `deploy-production.yml` | Push to `main` | Production (single container, port 7001) |
 
 ### Required GitHub Secrets
 
@@ -348,48 +348,26 @@ Configure in repository Settings → Secrets:
 
 1. Push to `main` branch
 2. GitHub Actions builds Docker image
-3. Pushes to GHCR with `:latest` tag
-4. Runs blue/green deployment:
-   - Starts inactive environment (blue or green)
-   - Waits for health check
-   - Switches traffic
-   - Stops old environment
+3. Pushes to GHCR with `:latest` tag (production builds also push a `:prod-<sha>` tag for rollbacks)
+4. SSHs to VPS and runs `scripts/deploy.sh`, which:
+   - Pulls the new image (`docker compose pull green`)
+   - Recreates only the web container (`docker compose up -d --no-deps green`)
+   - Waits up to 120s for the `green` container's health check to pass (fails the deploy if it stays unhealthy)
+
+The `--no-deps` flag ensures deploys recreate **only** the web container and never touch `postgres`, `redis`, or `collector`. Because there is a single web container, the deploy is not zero-downtime: expect a brief (~5-15s) restart blip while `green` is recreated. This is acceptable for a single low-traffic instance.
 
 ### Manual Deployment
 
 ```bash
-# SSH to VPS
-ssh pnodepulse@your-vps
+# SSH to VPS (Cloudflare Tunnel alias; direct port 22 is firewalled)
+ssh pnodepulse
 
 # Pull latest changes
 cd ~/pnode-pulse
 git pull origin main
 
-# Pull latest image
-docker compose pull blue
-
-# Restart service
-docker compose up -d blue
-```
-
-### Blue/Green Switch
-
-```bash
-# Check current active environment
-docker compose ps | grep healthy
-
-# If blue is active, switch to green
-docker compose --profile green up -d green
-
-# Wait for health check
-curl http://localhost:7001/api/health
-
-# Update nginx to point to 7001
-sudo vim /etc/nginx/sites-enabled/your-site
-sudo nginx -t && sudo systemctl reload nginx
-
-# Stop old blue
-docker compose stop blue
+# Pull the new image and recreate only the web container
+SERVICE=green bash scripts/deploy.sh
 ```
 
 ---
@@ -426,7 +404,7 @@ All services have built-in health checks:
 docker compose ps
 
 # Check specific container
-docker inspect pnode-pulse-web-blue --format='{{.State.Health.Status}}'
+docker inspect pnode-pulse-web-green --format='{{.State.Health.Status}}'
 ```
 
 ### Log Monitoring
@@ -436,7 +414,7 @@ docker inspect pnode-pulse-web-blue --format='{{.State.Health.Status}}'
 docker compose logs -f
 
 # Specific service
-docker compose logs -f blue
+docker compose logs -f green
 
 # Collector only
 docker logs -f pnode-pulse-collector
@@ -450,7 +428,7 @@ docker logs -f pnode-pulse-collector
 
 ```bash
 # Check logs
-docker compose logs blue
+docker compose logs green
 
 # Verify network
 docker network ls | grep pnode-pulse
@@ -467,7 +445,7 @@ docker compose up -d
 docker exec pnode-pulse-postgres pg_isready -U pnodepulse
 
 # Check password
-docker exec pnode-pulse-web-blue printenv DATABASE_URL
+docker exec pnode-pulse-web-green printenv DATABASE_URL
 ```
 
 ### Collector Not Collecting
@@ -508,28 +486,51 @@ npx prisma migrate reset
 docker stats
 
 # Restart containers
-docker compose restart blue
+docker compose restart green
 ```
 
 ---
 
-## Blue/Green Deployment
+## Production Deployment Model
 
-For zero-downtime updates:
+Production runs a single always-on web container:
+
+| Property        | Value                                                       |
+| --------------- | ----------------------------------------------------------- |
+| Compose service | `green`                                                     |
+| Container name  | `pnode-pulse-web-green`                                     |
+| Host port       | `7001`                                                      |
+| nginx upstream  | `http://localhost:7001` (permanent — no upstream switching) |
+
+Deploys run `scripts/deploy.sh`, which pulls the new image, recreates only the web container with `--no-deps` (leaving `postgres`, `redis`, and `collector` untouched), and waits up to 120s for the container's health check before considering the deploy successful:
 
 ```bash
-# Deploy to green while blue is active
-docker compose --profile green up -d green
+# On the VPS, as pnodepulse
+cd ~/pnode-pulse
+SERVICE=green bash scripts/deploy.sh
 
-# Wait for health check
-sleep 30
+# Verify
 curl http://localhost:7001/api/health
+```
 
-# Switch nginx to green (port 7001)
-# Update nginx config and reload
+This is not zero-downtime: expect a brief (~5-15s) restart blip while `green` is recreated. Acceptable for a single low-traffic instance.
 
-# Stop blue
-docker compose stop blue
+### Rollback
+
+Production builds push a `:prod-<sha>` tag to GHCR for every commit on `main`. To roll back, re-deploy a previous image tag:
+
+```bash
+# On the VPS, as pnodepulse
+cd ~/pnode-pulse
+
+# Pull the known-good image (replace <sha> with the target commit)
+docker pull ghcr.io/rector-labs/pnode-pulse:prod-<sha>
+
+# Re-tag it as :latest so deploy.sh picks it up
+docker tag ghcr.io/rector-labs/pnode-pulse:prod-<sha> ghcr.io/rector-labs/pnode-pulse:latest
+
+# Recreate the web container with the rolled-back image
+SERVICE=green bash scripts/deploy.sh
 ```
 
 ---
@@ -541,7 +542,7 @@ docker compose stop blue
 git pull origin main
 
 # Pull latest image
-docker compose pull
+docker compose pull green
 
 # Apply migrations
 docker run --rm \
@@ -552,10 +553,10 @@ docker run --rm \
   node:20-alpine \
   sh -c "npx prisma migrate deploy"
 
-# Restart services
-docker compose up -d blue
+# Recreate only the web container (postgres/redis/collector untouched)
+SERVICE=green bash scripts/deploy.sh
 
-# Restart collector
+# Restart collector (only if its image/config changed)
 docker restart pnode-pulse-collector
 ```
 
