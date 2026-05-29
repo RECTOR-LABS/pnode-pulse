@@ -94,6 +94,27 @@ services:
       timeout: 10s
       retries: 3
 
+  # Data collector worker — polls pNodes via pRPC and writes metrics/peers to the DB.
+  # Built from the `collector` Dockerfile target (tsx + the worker code). Core service:
+  # deployed via deploy-collector.yml; the web deploy (`up -d --no-deps green`) never
+  # touches it. No host ports — reaches postgres/redis on the internal network.
+  collector:
+    image: ghcr.io/rector-labs/pnode-pulse-collector:latest
+    container_name: pnode-pulse-collector
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://pnodepulse:${POSTGRES_PASSWORD}@postgres:5432/pnodepulse
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    networks:
+      - pnode-pulse-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   # pulse-api (lean Hono service hosting the tRPC server)
   # Tier 2 of the Vercel migration — see docs/VERCEL_CUTOVER_RUNBOOK.md.
   # Bound to 127.0.0.1 so nginx is the only public ingress.

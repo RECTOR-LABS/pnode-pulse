@@ -1,5 +1,6 @@
-# Build stage
-FROM node:20-alpine AS builder
+# Dependencies + source + generated Prisma client.
+# Shared base for both the web build and the collector so they install deps once.
+FROM node:20-alpine AS deps
 
 WORKDIR /app
 
@@ -15,12 +16,22 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build Next.js
+# Web build stage
+FROM deps AS builder
+
 ARG DATABASE_URL
 ENV DATABASE_URL=${DATABASE_URL}
 RUN npm run build
 
-# Production stage
+# Collector stage — runs the data-collection worker via tsx.
+# Reuses `deps` (full deps incl. tsx, source, generated Prisma client); the
+# Next.js build is NOT needed here, so this stage skips it.
+FROM deps AS collector
+
+ENV NODE_ENV=production
+CMD ["npx", "tsx", "scripts/start-collector.ts"]
+
+# Production web stage (Next.js standalone). This is the default build target.
 FROM node:20-alpine AS runner
 
 WORKDIR /app
