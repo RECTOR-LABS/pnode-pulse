@@ -11,11 +11,13 @@ Adds database fields to support Xandeum v0.7.0 `get-pods-with-stats` API.
 ## Changes
 
 ### nodes table
+
 - `is_public` (BOOLEAN, nullable) - Whether RPC port is publicly accessible
 - `rpc_port` (INTEGER, nullable) - RPC service port (typically 6000)
 - Index on `is_public` for filtering
 
 ### node_metrics table
+
 - `storage_committed` (BIGINT, nullable) - Total storage allocated in bytes
 - `storage_usage_percent` (DOUBLE PRECISION, nullable) - Storage utilization percentage
 
@@ -31,9 +33,10 @@ Adds database fields to support Xandeum v0.7.0 `get-pods-with-stats` API.
 ## Application
 
 ### Staging (Test First)
+
 ```bash
 # SSH to staging VPS
-ssh pnodepulse@176.222.53.185
+ssh pnodepulse@151.245.137.75
 
 # Backup database
 pg_dump -h localhost -p 5434 -U pnodepulse pnodepulse > backup_pre_v070.sql
@@ -47,6 +50,7 @@ psql -h localhost -p 5434 -U pnodepulse pnodepulse -c "\d node_metrics"
 ```
 
 ### Production
+
 ```bash
 # Same process after staging verification
 ```
@@ -91,6 +95,7 @@ ORDER BY c.table_name, c.column_name;
 ## Post-Migration
 
 After successful migration:
+
 1. Update issue #162 status
 2. Proceed with #161 (worker updates)
 3. Monitor logs for data collection
