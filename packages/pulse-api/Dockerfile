@@ -49,10 +49,12 @@ COPY --from=builder /app/packages/pulse-api/package.json ./package.json
 COPY --from=builder /app/packages/pulse-types ./packages/pulse-types
 RUN npm install --ignore-scripts --omit=dev
 
-# Generated Prisma client + schema
+# Generated Prisma client + schema. `npx prisma generate` was run from
+# /app/packages/pulse-api in the build stage, so the client landed in the
+# workspace-local node_modules — not the (non-existent) root one.
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
+COPY --from=builder /app/packages/pulse-api/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/packages/pulse-api/node_modules/@prisma/client ./node_modules/@prisma/client
 
 # Compiled JS
 COPY --from=builder /app/packages/pulse-api/dist ./dist
