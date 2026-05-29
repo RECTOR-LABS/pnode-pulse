@@ -42,7 +42,7 @@ export const peersRouter = createTRPCRouter({
       });
 
       const peerInfos: PeerInfo[] = peers.map((p) => ({
-        peerId: p.peerNodeId ?? p.id,
+        peerId: p.peerNodeId ?? Number(p.id),
         address: p.peerAddress,
         version: p.peerVersion ?? undefined,
         isActive: p.peerNode?.isActive ?? true, // Assume active if not linked
@@ -100,7 +100,7 @@ export const peersRouter = createTRPCRouter({
       allPeers.forEach((p) => {
         const peers = peersByNode.get(p.nodeId) ?? [];
         peers.push({
-          peerId: p.peerNodeId ?? p.id,
+          peerId: p.peerNodeId ?? Number(p.id),
           address: p.peerAddress,
           version: p.peerVersion ?? undefined,
           isActive: p.peerNode?.isActive ?? true,

@@ -42,7 +42,7 @@ export const peersRouter = createTRPCRouter({
       });
 
       const peerInfos: PeerInfo[] = peers.map((p) => ({
-        peerId: p.peerNodeId ?? p.id,
+        peerId: p.peerNodeId ?? Number(p.id),
         address: p.peerAddress,
         version: p.peerVersion ?? undefined,
         isActive: p.peerNode?.isActive ?? true, // Assume active if not linked
@@ -62,9 +62,11 @@ export const peersRouter = createTRPCRouter({
    */
   networkConnectivity: publicProcedure
     .input(
-      z.object({
-        limit: z.number().min(1).max(200).default(100),
-      }).optional()
+      z
+        .object({
+          limit: z.number().min(1).max(200).default(100),
+        })
+        .optional(),
     )
     .query(async ({ ctx, input }) => {
       const limit = input?.limit ?? 100;
@@ -98,7 +100,7 @@ export const peersRouter = createTRPCRouter({
       allPeers.forEach((p) => {
         const peers = peersByNode.get(p.nodeId) ?? [];
         peers.push({
-          peerId: p.peerNodeId ?? p.id,
+          peerId: p.peerNodeId ?? Number(p.id),
           address: p.peerAddress,
           version: p.peerVersion ?? undefined,
           isActive: p.peerNode?.isActive ?? true,
@@ -127,10 +129,14 @@ export const peersRouter = createTRPCRouter({
    */
   peerOptimizations: publicProcedure
     .input(
-      z.object({
-        limit: z.number().min(1).max(100).default(50),
-        priorityFilter: z.enum(["all", "critical", "high", "medium"]).default("all"),
-      }).optional()
+      z
+        .object({
+          limit: z.number().min(1).max(100).default(50),
+          priorityFilter: z
+            .enum(["all", "critical", "high", "medium"])
+            .default("all"),
+        })
+        .optional(),
     )
     .query(async ({ ctx, input }) => {
       const limit = input?.limit ?? 50;
@@ -152,10 +158,12 @@ export const peersRouter = createTRPCRouter({
       });
 
       // Get active peer counts (peers that are also active nodes)
-      const activePeerCounts = await ctx.db.$queryRaw<Array<{
-        node_id: number;
-        active_peers: bigint;
-      }>>`
+      const activePeerCounts = await ctx.db.$queryRaw<
+        Array<{
+          node_id: number;
+          active_peers: bigint;
+        }>
+      >`
         SELECT
           np.node_id,
           COUNT(*) FILTER (WHERE n.is_active = true) as active_peers
@@ -167,10 +175,10 @@ export const peersRouter = createTRPCRouter({
       `;
 
       const totalPeerMap = new Map(
-        peerCounts.map((p) => [p.nodeId, p._count.id])
+        peerCounts.map((p) => [p.nodeId, p._count.id]),
       );
       const activePeerMap = new Map(
-        activePeerCounts.map((p) => [p.node_id, Number(p.active_peers)])
+        activePeerCounts.map((p) => [p.node_id, Number(p.active_peers)]),
       );
 
       // Create simplified analyses for optimization detection
@@ -179,7 +187,8 @@ export const peersRouter = createTRPCRouter({
         address: node.address,
         totalPeers: totalPeerMap.get(node.id) ?? 0,
         activePeers: activePeerMap.get(node.id) ?? 0,
-        inactivePeers: (totalPeerMap.get(node.id) ?? 0) - (activePeerMap.get(node.id) ?? 0),
+        inactivePeers:
+          (totalPeerMap.get(node.id) ?? 0) - (activePeerMap.get(node.id) ?? 0),
         versionDiversity: 0,
         peerVersions: [],
         healthScore: 50 + Math.min((activePeerMap.get(node.id) ?? 0) * 3, 40),
@@ -194,7 +203,7 @@ export const peersRouter = createTRPCRouter({
         const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
         const maxPriority = priorityOrder[priorityFilter];
         optimizations = optimizations.filter(
-          (o) => priorityOrder[o.priority] <= maxPriority
+          (o) => priorityOrder[o.priority] <= maxPriority,
         );
       }
 
@@ -206,7 +215,8 @@ export const peersRouter = createTRPCRouter({
         totalNodesAnalyzed: nodes.length,
         nodesNeedingOptimization: optimizations.length,
         byPriority: {
-          critical: optimizations.filter((o) => o.priority === "critical").length,
+          critical: optimizations.filter((o) => o.priority === "critical")
+            .length,
           high: optimizations.filter((o) => o.priority === "high").length,
           medium: optimizations.filter((o) => o.priority === "medium").length,
           low: optimizations.filter((o) => o.priority === "low").length,
