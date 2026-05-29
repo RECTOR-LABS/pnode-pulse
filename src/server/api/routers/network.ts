@@ -60,19 +60,26 @@ export const networkRouter = createTRPCRouter({
    */
   storageStats: publicProcedure.query(async ({ ctx }) => {
     // Get storage from latest metrics per active node
-    const result = await ctx.db.$queryRaw<Array<{
-      total_storage: bigint;
-      node_count: bigint;
-      avg_storage: number;
-      min_storage: bigint;
-      max_storage: bigint;
-    }>>`
+    const result = await ctx.db.$queryRaw<
+      Array<{
+        total_storage: bigint;
+        node_count: bigint;
+        avg_storage: number;
+        min_storage: bigint;
+        max_storage: bigint;
+      }>
+    >`
       WITH latest_metrics AS (
-        SELECT DISTINCT ON (nm.node_id) nm.file_size
-        FROM node_metrics nm
-        JOIN nodes n ON n.id = nm.node_id
-        WHERE n.is_active = true AND nm.file_size IS NOT NULL
-        ORDER BY nm.node_id, nm.time DESC
+        SELECT m.file_size
+        FROM nodes n
+        JOIN LATERAL (
+          SELECT nm.file_size
+          FROM node_metrics nm
+          WHERE nm.node_id = n.id AND nm.file_size IS NOT NULL
+          ORDER BY nm.time DESC
+          LIMIT 1
+        ) m ON true
+        WHERE n.is_active = true
       )
       SELECT
         COALESCE(SUM(file_size), 0) as total_storage,
@@ -100,7 +107,7 @@ export const networkRouter = createTRPCRouter({
     .input(
       z.object({
         range: z.enum(["24h", "7d", "30d", "90d"]).default("7d"),
-      })
+      }),
     )
     .query(async ({ ctx, input }) => {
       const rangeHours = {
@@ -138,19 +145,26 @@ export const networkRouter = createTRPCRouter({
    */
   uptimeStats: publicProcedure.query(async ({ ctx }) => {
     // Get uptime stats from active nodes
-    const result = await ctx.db.$queryRaw<Array<{
-      avg_uptime: number;
-      min_uptime: number;
-      max_uptime: number;
-      total_uptime: bigint;
-      node_count: bigint;
-    }>>`
+    const result = await ctx.db.$queryRaw<
+      Array<{
+        avg_uptime: number;
+        min_uptime: number;
+        max_uptime: number;
+        total_uptime: bigint;
+        node_count: bigint;
+      }>
+    >`
       WITH latest_metrics AS (
-        SELECT DISTINCT ON (nm.node_id) nm.uptime
-        FROM node_metrics nm
-        JOIN nodes n ON n.id = nm.node_id
-        WHERE n.is_active = true AND nm.uptime IS NOT NULL
-        ORDER BY nm.node_id, nm.time DESC
+        SELECT m.uptime
+        FROM nodes n
+        JOIN LATERAL (
+          SELECT nm.uptime
+          FROM node_metrics nm
+          WHERE nm.node_id = n.id AND nm.uptime IS NOT NULL
+          ORDER BY nm.time DESC
+          LIMIT 1
+        ) m ON true
+        WHERE n.is_active = true
       )
       SELECT
         COALESCE(AVG(uptime), 0) as avg_uptime,
@@ -166,7 +180,10 @@ export const networkRouter = createTRPCRouter({
 
     // Calculate uptime percentage (assuming 30-day reference period)
     const thirtyDaysInSeconds = 30 * 24 * 60 * 60;
-    const uptimePercentage = Math.min(100, (avgUptimeSeconds / thirtyDaysInSeconds) * 100);
+    const uptimePercentage = Math.min(
+      100,
+      (avgUptimeSeconds / thirtyDaysInSeconds) * 100,
+    );
 
     return {
       avgUptimeSeconds: Math.round(avgUptimeSeconds),
@@ -185,7 +202,7 @@ export const networkRouter = createTRPCRouter({
     .input(
       z.object({
         range: z.enum(["24h", "7d", "30d"]).default("7d"),
-      })
+      }),
     )
     .query(async ({ ctx, input }) => {
       const rangeHours = {
@@ -222,42 +239,49 @@ export const networkRouter = createTRPCRouter({
    */
   aggregateMetrics: publicProcedure.query(async ({ ctx }) => {
     // Get comprehensive metrics from active nodes
-    const result = await ctx.db.$queryRaw<Array<{
-      // CPU stats
-      avg_cpu: number;
-      min_cpu: number;
-      max_cpu: number;
-      p50_cpu: number;
-      p90_cpu: number;
-      p99_cpu: number;
-      // RAM stats
-      avg_ram_percent: number;
-      min_ram_percent: number;
-      max_ram_percent: number;
-      p50_ram: number;
-      p90_ram: number;
-      p99_ram: number;
-      // Storage stats
-      avg_storage: number;
-      total_storage: bigint;
-      // Uptime
-      avg_uptime: number;
-      // Count
-      node_count: bigint;
-    }>>`
+    const result = await ctx.db.$queryRaw<
+      Array<{
+        // CPU stats
+        avg_cpu: number;
+        min_cpu: number;
+        max_cpu: number;
+        p50_cpu: number;
+        p90_cpu: number;
+        p99_cpu: number;
+        // RAM stats
+        avg_ram_percent: number;
+        min_ram_percent: number;
+        max_ram_percent: number;
+        p50_ram: number;
+        p90_ram: number;
+        p99_ram: number;
+        // Storage stats
+        avg_storage: number;
+        total_storage: bigint;
+        // Uptime
+        avg_uptime: number;
+        // Count
+        node_count: bigint;
+      }>
+    >`
       WITH latest_metrics AS (
-        SELECT DISTINCT ON (nm.node_id)
-          nm.cpu_percent,
-          CASE WHEN nm.ram_total > 0
-            THEN (nm.ram_used::float / nm.ram_total * 100)
+        SELECT
+          m.cpu_percent,
+          CASE WHEN m.ram_total > 0
+            THEN (m.ram_used::float / m.ram_total * 100)
             ELSE 0
           END as ram_percent,
-          nm.file_size,
-          nm.uptime
-        FROM node_metrics nm
-        JOIN nodes n ON n.id = nm.node_id
+          m.file_size,
+          m.uptime
+        FROM nodes n
+        JOIN LATERAL (
+          SELECT nm.cpu_percent, nm.ram_used, nm.ram_total, nm.file_size, nm.uptime
+          FROM node_metrics nm
+          WHERE nm.node_id = n.id
+          ORDER BY nm.time DESC
+          LIMIT 1
+        ) m ON true
         WHERE n.is_active = true
-        ORDER BY nm.node_id, nm.time DESC
       )
       SELECT
         -- CPU
@@ -322,7 +346,7 @@ export const networkRouter = createTRPCRouter({
       z.object({
         range: z.enum(["24h", "7d", "30d", "90d"]).default("7d"),
         metric: z.enum(["nodes", "storage", "cpu", "ram"]).default("nodes"),
-      })
+      }),
     )
     .query(async ({ ctx, input }) => {
       const { range, metric } = input;
@@ -380,7 +404,7 @@ export const networkRouter = createTRPCRouter({
     .input(
       z.object({
         range: z.enum(["24h", "7d", "30d"]).default("24h"),
-      })
+      }),
     )
     .query(async ({ ctx, input }) => {
       const { range } = input;
@@ -430,10 +454,12 @@ export const networkRouter = createTRPCRouter({
    */
   peerGraph: publicProcedure
     .input(
-      z.object({
-        limit: z.number().min(1).max(200).default(100),
-        includeInactive: z.boolean().default(false),
-      }).optional()
+      z
+        .object({
+          limit: z.number().min(1).max(200).default(100),
+          includeInactive: z.boolean().default(false),
+        })
+        .optional(),
     )
     .query(async ({ ctx, input }) => {
       const limit = input?.limit ?? 100;
@@ -442,12 +468,14 @@ export const networkRouter = createTRPCRouter({
       // Get nodes that have peer connections (these form the actual graph)
       // Prioritize nodes that are part of peer relationships
       const nodesWithPeers = includeInactive
-        ? await ctx.db.$queryRaw<Array<{
-            id: number;
-            address: string;
-            version: string | null;
-            is_active: boolean;
-          }>>`
+        ? await ctx.db.$queryRaw<
+            Array<{
+              id: number;
+              address: string;
+              version: string | null;
+              is_active: boolean;
+            }>
+          >`
             SELECT DISTINCT n.id, n.address, n.version, n.is_active
             FROM nodes n
             WHERE n.id IN (
@@ -458,12 +486,14 @@ export const networkRouter = createTRPCRouter({
             ORDER BY n.id
             LIMIT ${limit}
           `
-        : await ctx.db.$queryRaw<Array<{
-            id: number;
-            address: string;
-            version: string | null;
-            is_active: boolean;
-          }>>`
+        : await ctx.db.$queryRaw<
+            Array<{
+              id: number;
+              address: string;
+              version: string | null;
+              is_active: boolean;
+            }>
+          >`
             SELECT DISTINCT n.id, n.address, n.version, n.is_active
             FROM nodes n
             WHERE n.id IN (
@@ -476,7 +506,7 @@ export const networkRouter = createTRPCRouter({
             LIMIT ${limit}
           `;
 
-      const nodes = nodesWithPeers.map(n => ({
+      const nodes = nodesWithPeers.map((n) => ({
         id: n.id,
         address: n.address,
         version: n.version,
@@ -495,17 +525,19 @@ export const networkRouter = createTRPCRouter({
       }
 
       // Get latest storage metrics for each node
-      const metrics = await ctx.db.$queryRaw<Array<{
-        node_id: number;
-        file_size: bigint;
-      }>>`
+      const metrics = await ctx.db.$queryRaw<
+        Array<{
+          node_id: number;
+          file_size: bigint;
+        }>
+      >`
         SELECT DISTINCT ON (node_id) node_id, file_size
         FROM node_metrics
         WHERE node_id = ANY(${nodeIds})
         ORDER BY node_id, time DESC
       `;
 
-      const storageMap = new Map(metrics.map(m => [m.node_id, m.file_size]));
+      const storageMap = new Map(metrics.map((m) => [m.node_id, m.file_size]));
 
       // Build address-to-ID map for resolving peer addresses
       const addressToId = new Map(nodes.map((n) => [n.address, n.id]));
@@ -557,7 +589,9 @@ export const networkRouter = createTRPCRouter({
       }
 
       // Calculate max storage for normalization
-      const storageValues = Array.from(storageMap.values()).map(v => Number(v));
+      const storageValues = Array.from(storageMap.values()).map((v) =>
+        Number(v),
+      );
       const maxStorage = Math.max(...storageValues, 1);
 
       return {
@@ -567,7 +601,7 @@ export const networkRouter = createTRPCRouter({
           version: n.version,
           isActive: n.isActive,
           storage: Number(storageMap.get(n.id) ?? 0),
-          normalizedSize: (Number(storageMap.get(n.id) ?? 0) / maxStorage),
+          normalizedSize: Number(storageMap.get(n.id) ?? 0) / maxStorage,
         })),
         edges,
         stats: {
@@ -616,15 +650,17 @@ export const networkRouter = createTRPCRouter({
    */
   geoConnections: publicProcedure.query(async ({ ctx }) => {
     // Get inter-country connections aggregated by country pairs
-    const connections = await ctx.db.$queryRaw<Array<{
-      from_country: string;
-      from_lat: number;
-      from_lng: number;
-      to_country: string;
-      to_lat: number;
-      to_lng: number;
-      connection_count: bigint;
-    }>>`
+    const connections = await ctx.db.$queryRaw<
+      Array<{
+        from_country: string;
+        from_lat: number;
+        from_lng: number;
+        to_country: string;
+        to_lat: number;
+        to_lng: number;
+        connection_count: bigint;
+      }>
+    >`
       SELECT
         n1.country as from_country,
         AVG(n1.latitude) as from_lat,
@@ -648,17 +684,20 @@ export const networkRouter = createTRPCRouter({
 
     // Dedupe bidirectional connections (US→DE and DE→US become one line)
     const seen = new Set<string>();
-    const dedupedConnections = connections.filter(conn => {
-      const key = [conn.from_country, conn.to_country].sort().join('-');
+    const dedupedConnections = connections.filter((conn) => {
+      const key = [conn.from_country, conn.to_country].sort().join("-");
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
 
     // Find max for normalization
-    const maxCount = Math.max(...dedupedConnections.map(c => Number(c.connection_count)), 1);
+    const maxCount = Math.max(
+      ...dedupedConnections.map((c) => Number(c.connection_count)),
+      1,
+    );
 
-    return dedupedConnections.map(conn => ({
+    return dedupedConnections.map((conn) => ({
       from: {
         country: conn.from_country,
         lat: conn.from_lat,
