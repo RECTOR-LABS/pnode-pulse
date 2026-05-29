@@ -1,318 +1,91 @@
 # GitHub Actions Deployment Workflows
 
-Automated push-to-deploy workflows for pNode Pulse using GitHub Container Registry (GHCR) and blue/green deployment strategy.
+Automated push-to-deploy workflows for pNode Pulse using GitHub Container Registry (GHCR). Both environments use a simple **single-container** deploy: build the image in CI, push to GHCR, then recreate one web container on the VPS.
+
+> SSH to the VPS goes through the Cloudflare Tunnel (`ssh.rectorspace.com` → VPS:22) as user `pnodepulse`; direct port 22 is firewalled. CI installs `cloudflared` and uses it as an SSH `ProxyCommand` with key auth (`VPS_SSH_KEY`).
 
 ## Overview
 
-| Workflow | Trigger | Environment | Deployment Strategy |
-|----------|---------|-------------|---------------------|
-| `deploy-staging.yml` | Push to `dev` | Staging (port 7002) | Direct replacement |
-| `deploy-production.yml` | Push to `main` | Production (ports 7000/7001) | Blue/Green zero-downtime |
+| Workflow                | Trigger        | Environment            | URL                           | Strategy           |
+| ----------------------- | -------------- | ---------------------- | ----------------------------- | ------------------ |
+| `deploy-staging.yml`    | Push to `dev`  | Staging (port 7002)    | staging.pulse.rectorspace.com | Recreate `staging` |
+| `deploy-production.yml` | Push to `main` | Production (port 7001) | pulse.rectorspace.com         | Recreate `green`   |
 
-## Setup Instructions
+Both deploys recreate **only** their web container (`docker compose up -d --no-deps <service>`). `postgres`, `redis`, and the collector are **never** touched by a deploy — they are long-lived services managed out-of-band. nginx points at a fixed host port per environment, so there is no upstream switching.
 
-### 1. Configure GitHub Secrets
+## Required GitHub Secrets
 
-Navigate to: **Repository Settings → Secrets and variables → Actions → New repository secret**
+| Secret              | Value                                                                           |
+| ------------------- | ------------------------------------------------------------------------------- |
+| `VPS_SSH_KEY`       | Private SSH key whose public half is in `pnodepulse@VPS:~/.ssh/authorized_keys` |
+| `POSTGRES_PASSWORD` | Database password (also present in `~/pnode-pulse/.env` on the VPS)             |
 
-Add the following secrets:
+## Production Workflow (`deploy-production.yml`)
 
-| Secret Name | Value | How to Get |
-|-------------|-------|------------|
-| `VPS_SSH_KEY` | Private SSH key | Generate: `ssh-keygen -t ed25519 -C "github-actions"` |
-| `POSTGRES_PASSWORD` | Database password | Use existing or generate secure password |
+**Triggered by**: push to `main` (or manual `workflow_dispatch`).
 
-#### Generating SSH Key for GitHub Actions
+1. Checkout, log in to GHCR, build & push the image (`:latest`, `:prod-<sha>`).
+2. SSH to the VPS via the Cloudflare Tunnel.
+3. On the VPS: `git pull origin main` → `docker login ghcr.io` → `bash scripts/deploy.sh`.
+4. `scripts/deploy.sh`: `docker compose pull green` → `docker compose up -d --no-deps green` → wait for the `green` healthcheck (up to 120s). If it does not become healthy, the script exits non-zero and the workflow fails (alerting you to roll back).
+5. `docker image prune -f`, then verify (`docker compose ps green` + recent logs).
 
-```bash
-# On your local machine
-ssh-keygen -t ed25519 -C "github-actions-pnodepulse" -f ~/.ssh/github-actions-pnodepulse
+**Deploy time**: ~3–5 min. **Downtime**: a brief restart blip (~5–15s) while the `green` container is recreated. Acceptable for this single low-traffic instance; CI builds the image before it ships, so broken images are rare and the health gate flags them.
 
-# Copy private key content (paste this into VPS_SSH_KEY secret)
-cat ~/.ssh/github-actions-pnodepulse
+## Staging Workflow (`deploy-staging.yml`)
 
-# Copy public key to VPS
-ssh-copy-id -i ~/.ssh/github-actions-pnodepulse.pub pnodepulse@176.222.53.185
+**Triggered by**: push to `dev` (or manual). Builds & pushes `:dev`, then on the VPS recreates the `staging` container (`docker compose up -d --no-deps staging`). Same shape as production, different service/port/image tag.
 
-# Or manually add to VPS
-ssh pnodepulse@176.222.53.185
-echo "your-public-key-content" >> ~/.ssh/authorized_keys
-chmod 600 ~/.ssh/authorized_keys
-```
+## Rollback (Production)
 
-### 2. Enable GitHub Container Registry
-
-GHCR is automatically enabled for public repositories. For private repositories:
-
-1. Go to **Repository Settings → Actions → General**
-2. Under "Workflow permissions", select **Read and write permissions**
-3. Check **Allow GitHub Actions to create and approve pull requests**
-
-### 3. VPS Initial Setup
-
-SSH into VPS as `pnodepulse` user:
+Re-deploy a previous image. Image tags `:prod-<sha>` are pushed on every production build.
 
 ```bash
-ssh pnodepulse@176.222.53.185
-
-# Clone repository
-cd ~
-git clone https://github.com/RECTOR-LABS/pnode-pulse.git
-cd pnode-pulse
-
-# Create .env file
-cat > .env << 'EOF'
-POSTGRES_PASSWORD=your_secure_password_here
-EOF
-
-# Start infrastructure services
-docker compose up -d postgres redis
-
-# Wait for healthy status
-docker compose ps
-
-# Run database migration
-# (Use migration file from prisma/migrations/20251209060207_add_v070_fields/)
-docker compose exec postgres psql -U pnodepulse -d pnodepulse < prisma/migrations/20251209060207_add_v070_fields/migration.sql
-```
-
-### 4. Test Deployment
-
-#### Test Staging Deployment
-
-```bash
-# On local machine
-git checkout dev
-git commit --allow-empty -m "test: Trigger staging deployment"
-git push origin dev
-
-# Watch GitHub Actions
-# Go to: https://github.com/RECTOR-LABS/pnode-pulse/actions
-
-# Check deployment on VPS
-ssh pnodepulse@176.222.53.185
+ssh pnodepulse
 cd ~/pnode-pulse
-docker compose ps staging
-docker compose logs --tail 50 staging
-
-# Test health endpoint
-curl http://localhost:7002/api/health
+docker pull ghcr.io/rector-labs/pnode-pulse:prod-<sha>     # a known-good build
+docker tag ghcr.io/rector-labs/pnode-pulse:prod-<sha> ghcr.io/rector-labs/pnode-pulse:latest
+SERVICE=green bash scripts/deploy.sh                        # recreates green from :latest
 ```
 
-#### Test Production Deployment
+## Local development: exposing DB/redis host ports
 
-```bash
-# On local machine
-git checkout main
-git merge dev
-git push origin main
+`docker-compose.yml` deliberately does **not** publish postgres/redis on the host (they are reached inside the Docker network at `postgres:5432` / `redis:6379`). If you want to point a local tool (psql, a Redis GUI) at them during development, create an **untracked** `docker-compose.override.yml` (gitignored — it must never reach production):
 
-# Watch GitHub Actions for blue/green deployment
-# Check deployment on VPS
-ssh pnodepulse@176.222.53.185
-cd ~/pnode-pulse
-docker compose ps blue green
-
-# Test health endpoint
-curl http://localhost:7000/api/health  # Blue
-curl http://localhost:7001/api/health  # Green (if deployed)
+```yaml
+# docker-compose.override.yml (local only, gitignored)
+services:
+  postgres:
+    ports: ["127.0.0.1:5434:5432"]
+  redis:
+    ports: ["127.0.0.1:6381:6379"]
 ```
 
-## Workflow Details
-
-### Staging Workflow (`deploy-staging.yml`)
-
-**Triggered by**: Push to `dev` branch
-
-**Steps**:
-1. Checkout repository
-2. Login to GHCR
-3. Build Docker image
-4. Push to GHCR with `:dev` tag
-5. SSH to VPS
-6. Pull latest image
-7. Restart `staging` container
-8. Verify deployment
-
-**Deployment time**: ~3-5 minutes
-**Downtime**: ~5-10 seconds (container restart)
-
-### Production Workflow (`deploy-production.yml`)
-
-**Triggered by**: Push to `main` branch
-
-**Steps**:
-1. Checkout repository
-2. Login to GHCR
-3. Build Docker image
-4. Push to GHCR with `:latest` tag
-5. SSH to VPS
-6. Pull latest image
-7. Run `scripts/blue-green-deploy.sh`:
-   - Detect active environment (blue/green)
-   - Start inactive environment with new image
-   - Wait for health check to pass (max 60 seconds)
-   - Switch to new environment
-   - Stop old environment
-8. Verify deployment
-
-**Deployment time**: ~4-6 minutes
-**Downtime**: Zero (blue/green switch)
-
-## Blue/Green Deployment Script
-
-Located at: `scripts/blue-green-deploy.sh`
-
-**Key Features**:
-- Automatic active/inactive environment detection
-- Health check validation before traffic switch
-- Configurable health check timeout
-- Rollback capability (manual)
-- Detailed logging
-
-**Manual execution**:
-```bash
-ssh pnodepulse@176.222.53.185
-cd ~/pnode-pulse
-bash scripts/blue-green-deploy.sh
-```
-
-## Rollback Procedures
-
-### Staging Rollback
-
-```bash
-ssh pnodepulse@176.222.53.185
-cd ~/pnode-pulse
-
-# Pull previous image version (find tag from GHCR)
-docker pull ghcr.io/rector-labs/pnode-pulse:dev
-
-# Restart staging
-docker compose up -d staging
-```
-
-### Production Rollback
-
-**Option 1: Switch back to previous environment**
-```bash
-# If green is active, switch to blue
-docker compose up -d blue
-docker compose stop green
-```
-
-**Option 2: Deploy previous image version**
-```bash
-# Pull previous image (find SHA tag from GHCR)
-docker pull ghcr.io/rector-labs/pnode-pulse:prod-abc1234
-
-# Tag as latest
-docker tag ghcr.io/rector-labs/pnode-pulse:prod-abc1234 ghcr.io/rector-labs/pnode-pulse:latest
-
-# Run blue/green deploy
-bash scripts/blue-green-deploy.sh
-```
+`docker compose` auto-loads it locally. On the VPS, connect ad hoc instead: `docker exec -it pnode-pulse-postgres psql -U pnodepulse pnodepulse`.
 
 ## Monitoring
 
-### Health Check Endpoints
-
-| Environment | URL | Expected Response |
-|-------------|-----|-------------------|
-| Staging | http://localhost:7002/api/health | `{"status": "healthy"}` |
-| Blue | http://localhost:7000/api/health | `{"status": "healthy"}` |
-| Green | http://localhost:7001/api/health | `{"status": "healthy"}` |
-
-### Logs
+| Environment        | Local health URL                 |
+| ------------------ | -------------------------------- |
+| Staging            | http://localhost:7002/api/health |
+| Production (green) | http://localhost:7001/api/health |
 
 ```bash
-# View staging logs
-docker compose logs -f staging
-
-# View production logs
-docker compose logs -f blue green
-
-# View all logs
-docker compose logs -f
-```
-
-### Container Status
-
-```bash
-# Check all running containers
-docker compose ps
-
-# Check resource usage
-docker stats
+ssh pnodepulse
+cd ~/pnode-pulse
+docker compose ps                       # container status
+docker compose logs -f green            # production logs
+docker compose logs -f staging          # staging logs
 ```
 
 ## Troubleshooting
 
-### Workflow Fails to SSH to VPS
+**Workflow can't SSH** — verify `VPS_SSH_KEY` matches a public key in `pnodepulse@VPS:~/.ssh/authorized_keys`; the tunnel hostname is `ssh.rectorspace.com`.
 
-**Symptom**: "Permission denied (publickey)" error in GitHub Actions
+**Health gate fails** — `docker compose logs --tail 50 green`; confirm `postgres`/`redis` are healthy (`docker compose ps`) and reachable from the web container; check app startup errors. Roll back if needed (above).
 
-**Fix**:
-1. Verify `VPS_SSH_KEY` secret contains the correct private key
-2. Ensure public key is in `~/.ssh/authorized_keys` on VPS
-3. Check SSH key permissions on VPS: `chmod 600 ~/.ssh/authorized_keys`
-
-### Health Check Timeout
-
-**Symptom**: Deployment fails with "Health check timeout"
-
-**Fix**:
-1. Check container logs: `docker compose logs staging` (or blue/green)
-2. Verify DATABASE_URL and REDIS_URL in docker-compose.yml
-3. Ensure postgres and redis are healthy: `docker compose ps`
-4. Check application startup errors
-
-### Image Pull Fails
-
-**Symptom**: "Error response from daemon: pull access denied"
-
-**Fix**:
-1. Verify GHCR login in workflow
-2. Check repository visibility (public/private)
-3. Ensure workflow has package write permissions
-4. Re-authenticate on VPS:
-   ```bash
-   echo "GITHUB_TOKEN" | docker login ghcr.io -u USERNAME --password-stdin
-   ```
-
-### Container Fails to Start
-
-**Symptom**: Container starts then immediately exits
-
-**Fix**:
-1. Check environment variables in docker-compose.yml
-2. Verify .env file exists on VPS
-3. Check container logs for startup errors
-4. Verify database migration was applied
-5. Test locally with same environment
-
-## Best Practices
-
-1. **Always test in staging first**: Merge to `dev` → verify staging → merge to `main`
-2. **Monitor deployments**: Watch GitHub Actions logs during deployment
-3. **Verify health checks**: Always check health endpoints after deployment
-4. **Keep environments in sync**: Run same migrations in staging and production
-5. **Use semantic versioning**: Tag releases with version numbers
-6. **Backup before major changes**: Snapshot VPS or backup database before risky deployments
-
-## Next Steps
-
-After completing setup:
-
-1. Configure nginx reverse proxy for public domains
-2. Setup SSL certificates with Certbot
-3. Configure monitoring/alerting (optional)
-4. Setup log aggregation (optional)
-5. Configure automated backups (optional)
+**Image pull denied** — re-auth on the VPS: `echo "$GITHUB_TOKEN" | docker login ghcr.io -u <user> --password-stdin`.
 
 ## Resources
 
-- [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [GitHub Container Registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry)
-- [Docker Compose](https://docs.docker.com/compose/)
-- [Blue/Green Deployment Pattern](https://martinfowler.com/bliki/BlueGreenDeployment.html)
+- [GitHub Actions](https://docs.github.com/en/actions) · [GHCR](https://docs.github.com/en/packages) · [Docker Compose](https://docs.docker.com/compose/)

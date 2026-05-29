@@ -6,8 +6,8 @@ services:
     image: timescale/timescaledb:latest-pg16
     container_name: pnode-pulse-postgres
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:5434:5432"
+    # No host port published: reached internally at postgres:5432.
+    # Keeps the DB off the host (more secure) and avoids host-port churn on deploys.
     environment:
       POSTGRES_USER: pnodepulse
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -27,8 +27,7 @@ services:
     image: redis:7-alpine
     container_name: pnode-pulse-redis
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:6381:6379"
+    # No host port published: reached internally at redis:6379.
     volumes:
       - redis_data:/data
     networks:
@@ -42,7 +41,7 @@ services:
 
   # Staging (dev branch)
   staging:
-    image: ghcr.io/rector-labs/pnode-pulse:latest
+    image: ghcr.io/rector-labs/pnode-pulse:dev
     container_name: pnode-pulse-web-staging
     restart: unless-stopped
     ports:
@@ -66,33 +65,10 @@ services:
       timeout: 10s
       retries: 3
 
-  # Production Blue
-  blue:
-    image: ghcr.io/rector-labs/pnode-pulse:latest
-    container_name: pnode-pulse-web-blue
-    restart: unless-stopped
-    ports:
-      - "7000:3000"
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://pnodepulse:${POSTGRES_PASSWORD}@postgres:5432/pnodepulse
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      NEXT_PUBLIC_APP_URL: https://pulse.rectorspace.com
-    networks:
-      - pnode-pulse-net
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # Production Green
+  # Production web (single container).
+  # Deploys recreate ONLY this service via `docker compose up -d --no-deps green`
+  # (see scripts/deploy.sh), so postgres/redis are never disturbed by a web deploy.
+  # nginx points at host port 7001 permanently — no upstream switching.
   green:
     image: ghcr.io/rector-labs/pnode-pulse:latest
     container_name: pnode-pulse-web-green
@@ -117,8 +93,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    profiles:
-      - green
 
   # pulse-api (lean Hono service hosting the tRPC server)
   # Tier 2 of the Vercel migration — see docs/VERCEL_CUTOVER_RUNBOOK.md.
