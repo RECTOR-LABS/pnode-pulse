@@ -98,7 +98,7 @@ function formatUptime(seconds: number): string {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ type: string }> }
+  { params }: { params: Promise<{ type: string }> },
 ) {
   try {
     const { type: typeWithExt } = await params;
@@ -167,11 +167,17 @@ export async function GET(
 
       case "storage": {
         const result = await db.$queryRaw<Array<{ total: bigint }>>`
-          SELECT COALESCE(SUM("fileSize"), 0) as total
+          SELECT COALESCE(SUM(file_size), 0) as total
           FROM (
-            SELECT DISTINCT ON ("nodeId") "fileSize"
-            FROM "NodeMetric"
-            ORDER BY "nodeId", time DESC
+            SELECT m.file_size
+            FROM nodes n
+            JOIN LATERAL (
+              SELECT nm.file_size
+              FROM node_metrics nm
+              WHERE nm.node_id = n.id
+              ORDER BY nm.time DESC
+              LIMIT 1
+            ) m ON true
           ) latest
         `;
         const total = Number(result[0]?.total ?? 0);
@@ -188,9 +194,15 @@ export async function GET(
         const result = await db.$queryRaw<Array<{ avg_uptime: number }>>`
           SELECT COALESCE(AVG(uptime), 0) as avg_uptime
           FROM (
-            SELECT DISTINCT ON ("nodeId") uptime
-            FROM "NodeMetric"
-            ORDER BY "nodeId", time DESC
+            SELECT m.uptime
+            FROM nodes n
+            JOIN LATERAL (
+              SELECT nm.uptime
+              FROM node_metrics nm
+              WHERE nm.node_id = n.id
+              ORDER BY nm.time DESC
+              LIMIT 1
+            ) m ON true
           ) latest
         `;
         const avgUptime = result[0]?.avg_uptime ?? 0;
@@ -213,12 +225,15 @@ export async function GET(
       },
     });
   } catch (error) {
-    logger.error("Badge Error:", error instanceof Error ? error : new Error(String(error)));
+    logger.error(
+      "Badge Error:",
+      error instanceof Error ? error : new Error(String(error)),
+    );
 
     // Return error badge
     const errorBadge = generateBadge(
       { label: "pNode", value: "error", color: "#e05d44" },
-      "flat"
+      "flat",
     );
 
     return new NextResponse(errorBadge, {

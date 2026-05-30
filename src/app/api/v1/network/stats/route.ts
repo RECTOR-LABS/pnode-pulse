@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import {  checkRateLimit,
+import {
+  checkRateLimit,
   createRateLimitHeaders,
   rateLimitExceededResponse,
   trackApiUsage,
@@ -44,45 +45,56 @@ export async function GET(request: NextRequest) {
       }>
     >`
       WITH latest_metrics AS (
-        SELECT DISTINCT ON ("nodeId")
-          "nodeId",
-          "cpuPercent",
-          CASE WHEN "ramTotal" > 0
-            THEN ("ramUsed"::float / "ramTotal"::float) * 100
+        SELECT
+          m.cpu_percent,
+          CASE WHEN m.ram_total > 0
+            THEN (m.ram_used::float / m.ram_total::float) * 100
             ELSE 0
           END as ram_percent,
-          "fileSize",
-          uptime
-        FROM "NodeMetric"
-        ORDER BY "nodeId", time DESC
+          m.file_size,
+          m.uptime
+        FROM nodes n
+        JOIN LATERAL (
+          SELECT nm.cpu_percent, nm.ram_used, nm.ram_total, nm.file_size, nm.uptime
+          FROM node_metrics nm
+          WHERE nm.node_id = n.id
+          ORDER BY nm.time DESC
+          LIMIT 1
+        ) m ON true
+        WHERE n.is_active = true
       )
       SELECT
-        AVG("cpuPercent") as avg_cpu,
-        MIN("cpuPercent") as min_cpu,
-        MAX("cpuPercent") as max_cpu,
-        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY "cpuPercent") as p50_cpu,
-        PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY "cpuPercent") as p90_cpu,
-        PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY "cpuPercent") as p99_cpu,
+        AVG(cpu_percent) as avg_cpu,
+        MIN(cpu_percent) as min_cpu,
+        MAX(cpu_percent) as max_cpu,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY cpu_percent) as p50_cpu,
+        PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY cpu_percent) as p90_cpu,
+        PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY cpu_percent) as p99_cpu,
         AVG(ram_percent) as avg_ram_percent,
         MIN(ram_percent) as min_ram_percent,
         MAX(ram_percent) as max_ram_percent,
         PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ram_percent) as p50_ram,
         PERCENTILE_CONT(0.9) WITHIN GROUP (ORDER BY ram_percent) as p90_ram,
         PERCENTILE_CONT(0.99) WITHIN GROUP (ORDER BY ram_percent) as p99_ram,
-        SUM("fileSize") as total_storage,
-        AVG("fileSize") as avg_storage,
+        SUM(file_size) as total_storage,
+        AVG(file_size) as avg_storage,
         AVG(uptime) as avg_uptime,
         COUNT(*) as node_count
-      FROM latest_metrics m
-      JOIN "Node" n ON m."nodeId" = n.id
-      WHERE n."isActive" = true
+      FROM latest_metrics
     `;
 
     const s = stats[0];
     if (!s) {
       return NextResponse.json({
         cpu: { avg: 0, min: 0, max: 0, p50: 0, p90: 0, p99: 0 },
-        ram: { avgPercent: 0, minPercent: 0, maxPercent: 0, p50: 0, p90: 0, p99: 0 },
+        ram: {
+          avgPercent: 0,
+          minPercent: 0,
+          maxPercent: 0,
+          p50: 0,
+          p90: 0,
+          p99: 0,
+        },
         storage: { total: 0, avg: 0 },
         uptime: { avgSeconds: 0 },
         nodeCount: 0,
@@ -119,7 +131,13 @@ export async function GET(request: NextRequest) {
     const rateLimitHeaders = createRateLimitHeaders(rateLimitResult);
     const responseTime = Date.now() - startTime;
 
-    trackApiUsage(rateLimitResult.apiKeyId, "/api/v1/network/stats", "GET", responseTime, false);
+    trackApiUsage(
+      rateLimitResult.apiKeyId,
+      "/api/v1/network/stats",
+      "GET",
+      responseTime,
+      false,
+    );
 
     return NextResponse.json(response, {
       headers: {
@@ -128,14 +146,28 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    logger.error("API Error:", error instanceof Error ? error : new Error(String(error)));
+    logger.error(
+      "API Error:",
+      error instanceof Error ? error : new Error(String(error)),
+    );
 
     const responseTime = Date.now() - startTime;
-    trackApiUsage(rateLimitResult.apiKeyId, "/api/v1/network/stats", "GET", responseTime, true);
+    trackApiUsage(
+      rateLimitResult.apiKeyId,
+      "/api/v1/network/stats",
+      "GET",
+      responseTime,
+      true,
+    );
 
     return NextResponse.json(
-      { error: { code: "INTERNAL_ERROR", message: "An unexpected error occurred" } },
-      { status: 500 }
+      {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "An unexpected error occurred",
+        },
+      },
+      { status: 500 },
     );
   }
 }
