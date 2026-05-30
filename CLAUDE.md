@@ -1,11 +1,11 @@
 # CLAUDE.md - pNode Pulse
 
-## ✅ Superteam Bounty - READY TO SUBMIT
+## 🏆 Superteam Bounty - SUBMITTED (3rd place — $1,000 USDC)
 
 **Competition**: Build Analytics Platform for Xandeum pNodes
 **Prize Pool**: $5,000 USDC ($2,500 first / $1,500 second / $1,000 third)
-**Submission Deadline**: **December 26, 2025 @ 07:59 UTC** (11 days remaining)
-**Winner Announcement**: January 9, 2026
+**Result**: 🥉 3rd place — $1,000 USDC (submitted before the December 26, 2025 deadline; winners announced January 9, 2026)
+**Status**: Live + maintained post-bounty at https://pulse.rectorspace.com
 
 **Bounty Page**: https://earn.superteam.fun/listing/build-analytics-platform-for-xandeum-pnodes/
 
@@ -40,17 +40,17 @@
 
 **Repository**: [RECTOR-LABS/pnode-pulse](https://github.com/RECTOR-LABS/pnode-pulse)
 **License**: MIT (Open Core)
-**Phase**: Pre-Launch (Code 90% complete, Deployment 0%)
+**Phase**: Live — deployed at [pulse.rectorspace.com](https://pulse.rectorspace.com) (Vercel frontend → VPS API)
 
 ## Tech Stack
 
-| Layer      | Technology                                        |
-| ---------- | ------------------------------------------------- |
-| Frontend   | Next.js 14 (App Router), TypeScript, Tailwind CSS |
-| Backend    | tRPC, Node.js                                     |
-| Database   | PostgreSQL + TimescaleDB                          |
-| Cache      | Redis                                             |
-| Deployment | Docker Compose on VPS (pulse.rectorspace.com)     |
+| Layer      | Technology                                                      |
+| ---------- | --------------------------------------------------------------- |
+| Frontend   | Next.js 16 (App Router), React 19, TypeScript 5, Tailwind CSS 4 |
+| Backend    | tRPC v11, Node.js 24, Prisma 6                                  |
+| Database   | PostgreSQL + TimescaleDB                                        |
+| Cache      | Redis (ioredis, BullMQ)                                         |
+| Deployment | Vercel (frontend) → VPS Docker API (`green`, single-container)  |
 
 ## Commands
 
