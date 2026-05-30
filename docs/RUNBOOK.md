@@ -31,13 +31,13 @@ ssh pnodepulse
 docker compose ps
 
 # View logs
-docker compose logs -f blue --tail 100
+docker compose logs -f green --tail 100
 
 # Health check
-curl http://localhost:7000/api/health
+curl http://localhost:7001/api/health
 
 # Restart services
-docker compose restart blue
+docker compose restart green
 
 # Database backup
 ./scripts/backup-db.sh
@@ -48,11 +48,11 @@ docker compose restart blue
 
 ### Service Ports
 
-| Service                | Port | URL                           |
-| ---------------------- | ---- | ----------------------------- |
-| **Green (Production)** | 7001 | https://pulse.rectorspace.com |
-| **PostgreSQL**         | 5434 | localhost only                |
-| **Redis**              | 6381 | localhost only                |
+| Service                | Port          | URL / Access                     |
+| ---------------------- | ------------- | -------------------------------- |
+| **Green (Production)** | 7001 (host)   | https://pulse.rectorspace.com    |
+| **PostgreSQL**         | internal only | `postgres:5432` (Docker network) |
+| **Redis**              | internal only | `redis:6379` (Docker network)    |
 
 ### Contact Information
 
@@ -80,14 +80,14 @@ Deployment is fully automated via GitHub Actions on merge to `main` branch.
 **Deployment Steps** (automated):
 
 1. Build Docker image from `main` branch
-2. Push image to GHCR with `:latest` tag
-3. SSH to VPS
-4. Pull new image
-5. Execute blue/green deployment (zero downtime)
-6. Run health checks
-7. Notify in Slack (if configured)
+2. Push image to GHCR with `:latest` + `:prod-<sha>` tags (the SHA tag enables rollback)
+3. SSH to VPS (via Cloudflare Tunnel `ssh.rectorspace.com`)
+4. `git pull origin main`, then `bash scripts/deploy.sh`
+5. Run `scripts/deploy.sh` — single-container recreate of `green` (`docker compose pull green` → `docker compose up -d --no-deps green`), health-gated (up to 120s; the workflow fails if `green` never becomes healthy). Brief ~5–15s restart blip (NOT zero-downtime)
+6. Post-deploy smoke test curls ~9 public endpoints to confirm the live site responds
+7. `docker image prune -f`, then verify (`docker compose ps green` + recent logs)
 
-**Timeline**: ~10-15 minutes from merge to live
+**Timeline**: ~3-5 minutes from merge to live
 
 ### Manual Deployment
 
@@ -104,57 +104,45 @@ ssh pnodepulse
 # Navigate to project directory
 cd ~/pnode-pulse
 
-# Pull latest images
-docker compose pull blue
+# Pull the latest code (deploy.sh + compose definitions)
+git pull origin main
 
-# Deploy blue (production)
-docker compose up -d blue
+# Run the single-container deploy (pulls the image, recreates ONLY green
+# with --no-deps, then health-gates green for up to 120s)
+bash scripts/deploy.sh
 
-# Wait 10 seconds for health check
-sleep 10
+# Equivalent manual steps if you prefer to run them by hand:
+#   docker compose pull green
+#   docker compose up -d --no-deps green   # --no-deps leaves postgres/redis/collector untouched
 
-# Verify health
-curl -f http://localhost:7000/api/health || echo "⚠️  Health check failed"
+# Verify health (deploy.sh already health-gates; this is a sanity check)
+curl -f http://localhost:7001/api/health || echo "⚠️  Health check failed"
 
 # Check logs
-docker compose logs -f blue --tail 50
+docker compose logs -f green --tail 50
 ```
 
-### Blue/Green Deployment
+### Single-Container Deploy
 
-Zero-downtime deployment using blue/green strategy:
+Production runs **one** web container named `green` on host port 7001 (container port 3000). nginx points **permanently** at `localhost:7001` — there is no upstream switching, no `blue` container, no port 7000. A deploy recreates only `green`; `postgres`, `redis`, and the `collector` worker are long-lived and never touched by a deploy.
 
 ```bash
 # SSH to VPS
 ssh pnodepulse
 cd ~/pnode-pulse
 
-# Determine active environment
-ACTIVE=$(docker compose ps --filter "status=running" | grep "7000" | grep -q "blue" && echo "blue" || echo "green")
-INACTIVE=$([ "$ACTIVE" = "blue" ] && echo "green" || echo "blue")
-
-echo "Active: $ACTIVE, Deploying to: $INACTIVE"
-
-# Pull latest image
-docker compose pull $INACTIVE
-
-# Start inactive environment
-docker compose up -d $INACTIVE
-
-# Wait for health check
-sleep 15
-curl -f http://localhost:7001/api/health || exit 1
-
-# Switch nginx upstream (manual step - update nginx config)
-# sudo nano /etc/nginx/sites-available/pulse.rectorspace.com
-# Change upstream from 7000 to 7001 (or vice versa)
-# sudo nginx -t && sudo systemctl reload nginx
-
-# Stop old environment
-docker compose stop $ACTIVE
-
-echo "✓ Deployment complete: $INACTIVE is now active"
+# Pull the latest code, then run the deploy script
+git pull origin main
+bash scripts/deploy.sh
 ```
+
+`scripts/deploy.sh` does the following:
+
+1. `docker compose pull green` — fetch the new image.
+2. `docker compose up -d --no-deps green` — recreate ONLY the `green` web container (`--no-deps` leaves `postgres`/`redis`/`collector` running).
+3. Health-gate `green`: poll its container healthcheck for up to 120s. If it never reports `healthy`, the script exits non-zero (the deploy is considered failed — roll back).
+
+Because the single container is recreated in place, expect a brief ~5–15s restart blip (this is NOT a zero-downtime deploy). nginx needs no changes — the upstream is fixed at `localhost:7001`.
 
 ### Database Migrations
 
@@ -166,13 +154,13 @@ ssh pnodepulse
 cd ~/pnode-pulse
 
 # View pending migrations
-docker compose exec blue npx prisma migrate status
+docker compose exec green npx prisma migrate status
 
 # Apply migrations (non-interactive)
-docker compose exec blue npx prisma migrate deploy
+docker compose exec green npx prisma migrate deploy
 
 # Verify
-docker compose exec blue npx prisma migrate status
+docker compose exec green npx prisma migrate status
 # Should show: "Database is up to date"
 ```
 
@@ -186,30 +174,28 @@ docker compose exec blue npx prisma migrate status
 
 **Steps**:
 
+Rollback = re-deploy a known-good image. Every production build pushes a `:prod-<sha>` tag to GHCR specifically for this. There is no environment switch — you re-tag the good image as `:latest` and re-run the deploy.
+
 ```bash
 # SSH to VPS
 ssh pnodepulse
 cd ~/pnode-pulse
 
-# Option 1: Quick switch to inactive environment (if still running)
-docker compose start green  # or blue
-# Update nginx upstream back to previous port
-
-# Option 2: Rollback to specific Docker image
-# List recent image tags
+# List recent image tags to pick a known-good build
 docker images ghcr.io/rector-labs/pnode-pulse --format "table {{.Tag}}\t{{.CreatedAt}}"
 
-# Pull specific version (use git SHA from GitHub)
-docker pull ghcr.io/rector-labs/pnode-pulse:abc1234567890def
+# Pull the known-good production image (use its prod-<sha> tag)
+docker pull ghcr.io/rector-labs/pnode-pulse:prod-<sha>
 
-# Tag as latest locally
-docker tag ghcr.io/rector-labs/pnode-pulse:abc1234567890def ghcr.io/rector-labs/pnode-pulse:latest
+# Re-tag it as :latest locally (deploy.sh deploys whatever :latest points to)
+docker tag ghcr.io/rector-labs/pnode-pulse:prod-<sha> ghcr.io/rector-labs/pnode-pulse:latest
 
-# Restart with old image
-docker compose up -d blue
+# Recreate green from :latest (single-container, health-gated)
+SERVICE=green bash scripts/deploy.sh
+# (equivalently: docker compose up -d --no-deps green)
 
 # Verify
-curl -f http://localhost:7000/api/health
+curl -f http://localhost:7001/api/health
 ```
 
 **Timeline**: 2-5 minutes
@@ -222,7 +208,7 @@ curl -f http://localhost:7000/api/health
 
 ```bash
 # If migration just ran and caused immediate issues
-docker compose exec blue npx prisma migrate resolve --rolled-back 20251209_migration_name
+docker compose exec green npx prisma migrate resolve --rolled-back 20251209_migration_name
 
 # Restore application to previous version (without migration)
 ```
@@ -311,7 +297,7 @@ docker compose exec postgres psql -U pnodepulse -c "
 docker compose ps
 
 # Check logs for errors
-docker compose logs blue --tail 100
+docker compose logs green --tail 100
 
 # Check disk space
 df -h
@@ -320,7 +306,7 @@ df -h
 free -h
 
 # Restart service
-docker compose restart blue
+docker compose restart green
 
 # Full restart (if needed)
 docker compose down
@@ -379,7 +365,7 @@ docker compose restart redis
 
 ```bash
 # Check application logs
-docker compose logs blue --tail 200 | grep ERROR
+docker compose logs green --tail 200 | grep ERROR
 
 # Check nginx logs (if applicable)
 sudo tail -f /var/log/nginx/error.log
@@ -388,10 +374,10 @@ sudo tail -f /var/log/nginx/error.log
 docker stats
 
 # Check health endpoint
-curl -v http://localhost:7000/api/health
+curl -v http://localhost:7001/api/health
 
 # Restart application
-docker compose restart blue
+docker compose restart green
 ```
 
 ### High CPU/Memory Usage
@@ -404,13 +390,13 @@ docker stats
 htop  # or top
 
 # Check specific processes
-docker compose exec blue ps aux | head -20
+docker compose exec green ps aux | head -20
 
 # Restart high-usage container
-docker compose restart blue
+docker compose restart green
 
 # Check for memory leaks (if persistent)
-docker compose logs blue | grep "out of memory"
+docker compose logs green | grep "out of memory"
 ```
 
 ### Disk Space Full
@@ -422,8 +408,10 @@ df -h
 # Find large files
 du -h / | sort -rh | head -20
 
-# Clean up Docker images/containers
-docker system prune -a --volumes
+# Clean up dangling Docker images + build cache
+# (shared VPS: NEVER `docker system prune` — it would wipe other projects' images/volumes)
+docker image prune -f
+docker builder prune -f
 
 # Clean up old backups (if needed)
 find /backups/pnode-pulse/ -name "*.dump" -mtime +30 -delete
@@ -441,7 +429,7 @@ sudo journalctl --vacuum-time=7d
 **Application Health**:
 
 ```bash
-curl http://localhost:7000/api/health
+curl http://localhost:7001/api/health
 # Expected: {"status":"ok","timestamp":"..."}
 ```
 
@@ -465,13 +453,13 @@ docker compose exec redis redis-cli ping
 
 ```bash
 # Application
-docker compose logs -f blue --tail 100
+docker compose logs -f green --tail 100
 
 # All services
 docker compose logs -f --tail 50
 
 # Specific time range
-docker compose logs --since 30m blue
+docker compose logs --since 30m green
 ```
 
 **System Metrics**:
@@ -508,8 +496,8 @@ External monitoring checks your site from outside, detecting when it's completel
 **When Alert Fires**:
 
 1. Check health endpoint: `curl -s https://pulse.rectorspace.com/api/health`
-2. SSH and check logs: `ssh pnodepulse && docker compose logs blue --tail 100`
-3. Restart if needed: `docker compose restart blue`
+2. SSH and check logs: `ssh pnodepulse && docker compose logs green --tail 100`
+3. Restart if needed: `docker compose restart green`
 4. Check Sentry for related errors
 
 ### APM & Error Tracking
@@ -603,7 +591,7 @@ Recommended alerts:
 
 4. **Verify restoration**:
    ```bash
-   curl http://localhost:7000/api/health
+   curl http://localhost:7001/api/health
    # Check critical data in UI
    ```
 

@@ -76,16 +76,16 @@ Production-ready analytics platform tracking 200+ pNodes with real-time metrics,
 
 ### Innovation Features (Bonus)
 
-| Feature                  | Description                                                    |
-| ------------------------ | -------------------------------------------------------------- |
-| **TimescaleDB**          | Time-series database for efficient metrics storage and queries |
-| **Health Scoring**       | Multi-factor A-F grades based on CPU, RAM, uptime              |
-| **IP Change Detection**  | Tracks nodes by pubkey, detects IP migrations                  |
-| **Node Graveyard**       | Historical archive of inactive/offline nodes                   |
-| **Capacity Projections** | Growth forecasting based on historical trends                  |
-| **Embeddable Badges**    | SVG badges for external sites (network.svg, storage.svg)       |
-| **Public REST API**      | Full API access for third-party integrations                   |
-| **Blue/Green Deploy**    | Zero-downtime production deployments                           |
+| Feature                     | Description                                                    |
+| --------------------------- | -------------------------------------------------------------- |
+| **TimescaleDB**             | Time-series database for efficient metrics storage and queries |
+| **Health Scoring**          | Multi-factor A-F grades based on CPU, RAM, uptime              |
+| **IP Change Detection**     | Tracks nodes by pubkey, detects IP migrations                  |
+| **Node Graveyard**          | Historical archive of inactive/offline nodes                   |
+| **Capacity Projections**    | Growth forecasting based on historical trends                  |
+| **Embeddable Badges**       | SVG badges for external sites (network.svg, storage.svg)       |
+| **Public REST API**         | Full API access for third-party integrations                   |
+| **Single-Container Deploy** | Health-gated push-to-deploy on `main` with rollback            |
 
 ---
 
