@@ -324,7 +324,6 @@ pNode Pulse includes automated deployment workflows.
 
 | Workflow                | Trigger        | Target                                   |
 | ----------------------- | -------------- | ---------------------------------------- |
-| `deploy-staging.yml`    | Push to `dev`  | Staging (port 7002)                      |
 | `deploy-production.yml` | Push to `main` | Production (single container, port 7001) |
 
 ### Required GitHub Secrets
@@ -335,14 +334,6 @@ Configure in repository Settings → Secrets:
 | ------------------- | ----------------------------------- |
 | `VPS_SSH_KEY`       | Private SSH key for deployment user |
 | `POSTGRES_PASSWORD` | Database password                   |
-
-### Staging Deployment Flow
-
-1. Push to `dev` branch
-2. GitHub Actions builds Docker image
-3. Pushes to GitHub Container Registry (GHCR)
-4. SSHs to VPS and pulls new image
-5. Restarts staging container
 
 ### Production Deployment Flow
 

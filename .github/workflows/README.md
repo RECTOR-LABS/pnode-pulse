@@ -1,17 +1,16 @@
 # GitHub Actions Deployment Workflows
 
-Automated push-to-deploy workflows for pNode Pulse using GitHub Container Registry (GHCR). Both environments use a simple **single-container** deploy: build the image in CI, push to GHCR, then recreate one web container on the VPS.
+Automated push-to-deploy workflow for pNode Pulse using GitHub Container Registry (GHCR). Production uses a simple **single-container** deploy: build the image in CI, push to GHCR, then recreate the `green` web container on the VPS.
 
 > SSH to the VPS goes through the Cloudflare Tunnel (`ssh.rectorspace.com` → VPS:22) as user `pnodepulse`; direct port 22 is firewalled. CI installs `cloudflared` and uses it as an SSH `ProxyCommand` with key auth (`VPS_SSH_KEY`).
 
 ## Overview
 
-| Workflow                | Trigger        | Environment            | URL                           | Strategy           |
-| ----------------------- | -------------- | ---------------------- | ----------------------------- | ------------------ |
-| `deploy-staging.yml`    | Push to `dev`  | Staging (port 7002)    | staging.pulse.rectorspace.com | Recreate `staging` |
-| `deploy-production.yml` | Push to `main` | Production (port 7001) | pulse.rectorspace.com         | Recreate `green`   |
+| Workflow                | Trigger        | Environment            | URL                   | Strategy         |
+| ----------------------- | -------------- | ---------------------- | --------------------- | ---------------- |
+| `deploy-production.yml` | Push to `main` | Production (port 7001) | pulse.rectorspace.com | Recreate `green` |
 
-Both deploys recreate **only** their web container (`docker compose up -d --no-deps <service>`). `postgres`, `redis`, and the collector are **never** touched by a deploy — they are long-lived services managed out-of-band. nginx points at a fixed host port per environment, so there is no upstream switching.
+The deploy recreates **only** the `green` web container (`docker compose up -d --no-deps green`). `postgres`, `redis`, and the collector are **never** touched by a deploy — they are long-lived services managed out-of-band. nginx points at a fixed host port, so there is no upstream switching.
 
 ## Required GitHub Secrets
 
@@ -31,10 +30,6 @@ Both deploys recreate **only** their web container (`docker compose up -d --no-d
 5. `docker image prune -f`, then verify (`docker compose ps green` + recent logs).
 
 **Deploy time**: ~3–5 min. **Downtime**: a brief restart blip (~5–15s) while the `green` container is recreated. Acceptable for this single low-traffic instance; CI builds the image before it ships, so broken images are rare and the health gate flags them.
-
-## Staging Workflow (`deploy-staging.yml`)
-
-**Triggered by**: push to `dev` (or manual). Builds & pushes `:dev`, then on the VPS recreates the `staging` container (`docker compose up -d --no-deps staging`). Same shape as production, different service/port/image tag.
 
 ## Rollback (Production)
 
@@ -67,7 +62,6 @@ services:
 
 | Environment        | Local health URL                 |
 | ------------------ | -------------------------------- |
-| Staging            | http://localhost:7002/api/health |
 | Production (green) | http://localhost:7001/api/health |
 
 ```bash
@@ -75,7 +69,6 @@ ssh pnodepulse
 cd ~/pnode-pulse
 docker compose ps                       # container status
 docker compose logs -f green            # production logs
-docker compose logs -f staging          # staging logs
 ```
 
 ## Troubleshooting

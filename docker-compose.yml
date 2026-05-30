@@ -39,32 +39,6 @@ services:
       timeout: 3s
       retries: 5
 
-  # Staging (dev branch)
-  staging:
-    image: ghcr.io/rector-labs/pnode-pulse:dev
-    container_name: pnode-pulse-web-staging
-    restart: unless-stopped
-    ports:
-      - "7002:3000"
-    environment:
-      NODE_ENV: production
-      DATABASE_URL: postgresql://pnodepulse:${POSTGRES_PASSWORD}@postgres:5432/pnodepulse
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      NEXT_PUBLIC_APP_URL: https://staging.pulse.rectorspace.com
-    networks:
-      - pnode-pulse-net
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   # Production web (single container).
   # Deploys recreate ONLY this service via `docker compose up -d --no-deps green`
   # (see scripts/deploy.sh), so postgres/redis are never disturbed by a web deploy.
@@ -133,7 +107,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_ISSUER: pnode-pulse
       JWT_AUDIENCE: pnode-pulse-app
-      ALLOWED_ORIGINS: https://pulse.rectorspace.com,https://staging.pulse.rectorspace.com
+      ALLOWED_ORIGINS: https://pulse.rectorspace.com
       LOG_LEVEL: info
     networks:
       - pnode-pulse-net

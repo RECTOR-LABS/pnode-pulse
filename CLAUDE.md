@@ -221,29 +221,18 @@ curl -X POST http://<ip-address>:6000/rpc \
 | Service          | Port          |
 | ---------------- | ------------- |
 | Web (Production) | 7001          |
-| Staging          | 7002          |
 | PostgreSQL       | internal only |
 | Redis            | internal only |
 
 ### Push-to-Deploy Workflow
 
-**Automated deployment** triggers on every push to main/dev branches:
+**Automated deployment** triggers on every push to the `main` branch:
 
-| Branch | Environment                   | Port | URL                           |
-| ------ | ----------------------------- | ---- | ----------------------------- |
-| `dev`  | Staging                       | 7002 | staging.pulse.rectorspace.com |
-| `main` | Production (single container) | 7001 | pulse.rectorspace.com         |
+| Branch | Environment                   | Port | URL                   |
+| ------ | ----------------------------- | ---- | --------------------- |
+| `main` | Production (single container) | 7001 | pulse.rectorspace.com |
 
 #### Deployment Flow
-
-**Staging (dev branch)**:
-
-1. Push to `dev` branch
-2. GitHub Actions builds Docker image
-3. Pushes image to GHCR with `:dev` tag
-4. SSH to VPS, pulls new image
-5. Restarts `staging` container on port 7002
-6. Immediate deployment (no downtime concerns)
 
 **Production (main branch)**:
 
@@ -269,12 +258,6 @@ Configure these in repository settings (Settings → Secrets and variables → A
 #### Deployment Commands
 
 ```bash
-# Manual staging deployment
-ssh pnodepulse
-cd ~/pnode-pulse
-docker compose pull staging
-docker compose up -d staging
-
 # Manual production deployment (single container)
 ssh pnodepulse
 cd ~/pnode-pulse
@@ -282,7 +265,7 @@ bash scripts/deploy.sh
 
 # Check deployment status
 docker compose ps
-docker compose logs -f green staging
+docker compose logs -f green
 
 # Rollback (if needed)
 # Re-deploy a known-good image by its :prod-<sha> tag, then recreate green
@@ -296,7 +279,6 @@ All services have health endpoints for monitoring:
 
 | Endpoint           | URL                              | Checks            |
 | ------------------ | -------------------------------- | ----------------- |
-| Staging            | http://localhost:7002/api/health | DB, Redis, uptime |
 | Green (Production) | http://localhost:7001/api/health | DB, Redis, uptime |
 
 Health check response:
@@ -319,14 +301,6 @@ Health check response:
 Configure reverse proxy to route traffic:
 
 ```nginx
-# Staging
-server {
-  server_name staging.pulse.rectorspace.com;
-  location / {
-    proxy_pass http://localhost:7002;
-  }
-}
-
 # Production (single container, green)
 server {
   server_name pulse.rectorspace.com;
