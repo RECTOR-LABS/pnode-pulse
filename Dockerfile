@@ -1,6 +1,6 @@
 # Dependencies + source + generated Prisma client.
 # Shared base for both the web build and the collector so they install deps once.
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 
 WORKDIR /app
 
@@ -32,7 +32,7 @@ ENV NODE_ENV=production
 CMD ["npx", "tsx", "scripts/start-collector.ts"]
 
 # Production web stage (Next.js standalone). This is the default build target.
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 
 WORKDIR /app
 
