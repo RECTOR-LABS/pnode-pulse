@@ -48,13 +48,11 @@ docker compose restart blue
 
 ### Service Ports
 
-| Service                | Port | URL                                  |
-| ---------------------- | ---- | ------------------------------------ |
-| **Blue (Production)**  | 7000 | http://pulse.rectorspace.com         |
-| **Green (Production)** | 7001 | (inactive, for blue/green)           |
-| **Staging**            | 7002 | http://staging.pulse.rectorspace.com |
-| **PostgreSQL**         | 5434 | localhost only                       |
-| **Redis**              | 6381 | localhost only                       |
+| Service                | Port | URL                           |
+| ---------------------- | ---- | ----------------------------- |
+| **Green (Production)** | 7001 | https://pulse.rectorspace.com |
+| **PostgreSQL**         | 5434 | localhost only                |
+| **Redis**              | 6381 | localhost only                |
 
 ### Contact Information
 
@@ -504,7 +502,6 @@ External monitoring checks your site from outside, detecting when it's completel
 | Homepage | https://pulse.rectorspace.com | HTTP 200 |
 | Health | https://pulse.rectorspace.com/api/health | Keyword: `"status":"healthy"` |
 | API | https://pulse.rectorspace.com/api/v1/leaderboard | Keyword: `nodes` |
-| Staging | https://staging.pulse.rectorspace.com/api/health | HTTP 200 |
 
 **Full Setup Guide**: [`docs/UPTIME_MONITORING.md`](./UPTIME_MONITORING.md)
 
@@ -588,7 +585,7 @@ Recommended alerts:
 1. **Stop writes immediately**:
 
    ```bash
-   docker compose stop blue green staging
+   docker compose stop green
    ```
 
 2. **Assess damage**:
@@ -637,11 +634,11 @@ Recommended alerts:
 - [ ] Database VACUUM ANALYZE
 - [ ] Review and rotate application logs
 - [ ] Update dependencies (security patches)
-- [ ] Test restore procedure (staging)
+- [ ] Test restore procedure (restore to a scratch DB)
 
 ### Quarterly
 
-- [ ] Full restore test (production backup → staging)
+- [ ] Full restore test (production backup → scratch DB)
 - [ ] Disaster recovery drill
 - [ ] Review and update runbook
 - [ ] Performance optimization review
