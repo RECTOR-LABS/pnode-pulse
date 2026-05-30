@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { logger } from "@/lib/logger";
-import {  checkRateLimit,
+import {
+  checkRateLimit,
   createRateLimitHeaders,
   rateLimitExceededResponse,
   trackApiUsage,
@@ -46,24 +47,32 @@ export async function GET(request: NextRequest) {
         node_count: number;
       }>
     >`
-      SELECT
-        COALESCE(SUM(m."fileSize"), 0) as total_storage,
-        COALESCE(AVG(m."cpuPercent"), 0) as avg_cpu,
-        COALESCE(AVG(
-          CASE WHEN m."ramTotal" > 0
-            THEN (m."ramUsed"::float / m."ramTotal"::float) * 100
+      WITH latest_metrics AS (
+        SELECT
+          m.file_size,
+          m.cpu_percent,
+          CASE WHEN m.ram_total > 0
+            THEN (m.ram_used::float / m.ram_total::float) * 100
             ELSE 0
-          END
-        ), 0) as avg_ram_percent,
-        COALESCE(AVG(m.uptime), 0) as avg_uptime,
-        COUNT(DISTINCT m."nodeId") as node_count
-      FROM (
-        SELECT DISTINCT ON ("nodeId") *
-        FROM "NodeMetric"
-        ORDER BY "nodeId", time DESC
-      ) m
-      JOIN "Node" n ON m."nodeId" = n.id
-      WHERE n."isActive" = true
+          END as ram_percent,
+          m.uptime
+        FROM nodes n
+        JOIN LATERAL (
+          SELECT nm.file_size, nm.cpu_percent, nm.ram_used, nm.ram_total, nm.uptime
+          FROM node_metrics nm
+          WHERE nm.node_id = n.id
+          ORDER BY nm.time DESC
+          LIMIT 1
+        ) m ON true
+        WHERE n.is_active = true
+      )
+      SELECT
+        COALESCE(SUM(file_size), 0) as total_storage,
+        COALESCE(AVG(cpu_percent), 0) as avg_cpu,
+        COALESCE(AVG(ram_percent), 0) as avg_ram_percent,
+        COALESCE(AVG(uptime), 0) as avg_uptime,
+        COUNT(*) as node_count
+      FROM latest_metrics
     `;
 
     const metrics = latestMetrics[0] || {
@@ -102,7 +111,7 @@ export async function GET(request: NextRequest) {
       "/api/v1/network",
       "GET",
       responseTime,
-      false
+      false,
     );
 
     return NextResponse.json(response, {
@@ -112,7 +121,10 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    logger.error("API Error:", error instanceof Error ? error : new Error(String(error)));
+    logger.error(
+      "API Error:",
+      error instanceof Error ? error : new Error(String(error)),
+    );
 
     const responseTime = Date.now() - startTime;
     trackApiUsage(
@@ -120,12 +132,17 @@ export async function GET(request: NextRequest) {
       "/api/v1/network",
       "GET",
       responseTime,
-      true
+      true,
     );
 
     return NextResponse.json(
-      { error: { code: "INTERNAL_ERROR", message: "An unexpected error occurred" } },
-      { status: 500 }
+      {
+        error: {
+          code: "INTERNAL_ERROR",
+          message: "An unexpected error occurred",
+        },
+      },
+      { status: 500 },
     );
   }
 }
