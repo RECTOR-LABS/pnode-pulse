@@ -24,14 +24,22 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    // Get all nodes with peer counts (latest metric is fetched separately below)
+    // Get all nodes (only the columns this endpoint emits). Peer counts and the
+    // latest metric are fetched separately below to avoid Prisma's slow per-node
+    // _count and metric includes.
     const nodes = await db.node.findMany({
-      include: {
-        _count: {
-          select: { peers: true },
-        },
-      },
+      select: { id: true, address: true, isActive: true, version: true },
     });
+
+    // Peer count per node via one GROUP BY. Replaces Prisma's `_count: { peers }`,
+    // which issues a correlated count per node (~790ms over 1.5M node_peers rows
+    // vs ~85ms here).
+    const peerCountRows = await db.$queryRaw<
+      Array<{ node_id: number; count: bigint }>
+    >`SELECT node_id, COUNT(*) as count FROM node_peers GROUP BY node_id`;
+    const peerCountByNode = new Map(
+      peerCountRows.map((r) => [r.node_id, Number(r.count)]),
+    );
 
     // Latest metric per node via a single LATERAL query (one indexed lookup per node).
     // Replaces Prisma's `include: { metrics: { take: 1 } }`, which generates a
@@ -327,7 +335,9 @@ export async function GET() {
     lines.push("# TYPE pnode_peer_count gauge");
     for (const node of nodes) {
       const labels = `node="${node.address.split(":")[0]}"`;
-      lines.push(`pnode_peer_count{${labels}} ${node._count.peers}`);
+      lines.push(
+        `pnode_peer_count{${labels}} ${peerCountByNode.get(node.id) ?? 0}`,
+      );
     }
     lines.push("");
 
@@ -343,6 +353,9 @@ export async function GET() {
     return new NextResponse(lines.join("\n"), {
       headers: {
         "Content-Type": "text/plain; version=0.0.4; charset=utf-8",
+        // Let Vercel's edge cache absorb scrapes; the underlying data only
+        // changes per collector cycle, so ~30s staleness is acceptable.
+        "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
       },
     });
   } catch (error) {
