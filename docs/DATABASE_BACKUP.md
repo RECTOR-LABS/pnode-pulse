@@ -8,11 +8,11 @@ pNode Pulse uses PostgreSQL with TimescaleDB extension for time-series data. Thi
 
 ### Schedule & Retention
 
-| Frequency | Retention | Storage Location |
-|-----------|-----------|------------------|
-| **Daily** | 30 days | `/backups/pnode-pulse` on VPS |
-| **Weekly** | 90 days | S3 (optional, off-site) |
-| **Monthly** | 1 year | S3 Glacier (optional, archival) |
+| Frequency   | Retention | Storage Location                |
+| ----------- | --------- | ------------------------------- |
+| **Daily**   | 30 days   | `/backups/pnode-pulse` on VPS   |
+| **Weekly**  | 90 days   | S3 (optional, off-site)         |
+| **Monthly** | 1 year    | S3 Glacier (optional, archival) |
 
 **Backup Time**: 2:00 AM UTC daily (scheduled via cron)
 
@@ -106,8 +106,9 @@ cd ~/pnode-pulse
 ```
 
 The script will:
+
 1. ✋ **Prompt for confirmation** (destructive operation)
-2. 🛑 **Stop application** (blue/green/staging containers)
+2. 🛑 **Stop the application** (`green` container)
 3. 🗑️ **Drop existing objects** (`--clean --if-exists`)
 4. 📥 **Restore from backup**
 5. ✅ **Verify restoration** (count nodes and metrics)
@@ -159,6 +160,7 @@ fi
 ### Alerting
 
 Configure alerts for:
+
 - Backup fails to complete (cron sends email on error)
 - Backup file size anomaly (too small = incomplete backup)
 - No backup in 26 hours (missed schedule)
@@ -173,6 +175,7 @@ Configure alerts for:
 **Symptoms**: Application errors, query failures, data inconsistencies
 
 **Recovery**:
+
 1. Stop application immediately
 2. Backup corrupted database (if possible): `pg_dump -Fc > corrupted_backup.dump`
 3. Restore from last known good backup
@@ -187,10 +190,11 @@ Configure alerts for:
 **Symptoms**: Missing nodes, metrics, or other data
 
 **Recovery**:
+
 1. **DO NOT** run any DELETE or UPDATE queries
 2. Immediately create backup of current state
-3. Restore to staging environment from most recent backup
-4. Extract deleted data from staging backup
+3. Restore the most recent backup into a scratch / restore-test database
+4. Extract deleted data from the restore-test database
 5. Manually re-insert into production (or full restore if extensive)
 
 **RTO**: ~1-4 hours  
@@ -201,6 +205,7 @@ Configure alerts for:
 **Symptoms**: VPS unreachable, hardware failure
 
 **Recovery**:
+
 1. Provision new VPS
 2. Setup Docker, PostgreSQL, Redis
 3. Download latest backup from S3 (if configured) or copy from local storage
@@ -219,12 +224,12 @@ Off-site backups provide geographic redundancy and protection against VPS failur
 
 ### Supported Providers
 
-| Provider | Endpoint | Cost (approx.) |
-|----------|----------|----------------|
-| **AWS S3** | (default) | $0.023/GB/month |
-| **Backblaze B2** | `s3.REGION.backblazeb2.com` | $0.005/GB/month |
-| **Wasabi** | `s3.REGION.wasabisys.com` | $0.007/GB/month |
-| **MinIO** | Self-hosted | Free (self-hosted) |
+| Provider         | Endpoint                    | Cost (approx.)     |
+| ---------------- | --------------------------- | ------------------ |
+| **AWS S3**       | (default)                   | $0.023/GB/month    |
+| **Backblaze B2** | `s3.REGION.backblazeb2.com` | $0.005/GB/month    |
+| **Wasabi**       | `s3.REGION.wasabisys.com`   | $0.007/GB/month    |
+| **MinIO**        | Self-hosted                 | Free (self-hosted) |
 
 ### Quick Setup (Interactive)
 
@@ -237,6 +242,7 @@ cd ~/pnode-pulse
 ```
 
 This will:
+
 1. Install AWS CLI if needed
 2. Guide you through provider selection
 3. Configure credentials
@@ -256,12 +262,14 @@ apt install awscli
 #### 2. Configure Credentials
 
 **Option A: AWS Configure (interactive)**
+
 ```bash
 aws configure
 # Enter: Access Key ID, Secret Access Key, Region, Output format
 ```
 
 **Option B: Environment Variables**
+
 ```bash
 export AWS_ACCESS_KEY_ID="your-access-key"
 export AWS_SECRET_ACCESS_KEY="your-secret-key"
@@ -350,27 +358,27 @@ s3://pnode-pulse-backups/
 
 ### Retention Policy
 
-| Storage | Retention | Managed By |
-|---------|-----------|------------|
-| Local (`/backups/`) | 30 days | `backup-db.sh` (RETENTION_DAYS) |
-| S3 | 90 days | `backup-db.sh` (S3_RETENTION_DAYS) |
-| S3 Glacier | 1 year | AWS Lifecycle Rules (manual setup) |
+| Storage             | Retention | Managed By                         |
+| ------------------- | --------- | ---------------------------------- |
+| Local (`/backups/`) | 30 days   | `backup-db.sh` (RETENTION_DAYS)    |
+| S3                  | 90 days   | `backup-db.sh` (S3_RETENTION_DAYS) |
+| S3 Glacier          | 1 year    | AWS Lifecycle Rules (manual setup) |
 
 ### Storage Classes
 
-| Class | Use Case | Retrieval Time | Cost |
-|-------|----------|----------------|------|
-| **STANDARD** | Latest backup only | Instant | Higher |
-| **STANDARD_IA** | Daily backups (default) | Instant | Lower |
-| **GLACIER** | Monthly archives | Hours | Lowest |
+| Class           | Use Case                | Retrieval Time | Cost   |
+| --------------- | ----------------------- | -------------- | ------ |
+| **STANDARD**    | Latest backup only      | Instant        | Higher |
+| **STANDARD_IA** | Daily backups (default) | Instant        | Lower  |
+| **GLACIER**     | Monthly archives        | Hours          | Lowest |
 
 ### Cost Estimate
 
-| Data Volume | S3 Standard-IA | Backblaze B2 | Wasabi |
-|-------------|----------------|--------------|--------|
-| 1 GB | $0.02/month | $0.005/month | $0.007/month |
-| 10 GB | $0.23/month | $0.05/month | $0.07/month |
-| 100 GB | $2.30/month | $0.50/month | $0.70/month |
+| Data Volume | S3 Standard-IA | Backblaze B2 | Wasabi       |
+| ----------- | -------------- | ------------ | ------------ |
+| 1 GB        | $0.02/month    | $0.005/month | $0.007/month |
+| 10 GB       | $0.23/month    | $0.05/month  | $0.07/month  |
+| 100 GB      | $2.30/month    | $0.50/month  | $0.70/month  |
 
 ### Verify S3 Backups
 
@@ -396,9 +404,9 @@ rm /tmp/verify.dump
 
 ### Quarterly Restore Test
 
-1. **Setup test environment** (staging database)
+1. **Setup test environment** (restore-test database)
 2. **Select random backup** from last 30 days
-3. **Restore to staging**
+3. **Restore to the restore-test database**
 4. **Verify data integrity**: Check row counts, recent data
 5. **Test application**: Ensure queries work, UI loads
 6. **Document results**: Note any issues, update procedures
@@ -412,14 +420,14 @@ rm /tmp/verify.dump
 BACKUP_FILE=$(ls -t /backups/pnode-pulse/*.dump | shuf -n 1)
 echo "Testing restore of: $BACKUP_FILE"
 
-# Restore to staging database
+# Restore to restore-test database
 PGPASSWORD=$POSTGRES_PASSWORD pg_restore \
-  -h localhost -p 5435 -U pnodepulse -d pnodepulse_staging \
+  -h localhost -p 5435 -U pnodepulse -d pnodepulse_restore_test \
   --clean --if-exists \
   "$BACKUP_FILE"
 
 # Verify
-PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -p 5435 -U pnodepulse -d pnodepulse_staging -c "
+PGPASSWORD=$POSTGRES_PASSWORD psql -h localhost -p 5435 -U pnodepulse -d pnodepulse_restore_test -c "
   SELECT 'Nodes: ' || COUNT(*) FROM nodes;
   SELECT 'Metrics: ' || COUNT(*) FROM node_metrics;
 "

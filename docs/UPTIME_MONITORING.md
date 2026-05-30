@@ -112,18 +112,6 @@ This monitor validates:
 - Expected Status Codes: 200
 - Keyword: `nodes` (type: exists)
 
-#### Monitor 4: Staging Environment
-
-| Setting             | Value                                              |
-| ------------------- | -------------------------------------------------- |
-| Monitor Type        | HTTP(s)                                            |
-| Friendly Name       | pNode Pulse - Staging                              |
-| URL                 | `https://staging.pulse.rectorspace.com/api/health` |
-| Monitoring Interval | 15 minutes                                         |
-| Monitor Timeout     | 30 seconds                                         |
-
-**Note**: Longer interval for staging (less critical).
-
 ### Step 3: Configure Alert Contacts
 
 Go to **My Settings** → **Alert Contacts** → **Add Alert Contact**
@@ -271,7 +259,6 @@ To use `status.pulse.rectorspace.com`:
 - **Homepage**: User-facing availability
 - **Health endpoint**: Application + dependencies
 - **Critical API**: Core functionality (leaderboard, nodes)
-- **Staging**: Pre-production validation
 
 ### 2. Set Appropriate Intervals
 
@@ -280,7 +267,6 @@ To use `status.pulse.rectorspace.com`:
 | Production homepage | 5 min    | Critical user experience |
 | Production health   | 5 min    | Early warning system     |
 | Production API      | 5 min    | Core functionality       |
-| Staging             | 15 min   | Less critical            |
 
 ### 3. Configure Escalation
 
@@ -311,11 +297,11 @@ Set up tiered alerting:
    ```bash
    ssh pnodepulse
    docker compose ps
-   docker compose logs --tail=100 blue
+   docker compose logs --tail=100 green
    ```
 4. **Restart if needed**:
    ```bash
-   docker compose restart blue
+   docker compose restart green
    ```
 5. **Document incident** in runbook/post-mortem
 
@@ -323,7 +309,7 @@ Set up tiered alerting:
 
 | Alert            | Likely Cause      | Fix                            |
 | ---------------- | ----------------- | ------------------------------ |
-| Homepage down    | Container crashed | `docker compose up -d blue`    |
+| Homepage down    | Container crashed | `docker compose up -d green`   |
 | Health degraded  | Redis down        | `docker compose restart redis` |
 | Health unhealthy | Database down     | Check PostgreSQL logs          |
 | API timeout      | High load         | Scale or optimize queries      |
@@ -351,7 +337,6 @@ When UptimeRobot detects downtime:
 - [ ] Add homepage monitor (HTTPS)
 - [ ] Add health endpoint monitor
 - [ ] Add API endpoint monitor
-- [ ] Add staging monitor
 - [ ] Configure email alert contact
 - [ ] Configure Discord/Slack webhook
 - [ ] Test alerts (pause/resume monitor)

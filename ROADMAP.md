@@ -262,13 +262,12 @@ Per Xandeum team (Discord, 2025-12-07):
 **Domain**: `pulse.rectorspace.com`
 **VPS**: 151.245.137.75 (rectorspace.com)
 
-| Service     | Port | Container Name        |
-| ----------- | ---- | --------------------- |
-| Web (Blue)  | 7000 | pnode-pulse-web-blue  |
-| Web (Green) | 7001 | pnode-pulse-web-green |
-| Staging     | 7002 | pnode-pulse-staging   |
-| PostgreSQL  | 5434 | pnode-pulse-postgres  |
-| Redis       | 6381 | pnode-pulse-redis     |
+| Service          | Port          | Container Name        |
+| ---------------- | ------------- | --------------------- |
+| Web (Production) | 7001          | pnode-pulse-web-green |
+| Collector        | internal only | pnode-pulse-collector |
+| PostgreSQL       | internal only | pnode-pulse-postgres  |
+| Redis            | internal only | pnode-pulse-redis     |
 
 ---
 

@@ -13,6 +13,7 @@ Application Performance Monitoring (APM) and error tracking provide critical vis
 ### Why APM?
 
 **Without APM** (current state):
+
 - ❌ Errors only visible in console logs (requires SSH)
 - ❌ No alerting when errors spike
 - ❌ No stack traces or context
@@ -20,6 +21,7 @@ Application Performance Monitoring (APM) and error tracking provide critical vis
 - ❌ Slow debugging (manual log inspection)
 
 **With APM** (after setup):
+
 - ✅ Real-time error notifications
 - ✅ Full stack traces with source maps
 - ✅ User context and breadcrumbs
@@ -32,6 +34,7 @@ Application Performance Monitoring (APM) and error tracking provide critical vis
 ## Recommended Service: Sentry
 
 **Why Sentry?**
+
 - Free tier (5K events/month)
 - Excellent Next.js support (@sentry/nextjs)
 - Source map support for readable stack traces
@@ -39,6 +42,7 @@ Application Performance Monitoring (APM) and error tracking provide critical vis
 - Performance monitoring included
 
 **Alternatives**:
+
 - **Datadog**: Full observability platform (expensive, $$$)
 - **New Relic**: Comprehensive APM (complex setup)
 - **LogRocket**: Session replay focus (frontend-heavy)
@@ -70,6 +74,7 @@ npx @sentry/wizard@latest -i nextjs
 ```
 
 **Wizard will prompt for**:
+
 - DSN (from Sentry project settings)
 - Upload source maps? **Yes**
 - Create example page? **No** (we'll integrate manually)
@@ -88,6 +93,7 @@ SENTRY_PROJECT=pnode-pulse
 ```
 
 **Where to find these**:
+
 - **DSN**: Sentry project settings → Client Keys (DSN)
 - **Auth Token**: Sentry account → Settings → Auth Tokens → Create New Token
   - Scopes needed: `project:releases`, `org:read`
@@ -99,32 +105,26 @@ Update `docker-compose.yml` to pass Sentry env vars:
 
 ```yaml
 services:
-  blue:
+  green:
     environment:
       # Existing vars...
       SENTRY_DSN: ${SENTRY_DSN}
       NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN}
       SENTRY_ENVIRONMENT: production
       SENTRY_RELEASE: ${GIT_COMMIT_SHA:-latest}
-
-  staging:
-    environment:
-      # Existing vars...
-      SENTRY_DSN: ${SENTRY_DSN}
-      NEXT_PUBLIC_SENTRY_DSN: ${NEXT_PUBLIC_SENTRY_DSN}
-      SENTRY_ENVIRONMENT: staging
-      SENTRY_RELEASE: ${GIT_COMMIT_SHA:-dev}
 ```
 
 ### Step 5: Verify Installation
 
 The wizard creates these files (review them):
+
 - `sentry.client.config.ts` - Client-side configuration
 - `sentry.server.config.ts` - Server-side configuration
 - `sentry.edge.config.ts` - Edge runtime configuration
 - `next.config.js` - Updated with Sentry webpack plugin
 
 **Check configuration**:
+
 ```typescript
 // sentry.server.config.ts should have:
 import * as Sentry from "@sentry/nextjs";
@@ -132,10 +132,10 @@ import * as Sentry from "@sentry/nextjs";
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
   environment: process.env.NODE_ENV,
-  
+
   // Performance Monitoring
   tracesSampleRate: 0.1, // 10% of transactions
-  
+
   // Session Replay (debugging)
   replaysSessionSampleRate: 0.1, // 10% of sessions
   replaysOnErrorSampleRate: 1.0, // 100% when errors occur
@@ -168,7 +168,7 @@ try {
       userId: ctx.session?.user?.id,
     },
   });
-  
+
   throw new TRPCError({
     code: "INTERNAL_SERVER_ERROR",
     message: error instanceof Error ? error.message : "Unknown error",
@@ -190,8 +190,8 @@ export async function runCollection() {
       tags: { worker: "collector" },
       extra: { nodesPolled: addresses.length },
     });
-    
-    logger.error('Collection failed', error);
+
+    logger.error("Collection failed", error);
     throw error;
   }
 }
@@ -245,16 +245,19 @@ try {
 2. **Create Alert Rule**:
 
 **Rule 1: Error Spike**
+
 - Condition: >10 errors in 5 minutes
 - Action: Email team
 - Environment: production
 
 **Rule 2: New Error Type**
+
 - Condition: First seen error
 - Action: Slack notification (if configured)
 - Environment: production
 
 **Rule 3: Performance Degradation**
+
 - Condition: p95 latency >2 seconds
 - Action: Email
 - Environment: production
@@ -290,11 +293,12 @@ module.exports = withSentryConfig(
     transpileClientSDK: true,
     hideSourceMaps: true, // Hides source maps from browser DevTools
     disableLogger: true,
-  }
+  },
 );
 ```
 
 **Verification**:
+
 1. Deploy to production
 2. Trigger an error
 3. Check Sentry issue - stack trace should show TypeScript code, not minified JS
@@ -316,7 +320,8 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 ```
 
 **Test**:
-1. Deploy to staging
+
+1. Deploy to production
 2. Visit `/api/sentry-test`
 3. Check Sentry dashboard for error
 4. Verify stack trace is readable
@@ -381,10 +386,12 @@ Sentry.init({
 ## Cost Management
 
 **Free Tier Limits**:
+
 - 5,000 errors/month
 - 10,000 performance transactions/month
 
 **Staying Within Free Tier**:
+
 1. **Sample Performance**: Set `tracesSampleRate: 0.1` (10%)
 2. **Filter Noisy Errors**: Ignore known issues in Sentry dashboard
 3. **Monitor Usage**: Check Sentry → Stats → Usage
@@ -399,10 +406,9 @@ Sentry.init({
 - [ ] Run Sentry wizard (`npx @sentry/wizard`)
 - [ ] Add environment variables to `.env`
 - [ ] Update `docker-compose.yml` with Sentry env vars
-- [ ] Deploy to staging and test
 - [ ] Configure alert rules in Sentry
 - [ ] (Optional) Setup Slack integration
-- [ ] Deploy to production
+- [ ] Deploy to production and test
 - [ ] Monitor error dashboard for 24 hours
 - [ ] Document in runbook
 
@@ -411,17 +417,20 @@ Sentry.init({
 ## Troubleshooting
 
 **Errors not appearing in Sentry**:
+
 - Check `SENTRY_DSN` is set correctly
 - Verify Sentry init in both client and server configs
 - Check browser console for Sentry errors
 - Ensure source maps uploaded successfully
 
 **Source maps not working**:
+
 - Verify `SENTRY_AUTH_TOKEN` has correct scopes
 - Check `next.config.js` Sentry configuration
 - Look for source map upload errors in build logs
 
 **Too many errors logged**:
+
 - Add filters in Sentry (Settings → Inbound Filters)
 - Ignore patterns: `/healthcheck/`, browser extensions
 - Reduce sample rate if hitting free tier limit
