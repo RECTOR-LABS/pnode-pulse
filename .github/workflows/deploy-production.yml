@@ -83,3 +83,39 @@ jobs:
           docker compose ps green
           docker compose logs --tail 20 green
           REMOTE
+
+      # Smoke-test the freshly-deployed green container directly on localhost:7001
+      # (bypasses the Vercel edge cache, so a stale 200 can't mask a new 500/502).
+      # The unit suite mocks Prisma, so raw-SQL/route regressions only surface here.
+      - name: Smoke-test API endpoints
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new \
+              -o ProxyCommand="cloudflared access ssh --hostname=ssh.rectorspace.com" \
+              pnodepulse@ssh.rectorspace.com bash -s <<'REMOTE'
+          set -uo pipefail
+          fail=0
+          check() {
+            local path="$1" expect="$2" name="$3" code
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 "http://localhost:7001${path}") || code=000
+            if [ "$code" != "$expect" ]; then
+              echo "FAIL  ${name}  ${path} -> HTTP ${code} (expected ${expect})"
+              fail=1
+            else
+              echo "ok    ${name}  ${path} -> ${code}"
+            fi
+          }
+          check "/api/health"             200 health
+          check "/api/v1/network"         200 network
+          check "/api/v1/network/stats"   200 network-stats
+          check "/api/v1/leaderboard"     200 leaderboard
+          check "/api/v1/nodes"           200 nodes
+          check "/api/metrics"            200 metrics
+          check "/api/badge/storage.svg"  200 badge-storage
+          check "/api/badge/uptime.svg"   200 badge-uptime
+          check "/api/badge/nodes.svg"    200 badge-nodes
+          if [ "$fail" -ne 0 ]; then
+            echo "Smoke test FAILED — one or more endpoints did not return the expected status."
+            exit 1
+          fi
+          echo "All smoke-test endpoints healthy."
+          REMOTE
