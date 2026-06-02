@@ -11,7 +11,7 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure, protectedProcedure } from "../trpc";
 import { TRPCError } from "@trpc/server";
-import { sign } from "tweetnacl";
+import nacl from "tweetnacl";
 import { randomBytes } from "crypto";
 import bs58 from "bs58";
 import type { Prisma } from "@prisma/client";
@@ -75,7 +75,11 @@ function verifySignature(
     const signatureBytes = bs58.decode(signature);
     const publicKeyBytes = bs58.decode(publicKey);
 
-    return sign.detached.verify(messageBytes, signatureBytes, publicKeyBytes);
+    return nacl.sign.detached.verify(
+      messageBytes,
+      signatureBytes,
+      publicKeyBytes,
+    );
   } catch {
     return false;
   }
