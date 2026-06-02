@@ -5,6 +5,15 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Second client output, written into pulse-api's isolated node_modules so the
+// generated runtime (enums, model types) is resolvable from within the
+// packages/pulse-api workspace. The default `generator client` above still
+// writes to repo-root node_modules for the monolith Next.js app.
+generator pulseApiClient {
+  provider = "prisma-client-js"
+  output   = "../packages/pulse-api/node_modules/.prisma/client"
+}
+
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
