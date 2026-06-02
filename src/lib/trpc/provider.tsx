@@ -13,11 +13,19 @@ import superjson from "superjson";
 import { trpc } from "./client";
 
 function getBaseUrl() {
+  // If NEXT_PUBLIC_API_URL is set, route all tRPC traffic to the external
+  // pulse-api service (e.g. https://api.pulse.rectorspace.com). This is the
+  // Phase 3 cutover path — the Vercel-hosted FE talks to pulse-api on VPS
+  // instead of the monolith's local /api/trpc route handler.
+  // When unset, fall back to legacy behavior: relative path in the browser,
+  // localhost during SSR — i.e. the monolith handles tRPC itself.
+  const externalApiUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (externalApiUrl) {
+    return externalApiUrl.replace(/\/+$/, "");
+  }
   if (typeof window !== "undefined") {
-    // Browser should use relative path
     return "";
   }
-  // SSR should use localhost
   return `http://localhost:${process.env.PORT ?? 3000}`;
 }
 
@@ -35,7 +43,7 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
             refetchOnWindowFocus: true,
           },
         },
-      })
+      }),
   );
 
   const [trpcClient] = useState(() =>
@@ -46,7 +54,7 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
           transformer: superjson,
         }),
       ],
-    })
+    }),
   );
 
   return (
