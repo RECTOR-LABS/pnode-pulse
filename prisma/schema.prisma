@@ -5,18 +5,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
-// Second client output, written into pulse-api's isolated node_modules so the
-// generated runtime (enums, model types) is resolvable from within the
-// packages/pulse-api workspace. The default `generator client` above still
-// writes to repo-root node_modules for the monolith Next.js app.
-generator pulseApiClient {
-  provider = "prisma-client-js"
-  output   = "../packages/pulse-api/node_modules/.prisma/client"
-}
-
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // Neon pooled connection (-pooler host) used by the app at runtime.
+  url       = env("DATABASE_URL")
+  // Neon direct (non-pooled) connection used by `prisma migrate` / DDL.
+  directUrl = env("DIRECT_DATABASE_URL")
 }
 
 // ============================================
@@ -25,29 +19,29 @@ datasource db {
 
 /// User account (wallet-based authentication)
 model User {
-  id              String   @id @default(cuid())
+  id            String  @id @default(cuid())
   /// Solana wallet public key (Base58)
-  walletAddress   String   @unique @map("wallet_address")
+  walletAddress String  @unique @map("wallet_address")
   /// Display name (optional)
-  displayName     String?  @map("display_name")
+  displayName   String? @map("display_name")
   /// Avatar URL
-  avatarUrl       String?  @map("avatar_url")
+  avatarUrl     String? @map("avatar_url")
 
   /// User preferences
-  preferences     Json     @default("{}")
+  preferences Json @default("{}")
 
   /// Account status
-  isActive        Boolean  @default(true) @map("is_active")
+  isActive Boolean @default(true) @map("is_active")
 
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-  lastLoginAt     DateTime? @map("last_login_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  lastLoginAt DateTime? @map("last_login_at")
 
   // Relations
-  sessions        UserSession[]
-  nodeClaims      NodeClaim[]
-  apiKeys         ApiKey[]
-  profile         OperatorProfile?
+  sessions   UserSession[]
+  nodeClaims NodeClaim[]
+  apiKeys    ApiKey[]
+  profile    OperatorProfile?
 
   @@index([walletAddress])
   @@map("users")
@@ -55,21 +49,21 @@ model User {
 
 /// User session for JWT management
 model UserSession {
-  id              String   @id @default(cuid())
-  userId          String   @map("user_id")
+  id        String  @id @default(cuid())
+  userId    String  @map("user_id")
   /// JWT token hash (for invalidation)
-  tokenHash       String   @map("token_hash")
+  tokenHash String  @map("token_hash")
   /// User agent string
-  userAgent       String?  @map("user_agent")
+  userAgent String? @map("user_agent")
   /// IP address
-  ipAddress       String?  @map("ip_address")
+  ipAddress String? @map("ip_address")
 
-  expiresAt       DateTime @map("expires_at")
-  createdAt       DateTime @default(now()) @map("created_at")
-  lastUsedAt      DateTime @default(now()) @map("last_used_at")
+  expiresAt  DateTime @map("expires_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastUsedAt DateTime @default(now()) @map("last_used_at")
 
   // Relations
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([tokenHash])
@@ -79,17 +73,17 @@ model UserSession {
 
 /// Auth challenge for wallet signature verification
 model AuthChallenge {
-  id              String   @id @default(cuid())
+  id            String   @id @default(cuid())
   /// Wallet address this challenge is for
-  walletAddress   String   @map("wallet_address")
+  walletAddress String   @map("wallet_address")
   /// Random nonce
-  nonce           String
+  nonce         String
   /// Challenge message
-  message         String
+  message       String
   /// Expiration time (5 minutes)
-  expiresAt       DateTime @map("expires_at")
+  expiresAt     DateTime @map("expires_at")
 
-  createdAt       DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([walletAddress])
   @@index([nonce])
@@ -98,26 +92,26 @@ model AuthChallenge {
 
 /// Node ownership claim
 model NodeClaim {
-  id              String   @id @default(cuid())
-  userId          String   @map("user_id")
-  nodeId          Int      @map("node_id")
+  id     String @id @default(cuid())
+  userId String @map("user_id")
+  nodeId Int    @map("node_id")
 
   /// Verification method used
   verificationMethod ClaimVerificationMethod @map("verification_method")
   /// Status of the claim
-  status          ClaimStatus @default(PENDING)
+  status             ClaimStatus             @default(PENDING)
   /// Custom display name for the node
-  displayName     String?  @map("display_name")
+  displayName        String?                 @map("display_name")
 
   /// Verification data (token, signature, etc.)
-  verificationData Json?   @map("verification_data")
+  verificationData Json? @map("verification_data")
 
-  claimedAt       DateTime? @map("claimed_at")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  claimedAt DateTime? @map("claimed_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([nodeId])
   @@index([userId])
@@ -145,27 +139,27 @@ enum ClaimStatus {
 /// Registry of all known pNodes
 /// Primary identifier is pubkey (immutable), address can change
 model Node {
-  id        Int      @id @default(autoincrement())
+  id            Int        @id @default(autoincrement())
   /// IP:Port address (e.g., "192.190.136.36:6000") - can change over time
-  address   String   @unique
+  address       String     @unique
   /// Gossip address (e.g., "192.190.136.36:9001")
   gossipAddress String?
   /// Base58 public key - PRIMARY IDENTIFIER (immutable, unique when present)
-  pubkey    String?  @unique
+  pubkey        String?    @unique
   /// pNode software version
-  version   String?
+  version       String?
   /// Whether RPC port is publicly accessible (from v0.7.0+ get-pods-with-stats)
-  isPublic  Boolean? @map("is_public")
+  isPublic      Boolean?   @map("is_public")
   /// RPC service port (typically 6000, from v0.7.0+ get-pods-with-stats)
-  rpcPort   Int?     @map("rpc_port")
+  rpcPort       Int?       @map("rpc_port")
   /// First time this node was seen
-  firstSeen DateTime @default(now()) @map("first_seen")
+  firstSeen     DateTime   @default(now()) @map("first_seen")
   /// Last time we successfully polled this node
-  lastSeen  DateTime? @map("last_seen")
+  lastSeen      DateTime?  @map("last_seen")
   /// Whether the node is currently reachable (legacy, use status instead)
-  isActive  Boolean  @default(true) @map("is_active")
+  isActive      Boolean    @default(true) @map("is_active")
   /// Node lifecycle status for pruning (ACTIVE → INACTIVE → ARCHIVED)
-  status    NodeStatus @default(ACTIVE)
+  status        NodeStatus @default(ACTIVE)
 
   /// Geolocation - latitude coordinate
   latitude  Float?
@@ -180,12 +174,12 @@ model Node {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  metrics   NodeMetric[]
-  peers     NodePeer[]   @relation("NodePeers")
-  peeredBy  NodePeer[]   @relation("PeeredByNodes")
-  alerts    Alert[]
-  portfolios PortfolioNode[]
-  uptimeEvents UptimeEvent[]
+  metrics        NodeMetric[]
+  peers          NodePeer[]          @relation("NodePeers")
+  peeredBy       NodePeer[]          @relation("PeeredByNodes")
+  alerts         Alert[]
+  portfolios     PortfolioNode[]
+  uptimeEvents   UptimeEvent[]
   addressChanges NodeAddressChange[]
 
   @@index([address])
@@ -202,18 +196,18 @@ model Node {
 
 /// Tracks IP address changes for a node (when pubkey stays same but IP changes)
 model NodeAddressChange {
-  id          BigInt   @id @default(autoincrement())
-  nodeId      Int      @map("node_id")
+  id     BigInt @id @default(autoincrement())
+  nodeId Int    @map("node_id")
 
   /// Previous IP:Port address
-  oldAddress  String   @map("old_address")
+  oldAddress String   @map("old_address")
   /// New IP:Port address
-  newAddress  String   @map("new_address")
+  newAddress String   @map("new_address")
   /// When the change was detected
-  detectedAt  DateTime @default(now()) @map("detected_at")
+  detectedAt DateTime @default(now()) @map("detected_at")
 
   // Relations
-  node        Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  node Node @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
   @@index([nodeId])
   @@index([detectedAt(sort: Desc)])
@@ -223,54 +217,147 @@ model NodeAddressChange {
 /// Time-series metrics for each node (TimescaleDB hypertable)
 /// Note: Prisma doesn't support hypertables directly, use raw SQL migration
 model NodeMetric {
-  id              BigInt   @id @default(autoincrement())
-  time            DateTime @default(now())
-  nodeId          Int      @map("node_id")
+  id     BigInt   @id @default(autoincrement())
+  time   DateTime @default(now())
+  nodeId Int      @map("node_id")
 
   // System metrics
-  cpuPercent      Float?   @map("cpu_percent")
-  ramUsed         BigInt?  @map("ram_used")
-  ramTotal        BigInt?  @map("ram_total")
-  uptime          Int?
+  cpuPercent Float?  @map("cpu_percent")
+  ramUsed    BigInt? @map("ram_used")
+  ramTotal   BigInt? @map("ram_total")
+  uptime     Int?
 
   // Storage metrics
-  fileSize        BigInt?  @map("file_size")
-  totalBytes      BigInt?  @map("total_bytes")
-  totalPages      Int?     @map("total_pages")
-  currentIndex    Int?     @map("current_index")
+  fileSize            BigInt? @map("file_size")
+  totalBytes          BigInt? @map("total_bytes")
+  totalPages          Int?    @map("total_pages")
+  currentIndex        Int?    @map("current_index")
   /// Total storage allocated in bytes (from v0.7.0+ get-pods-with-stats)
-  storageCommitted BigInt? @map("storage_committed")
+  storageCommitted    BigInt? @map("storage_committed")
   /// Storage utilization percentage (from v0.7.0+ get-pods-with-stats)
-  storageUsagePercent Float? @map("storage_usage_percent")
+  storageUsagePercent Float?  @map("storage_usage_percent")
 
   // Network metrics
-  packetsReceived Int?     @map("packets_received")
-  packetsSent     Int?     @map("packets_sent")
-  activeStreams   Int?     @map("active_streams")
+  packetsReceived Int? @map("packets_received")
+  packetsSent     Int? @map("packets_sent")
+  activeStreams   Int? @map("active_streams")
 
   // Relations
-  node            Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  node Node @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
   @@index([nodeId, time(sort: Desc)])
   @@map("node_metrics")
 }
 
+// ============================================
+// Rollup tables (incremental aggregates)
+// Replace the former TimescaleDB continuous aggregates. Populated by the
+// rollup cron (src/app/api/cron/rollups) via idempotent upserts, and persist
+// independently of raw node_metrics retention — so long-term hourly/daily/
+// weekly history survives the 14-day raw prune. Column names/types mirror the
+// original CAgg definitions so existing $queryRaw readers stay unchanged.
+// ============================================
+
+/// Hourly per-node metric rollup
+model NodeMetricHourly {
+  bucket               DateTime
+  nodeId               Int      @map("node_id")
+  avgCpu               Float?   @map("avg_cpu")
+  avgRamPercent        Float?   @map("avg_ram_percent")
+  maxUptime            Int?     @map("max_uptime")
+  maxFileSize          BigInt?  @map("max_file_size")
+  maxTotalBytes        BigInt?  @map("max_total_bytes")
+  totalPacketsReceived BigInt?  @map("total_packets_received")
+  totalPacketsSent     BigInt?  @map("total_packets_sent")
+  sampleCount          BigInt   @map("sample_count")
+
+  @@id([bucket, nodeId])
+  @@index([nodeId, bucket])
+  @@map("node_metrics_hourly")
+}
+
+/// Daily per-node metric rollup
+model NodeMetricDaily {
+  bucket               DateTime
+  nodeId               Int      @map("node_id")
+  avgCpu               Float?   @map("avg_cpu")
+  avgRamPercent        Float?   @map("avg_ram_percent")
+  maxUptime            Int?     @map("max_uptime")
+  maxFileSize          BigInt?  @map("max_file_size")
+  maxTotalBytes        BigInt?  @map("max_total_bytes")
+  totalPacketsReceived BigInt?  @map("total_packets_received")
+  totalPacketsSent     BigInt?  @map("total_packets_sent")
+  sampleCount          BigInt   @map("sample_count")
+
+  @@id([bucket, nodeId])
+  @@index([nodeId, bucket])
+  @@map("node_metrics_daily")
+}
+
+/// Weekly per-node metric rollup
+model NodeMetricWeekly {
+  bucket               DateTime
+  nodeId               Int      @map("node_id")
+  avgCpu               Float?   @map("avg_cpu")
+  avgRamPercent        Float?   @map("avg_ram_percent")
+  maxUptime            Int?     @map("max_uptime")
+  maxFileSize          BigInt?  @map("max_file_size")
+  maxTotalBytes        BigInt?  @map("max_total_bytes")
+  totalPacketsReceived BigInt?  @map("total_packets_received")
+  totalPacketsSent     BigInt?  @map("total_packets_sent")
+  sampleCount          BigInt   @map("sample_count")
+
+  @@id([bucket, nodeId])
+  @@index([nodeId, bucket])
+  @@map("node_metrics_weekly")
+}
+
+/// Hourly network-wide metric rollup
+model NetworkMetricHourly {
+  bucket               DateTime @id
+  nodeCount            BigInt   @map("node_count")
+  totalStorage         BigInt   @map("total_storage")
+  avgCpu               Float?   @map("avg_cpu")
+  avgRamPercent        Float?   @map("avg_ram_percent")
+  avgUptime            Float?   @map("avg_uptime")
+  totalPacketsReceived BigInt?  @map("total_packets_received")
+  totalPacketsSent     BigInt?  @map("total_packets_sent")
+  sampleCount          BigInt   @map("sample_count")
+
+  @@map("network_metrics_hourly")
+}
+
+/// Daily network-wide metric rollup
+model NetworkMetricDaily {
+  bucket               DateTime @id
+  nodeCount            BigInt   @map("node_count")
+  totalStorage         BigInt   @map("total_storage")
+  avgCpu               Float?   @map("avg_cpu")
+  avgRamPercent        Float?   @map("avg_ram_percent")
+  avgUptime            Float?   @map("avg_uptime")
+  totalPacketsReceived BigInt?  @map("total_packets_received")
+  totalPacketsSent     BigInt?  @map("total_packets_sent")
+  sampleCount          BigInt   @map("sample_count")
+
+  @@map("network_metrics_daily")
+}
+
 /// Peer relationships between nodes (from get-pods)
 model NodePeer {
-  id            BigInt   @id @default(autoincrement())
-  nodeId        Int      @map("node_id")
-  peerNodeId    Int?     @map("peer_node_id")
+  id          BigInt   @id @default(autoincrement())
+  nodeId      Int      @map("node_id")
+  peerNodeId  Int?     @map("peer_node_id")
   /// Peer address if not yet registered as a node
-  peerAddress   String   @map("peer_address")
-  lastSeenAt    DateTime @map("last_seen_at")
-  peerVersion   String?  @map("peer_version")
+  peerAddress String   @map("peer_address")
+  lastSeenAt  DateTime @map("last_seen_at")
+  peerVersion String?  @map("peer_version")
 
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  node          Node     @relation("NodePeers", fields: [nodeId], references: [id], onDelete: Cascade)
-  peerNode      Node?    @relation("PeeredByNodes", fields: [peerNodeId], references: [id], onDelete: SetNull)
+  node     Node  @relation("NodePeers", fields: [nodeId], references: [id], onDelete: Cascade)
+  peerNode Node? @relation("PeeredByNodes", fields: [peerNodeId], references: [id], onDelete: SetNull)
 
   @@unique([nodeId, peerAddress])
   @@index([nodeId])
@@ -284,21 +371,21 @@ model NodePeer {
 
 /// Network-wide aggregated statistics (computed periodically)
 model NetworkStats {
-  id              Int      @id @default(autoincrement())
-  time            DateTime @default(now())
+  id   Int      @id @default(autoincrement())
+  time DateTime @default(now())
 
-  totalNodes      Int      @map("total_nodes")
-  activeNodes     Int      @map("active_nodes")
-  totalStorage    BigInt   @map("total_storage")
-  avgCpuPercent   Float    @map("avg_cpu_percent")
-  avgRamPercent   Float    @map("avg_ram_percent")
-  avgUptime       Int      @map("avg_uptime")
-  totalPeers      Int      @map("total_peers")
+  totalNodes    Int    @map("total_nodes")
+  activeNodes   Int    @map("active_nodes")
+  totalStorage  BigInt @map("total_storage")
+  avgCpuPercent Float  @map("avg_cpu_percent")
+  avgRamPercent Float  @map("avg_ram_percent")
+  avgUptime     Int    @map("avg_uptime")
+  totalPeers    Int    @map("total_peers")
 
   /// JSON object tracking version distribution: { "0.6.0": 15, "0.5.1": 10, ... }
   versionDistribution Json? @map("version_distribution")
 
-  createdAt       DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   @@index([time(sort: Desc)])
   @@map("network_stats")
@@ -306,16 +393,16 @@ model NetworkStats {
 
 /// Collection job tracking
 model CollectionJob {
-  id          Int      @id @default(autoincrement())
-  startedAt   DateTime @default(now()) @map("started_at")
+  id          Int       @id @default(autoincrement())
+  startedAt   DateTime  @default(now()) @map("started_at")
   completedAt DateTime? @map("completed_at")
   status      JobStatus @default(RUNNING)
 
-  nodesPolled   Int    @default(0) @map("nodes_polled")
-  nodesSuccess  Int    @default(0) @map("nodes_success")
-  nodesFailed   Int    @default(0) @map("nodes_failed")
+  nodesPolled  Int @default(0) @map("nodes_polled")
+  nodesSuccess Int @default(0) @map("nodes_success")
+  nodesFailed  Int @default(0) @map("nodes_failed")
 
-  errorMessage  String? @map("error_message")
+  errorMessage String? @map("error_message")
 
   @@index([status])
   @@index([startedAt(sort: Desc)])
@@ -344,42 +431,42 @@ enum NodeStatus {
 
 /// Alert rule definition
 model AlertRule {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   name        String
   description String?
 
   /// Target nodes to monitor
-  targetType  AlertTargetType @default(ALL_NODES) @map("target_type")
-  nodeIds     Int[]           @map("node_ids")
+  targetType AlertTargetType @default(ALL_NODES) @map("target_type")
+  nodeIds    Int[]           @map("node_ids")
 
   /// Condition
-  metric      AlertMetric
-  operator    AlertOperator
-  threshold   Float
+  metric    AlertMetric
+  operator  AlertOperator
+  threshold Float
   /// Duration in seconds the condition must hold (optional)
-  duration    Int?
+  duration  Int?
 
   /// Notification channels (JSON array of channel IDs)
-  channels    Json      @default("[]")
+  channels Json @default("[]")
   /// Cooldown between repeated alerts in seconds
-  cooldown    Int       @default(300)
+  cooldown Int  @default(300)
 
   /// Escalation policy (optional)
   escalationPolicyId String? @map("escalation_policy_id")
 
   /// State
-  isEnabled   Boolean   @default(true) @map("is_enabled")
+  isEnabled       Boolean   @default(true) @map("is_enabled")
   lastTriggeredAt DateTime? @map("last_triggered_at")
 
   /// Owner (session for anonymous, user for authenticated)
-  sessionId   String?   @map("session_id")
-  userId      String?   @map("user_id")
+  sessionId String? @map("session_id")
+  userId    String? @map("user_id")
 
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  alerts      Alert[]
+  alerts           Alert[]
   escalationPolicy EscalationPolicy? @relation(fields: [escalationPolicyId], references: [id], onDelete: SetNull)
 
   @@index([sessionId])
@@ -391,35 +478,35 @@ model AlertRule {
 
 /// Triggered alert instance
 model Alert {
-  id          String      @id @default(cuid())
-  ruleId      String      @map("rule_id")
-  nodeId      Int?        @map("node_id")
+  id     String @id @default(cuid())
+  ruleId String @map("rule_id")
+  nodeId Int?   @map("node_id")
 
   /// Alert details
-  metric      AlertMetric
-  value       Float
-  threshold   Float
-  message     String
+  metric    AlertMetric
+  value     Float
+  threshold Float
+  message   String
 
   /// State
-  status      AlertStatus @default(ACTIVE)
-  triggeredAt DateTime    @default(now()) @map("triggered_at")
-  acknowledgedAt DateTime? @map("acknowledged_at")
-  resolvedAt  DateTime?   @map("resolved_at")
-  acknowledgedBy String?  @map("acknowledged_by")
+  status         AlertStatus @default(ACTIVE)
+  triggeredAt    DateTime    @default(now()) @map("triggered_at")
+  acknowledgedAt DateTime?   @map("acknowledged_at")
+  resolvedAt     DateTime?   @map("resolved_at")
+  acknowledgedBy String?     @map("acknowledged_by")
 
   /// Notification tracking
-  notificationsSent Json  @default("{}") @map("notifications_sent")
+  notificationsSent Json @default("{}") @map("notifications_sent")
 
   /// Escalation tracking
-  currentEscalationStep Int @default(0) @map("current_escalation_step")
-  lastEscalationAt DateTime? @map("last_escalation_at")
+  currentEscalationStep Int       @default(0) @map("current_escalation_step")
+  lastEscalationAt      DateTime? @map("last_escalation_at")
 
-  createdAt   DateTime    @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  rule        AlertRule   @relation(fields: [ruleId], references: [id], onDelete: Cascade)
-  node        Node?       @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  rule AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  node Node?     @relation(fields: [nodeId], references: [id], onDelete: SetNull)
 
   @@index([ruleId])
   @@index([nodeId])
@@ -430,23 +517,23 @@ model Alert {
 
 /// Notification channel configuration
 model NotificationChannel {
-  id          String                  @id @default(cuid())
-  type        NotificationChannelType
-  name        String
+  id         String                  @id @default(cuid())
+  type       NotificationChannelType
+  name       String
   /// Type-specific configuration (email, webhook URL, chat ID, etc.)
-  config      Json
-  isVerified  Boolean                 @default(false) @map("is_verified")
+  config     Json
+  isVerified Boolean                 @default(false) @map("is_verified")
 
   /// Verification (for email)
-  verificationCode String?            @map("verification_code")
-  verificationExpiry DateTime?        @map("verification_expiry")
+  verificationCode   String?   @map("verification_code")
+  verificationExpiry DateTime? @map("verification_expiry")
 
   /// Owner
-  sessionId   String?                 @map("session_id")
-  userId      String?                 @map("user_id")
+  sessionId String? @map("session_id")
+  userId    String? @map("user_id")
 
-  createdAt   DateTime                @default(now()) @map("created_at")
-  updatedAt   DateTime                @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@index([sessionId])
   @@index([userId])
@@ -456,20 +543,20 @@ model NotificationChannel {
 
 /// Escalation policy for unacknowledged alerts
 model EscalationPolicy {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   name        String
   description String?
 
   /// Owner
-  sessionId   String?  @map("session_id")
-  userId      String?  @map("user_id")
+  sessionId String? @map("session_id")
+  userId    String? @map("user_id")
 
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  steps       EscalationStep[]
-  rules       AlertRule[]
+  steps EscalationStep[]
+  rules AlertRule[]
 
   @@index([sessionId])
   @@index([userId])
@@ -478,23 +565,23 @@ model EscalationPolicy {
 
 /// Individual step in an escalation policy
 model EscalationStep {
-  id          String   @id @default(cuid())
-  policyId    String   @map("policy_id")
+  id       String @id @default(cuid())
+  policyId String @map("policy_id")
 
   /// Order of this step (1, 2, 3...)
-  stepOrder   Int      @map("step_order")
+  stepOrder             Int  @map("step_order")
   /// Delay in minutes after alert before this step triggers
-  delayMinutes Int     @map("delay_minutes")
+  delayMinutes          Int  @map("delay_minutes")
   /// Channel IDs to notify at this step
-  channels    Json     @default("[]")
+  channels              Json @default("[]")
   /// Optional: repeat notification every X minutes until acknowledged
   repeatIntervalMinutes Int? @map("repeat_interval_minutes")
 
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  policy      EscalationPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  policy EscalationPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
 
   @@unique([policyId, stepOrder])
   @@index([policyId])
@@ -547,19 +634,19 @@ enum NotificationChannelType {
 
 /// Portfolio of nodes an operator manages
 model Portfolio {
-  id          String   @id @default(cuid())
-  name        String   @default("My Portfolio")
+  id   String @id @default(cuid())
+  name String @default("My Portfolio")
 
   /// Owner
-  sessionId   String?  @map("session_id")
-  userId      String?  @map("user_id")
+  sessionId String? @map("session_id")
+  userId    String? @map("user_id")
 
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  nodes       PortfolioNode[]
-  reports     ScheduledReport[]
+  nodes   PortfolioNode[]
+  reports ScheduledReport[]
 
   @@index([sessionId])
   @@index([userId])
@@ -568,22 +655,22 @@ model Portfolio {
 
 /// Node membership in a portfolio
 model PortfolioNode {
-  id          String   @id @default(cuid())
-  portfolioId String   @map("portfolio_id")
-  nodeId      Int      @map("node_id")
+  id          String @id @default(cuid())
+  portfolioId String @map("portfolio_id")
+  nodeId      Int    @map("node_id")
 
   /// Custom label for the node
-  label       String?
+  label     String?
   /// Is this node starred/favorited
-  isStarred   Boolean  @default(false) @map("is_starred")
+  isStarred Boolean @default(false) @map("is_starred")
   /// Custom SLA target for this node (percentage, e.g., 99.9)
-  slaTarget   Float?   @map("sla_target")
+  slaTarget Float?  @map("sla_target")
 
-  addedAt     DateTime @default(now()) @map("added_at")
+  addedAt DateTime @default(now()) @map("added_at")
 
   // Relations
-  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
-  node        Node      @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  node      Node      @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
   @@unique([portfolioId, nodeId])
   @@index([portfolioId])
@@ -593,19 +680,19 @@ model PortfolioNode {
 
 /// Uptime events for tracking node availability
 model UptimeEvent {
-  id          BigInt   @id @default(autoincrement())
-  nodeId      Int      @map("node_id")
+  id     BigInt @id @default(autoincrement())
+  nodeId Int    @map("node_id")
 
   /// Event type: node went online or offline
-  eventType   UptimeEventType @map("event_type")
+  eventType UptimeEventType @map("event_type")
   /// When the event occurred
-  timestamp   DateTime @default(now())
+  timestamp DateTime        @default(now())
 
   /// For offline events, duration until next online (filled when resolved)
   durationSeconds Int? @map("duration_seconds")
 
   // Relations
-  node        Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  node Node @relation(fields: [nodeId], references: [id], onDelete: Cascade)
 
   @@index([nodeId, timestamp(sort: Desc)])
   @@index([eventType])
@@ -623,50 +710,50 @@ enum UptimeEventType {
 
 /// Scheduled report configuration
 model ScheduledReport {
-  id          String   @id @default(cuid())
-  name        String
+  id   String @id @default(cuid())
+  name String
 
   /// Report type determines content
-  reportType  ReportType @map("report_type")
+  reportType ReportType @map("report_type")
 
   /// Schedule configuration
-  schedule    ReportSchedule
+  schedule       ReportSchedule
   /// Cron expression for custom schedules (optional)
-  cronExpr    String?  @map("cron_expr")
+  cronExpr       String?        @map("cron_expr")
   /// Timezone for scheduling (e.g., "America/New_York")
-  timezone    String   @default("UTC")
+  timezone       String         @default("UTC")
   /// Hour to send (0-23)
-  sendHour    Int      @default(9) @map("send_hour")
+  sendHour       Int            @default(9) @map("send_hour")
   /// Day of week for weekly (0=Sun, 1=Mon, etc.)
-  sendDayOfWeek Int?   @map("send_day_of_week")
+  sendDayOfWeek  Int?           @map("send_day_of_week")
   /// Day of month for monthly (1-28)
-  sendDayOfMonth Int?  @map("send_day_of_month")
+  sendDayOfMonth Int?           @map("send_day_of_month")
 
   /// Recipients (JSON array of email addresses)
-  recipients  Json     @default("[]")
+  recipients Json     @default("[]")
   /// Notification channels to use (channel IDs)
-  channelIds  String[] @map("channel_ids")
+  channelIds String[] @map("channel_ids")
 
   /// Scope: portfolio nodes or all nodes
   scope       ReportScope @default(PORTFOLIO)
   /// If PORTFOLIO scope, which portfolio
-  portfolioId String?  @map("portfolio_id")
+  portfolioId String?     @map("portfolio_id")
 
   /// State
-  isEnabled   Boolean  @default(true) @map("is_enabled")
-  lastSentAt  DateTime? @map("last_sent_at")
-  nextSendAt  DateTime? @map("next_send_at")
+  isEnabled  Boolean   @default(true) @map("is_enabled")
+  lastSentAt DateTime? @map("last_sent_at")
+  nextSendAt DateTime? @map("next_send_at")
 
   /// Owner
-  sessionId   String?  @map("session_id")
-  userId      String?  @map("user_id")
+  sessionId String? @map("session_id")
+  userId    String? @map("user_id")
 
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  portfolio   Portfolio? @relation(fields: [portfolioId], references: [id], onDelete: SetNull)
-  deliveries  ReportDelivery[]
+  portfolio  Portfolio?       @relation(fields: [portfolioId], references: [id], onDelete: SetNull)
+  deliveries ReportDelivery[]
 
   @@index([sessionId])
   @@index([userId])
@@ -677,23 +764,23 @@ model ScheduledReport {
 
 /// Report delivery log
 model ReportDelivery {
-  id          String   @id @default(cuid())
-  reportId    String   @map("report_id")
+  id       String @id @default(cuid())
+  reportId String @map("report_id")
 
   /// Delivery status
-  status      DeliveryStatus @default(PENDING)
+  status     DeliveryStatus @default(PENDING)
   /// Error message if failed
-  error       String?
+  error      String?
   /// Recipients this was sent to
-  recipients  Json     @default("[]")
+  recipients Json           @default("[]")
 
   /// Timestamps
-  scheduledFor DateTime @map("scheduled_for")
-  sentAt      DateTime? @map("sent_at")
-  createdAt   DateTime @default(now()) @map("created_at")
+  scheduledFor DateTime  @map("scheduled_for")
+  sentAt       DateTime? @map("sent_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
 
   // Relations
-  report      ScheduledReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  report ScheduledReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   @@index([reportId])
   @@index([status])
@@ -731,37 +818,37 @@ enum DeliveryStatus {
 
 /// API Key for public API access
 model ApiKey {
-  id              String   @id @default(cuid())
-  userId          String   @map("user_id")
+  id     String @id @default(cuid())
+  userId String @map("user_id")
 
   /// Key name for identification
-  name            String
+  name    String
   /// Key prefix for display (e.g., "pk_live_abc...")
-  prefix          String   @unique
+  prefix  String @unique
   /// Hashed key value (SHA-256)
-  keyHash         String   @map("key_hash")
+  keyHash String @map("key_hash")
 
   /// Permissions/scopes (JSON array)
-  scopes          Json     @default("[\"read\"]")
+  scopes Json       @default("[\"read\"]")
   /// Rate limit tier
-  tier            ApiKeyTier @default(FREE)
+  tier   ApiKeyTier @default(FREE)
 
   /// Last usage tracking
-  lastUsedAt      DateTime? @map("last_used_at")
+  lastUsedAt   DateTime? @map("last_used_at")
   /// Total request count
-  requestCount    BigInt   @default(0) @map("request_count")
+  requestCount BigInt    @default(0) @map("request_count")
 
   /// Status
-  isActive        Boolean  @default(true) @map("is_active")
-  expiresAt       DateTime? @map("expires_at")
-  revokedAt       DateTime? @map("revoked_at")
+  isActive  Boolean   @default(true) @map("is_active")
+  expiresAt DateTime? @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
 
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  usageLogs       ApiKeyUsage[]
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usageLogs ApiKeyUsage[]
 
   @@index([userId])
   @@index([prefix])
@@ -772,28 +859,28 @@ model ApiKey {
 
 /// API Key usage log for analytics and rate limiting
 model ApiKeyUsage {
-  id              BigInt   @id @default(autoincrement())
-  apiKeyId        String   @map("api_key_id")
+  id       BigInt @id @default(autoincrement())
+  apiKeyId String @map("api_key_id")
 
   /// Time bucket (hourly)
-  bucket          DateTime
+  bucket   DateTime
   /// Endpoint path
-  endpoint        String
+  endpoint String
   /// HTTP method
-  method          String   @default("GET")
+  method   String   @default("GET")
 
   /// Request count in this bucket
-  requestCount    Int      @default(1) @map("request_count")
+  requestCount    Int @default(1) @map("request_count")
   /// Total response time in ms
-  totalResponseMs Int      @default(0) @map("total_response_ms")
+  totalResponseMs Int @default(0) @map("total_response_ms")
   /// Error count
-  errorCount      Int      @default(0) @map("error_count")
+  errorCount      Int @default(0) @map("error_count")
 
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  apiKey          ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
 
   @@unique([apiKeyId, bucket, endpoint, method])
   @@index([apiKeyId])
@@ -813,40 +900,40 @@ enum ApiKeyTier {
 
 /// Operator public profile
 model OperatorProfile {
-  id              String   @id @default(cuid())
-  userId          String   @unique @map("user_id")
+  id     String @id @default(cuid())
+  userId String @unique @map("user_id")
 
   /// Display name (username)
-  displayName     String   @map("display_name")
+  displayName String  @map("display_name")
   /// Profile bio/description
-  bio             String?
+  bio         String?
   /// Avatar URL
-  avatarUrl       String?  @map("avatar_url")
+  avatarUrl   String? @map("avatar_url")
   /// Website/social links (JSON)
-  links           Json     @default("[]")
+  links       Json    @default("[]")
 
   /// Privacy settings
-  isPublic        Boolean  @default(true) @map("is_public")
-  showNodeStats   Boolean  @default(true) @map("show_node_stats")
-  showBadges      Boolean  @default(true) @map("show_badges")
+  isPublic      Boolean @default(true) @map("is_public")
+  showNodeStats Boolean @default(true) @map("show_node_stats")
+  showBadges    Boolean @default(true) @map("show_badges")
 
   /// Profile stats (denormalized for performance)
-  totalNodes      Int      @default(0) @map("total_nodes")
-  totalUptime     BigInt   @default(0) @map("total_uptime")
-  totalStorage    BigInt   @default(0) @map("total_storage")
-  avgCpuEfficiency Float   @default(0) @map("avg_cpu_efficiency")
+  totalNodes       Int    @default(0) @map("total_nodes")
+  totalUptime      BigInt @default(0) @map("total_uptime")
+  totalStorage     BigInt @default(0) @map("total_storage")
+  avgCpuEfficiency Float  @default(0) @map("avg_cpu_efficiency")
 
   /// Ranking (updated periodically)
-  rank            Int?
-  rankPeriod      String?  @map("rank_period")
-  rankUpdatedAt   DateTime? @map("rank_updated_at")
+  rank          Int?
+  rankPeriod    String?   @map("rank_period")
+  rankUpdatedAt DateTime? @map("rank_updated_at")
 
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  badges          OperatorBadge[]
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badges OperatorBadge[]
 
   @@index([displayName])
   @@index([rank])
@@ -856,36 +943,36 @@ model OperatorProfile {
 
 /// Achievement badge definition
 model Badge {
-  id              String   @id @default(cuid())
+  id String @id @default(cuid())
 
   /// Badge identifier (e.g., "early_adopter", "uptime_champion")
-  slug            String   @unique
+  slug        String    @unique
   /// Display name
-  name            String
+  name        String
   /// Description of how to earn it
-  description     String
+  description String
   /// Badge icon URL or emoji
-  icon            String
+  icon        String
   /// Badge tier/rarity
-  tier            BadgeTier @default(COMMON)
+  tier        BadgeTier @default(COMMON)
 
   /// Achievement criteria (JSON)
   /// e.g., { "type": "uptime", "threshold": 2592000 } (30 days in seconds)
-  criteria        Json
+  criteria Json
 
   /// How many operators have earned this
-  earnedCount     Int      @default(0) @map("earned_count")
+  earnedCount Int @default(0) @map("earned_count")
 
   /// Is this badge currently available to earn
-  isActive        Boolean  @default(true) @map("is_active")
+  isActive     Boolean @default(true) @map("is_active")
   /// Display order
-  displayOrder    Int      @default(0) @map("display_order")
+  displayOrder Int     @default(0) @map("display_order")
 
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  operators       OperatorBadge[]
+  operators OperatorBadge[]
 
   @@index([slug])
   @@index([tier])
@@ -895,25 +982,25 @@ model Badge {
 
 /// Badge earned by an operator
 model OperatorBadge {
-  id              String   @id @default(cuid())
-  profileId       String   @map("profile_id")
-  badgeId         String   @map("badge_id")
+  id        String @id @default(cuid())
+  profileId String @map("profile_id")
+  badgeId   String @map("badge_id")
 
   /// When the badge was earned
-  earnedAt        DateTime @default(now()) @map("earned_at")
+  earnedAt         DateTime @default(now()) @map("earned_at")
   /// Achievement value when earned (e.g., uptime seconds)
-  achievementValue Float?  @map("achievement_value")
+  achievementValue Float?   @map("achievement_value")
   /// Optional node that triggered this badge
-  nodeId          Int?     @map("node_id")
+  nodeId           Int?     @map("node_id")
 
   /// Is this badge featured on profile
-  isFeatured      Boolean  @default(false) @map("is_featured")
+  isFeatured Boolean @default(false) @map("is_featured")
 
-  createdAt       DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  profile         OperatorProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
-  badge           Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  profile OperatorProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  badge   Badge           @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
   @@unique([profileId, badgeId])
   @@index([profileId])
