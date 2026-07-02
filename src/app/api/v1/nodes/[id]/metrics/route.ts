@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
+import { getBucketedNodeMetrics } from "@/lib/db/metrics-history";
 import { logger } from "@/lib/logger";
 import {
   checkRateLimit,
@@ -117,69 +118,11 @@ export async function GET(
           uptimeSeconds: m.uptime ?? 0,
         };
       });
-    } else if (aggregation === "hourly") {
-      const metrics = await db.$queryRaw<
-        Array<{
-          bucket: Date;
-          avg_cpu: number;
-          avg_ram_percent: number;
-          max_storage: bigint;
-          max_uptime: number;
-        }>
-      >`
-        SELECT
-          time_bucket('1 hour', time) as bucket,
-          AVG("cpuPercent") as avg_cpu,
-          AVG(
-            CASE WHEN "ramTotal" > 0
-              THEN ("ramUsed"::float / "ramTotal"::float) * 100
-              ELSE 0
-            END
-          ) as avg_ram_percent,
-          MAX("fileSize") as max_storage,
-          MAX(uptime) as max_uptime
-        FROM "NodeMetric"
-        WHERE "nodeId" = ${nodeId}
-          AND time >= ${fromTime}
-        GROUP BY bucket
-        ORDER BY bucket ASC
-      `;
-
-      data = metrics.map((m) => ({
-        time: m.bucket.toISOString(),
-        cpuPercent: Math.round((m.avg_cpu ?? 0) * 100) / 100,
-        ramPercent: Math.round((m.avg_ram_percent ?? 0) * 100) / 100,
-        storageBytes: Number(m.max_storage ?? 0),
-        uptimeSeconds: m.max_uptime ?? 0,
-      }));
     } else {
-      // daily
-      const metrics = await db.$queryRaw<
-        Array<{
-          bucket: Date;
-          avg_cpu: number;
-          avg_ram_percent: number;
-          max_storage: bigint;
-          max_uptime: number;
-        }>
-      >`
-        SELECT
-          time_bucket('1 day', time) as bucket,
-          AVG("cpuPercent") as avg_cpu,
-          AVG(
-            CASE WHEN "ramTotal" > 0
-              THEN ("ramUsed"::float / "ramTotal"::float) * 100
-              ELSE 0
-            END
-          ) as avg_ram_percent,
-          MAX("fileSize") as max_storage,
-          MAX(uptime) as max_uptime
-        FROM "NodeMetric"
-        WHERE "nodeId" = ${nodeId}
-          AND time >= ${fromTime}
-        GROUP BY bucket
-        ORDER BY bucket ASC
-      `;
+      // hourly or daily — bucket raw metrics with date_trunc (Neon-compatible,
+      // replaces the former TimescaleDB time_bucket()).
+      const unit = aggregation === "hourly" ? "hour" : "day";
+      const metrics = await getBucketedNodeMetrics(db, nodeId, fromTime, unit);
 
       data = metrics.map((m) => ({
         time: m.bucket.toISOString(),

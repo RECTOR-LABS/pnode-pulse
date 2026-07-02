@@ -5,8 +5,6 @@
  */
 
 import { db } from "@/lib/db";
-import { publishNetworkUpdate } from "@/lib/redis/pubsub";
-import { logger } from "@/lib/logger";
 
 /**
  * Compute and store network stats
@@ -71,12 +69,5 @@ export async function computeNetworkStats() {
         versionDistribution: versionDistJson,
       },
     });
-
-    // Publish real-time update
-    await publishNetworkUpdate(
-      Number(stats.total_nodes),
-      Number(stats.active_nodes),
-      Number(stats.total_nodes) - Number(stats.active_nodes),
-    ).catch((err) => logger.error("Failed to publish network update", err));
   }
 }

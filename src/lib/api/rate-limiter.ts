@@ -6,10 +6,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getRedis, isRedisAvailable } from "@/lib/redis";
 import { db } from "@/lib/db";
 import { createHash } from "crypto";
 import { logger } from "@/lib/logger";
+import { getSlidingWindowLimiter } from "@/lib/redis/upstash";
 import {
   RATE_LIMITS,
   type RateLimitTier,
@@ -18,10 +18,14 @@ import {
 } from "./constants";
 
 // Re-export for convenience (server-side usage)
-export { RATE_LIMITS, type RateLimitTier, type RateLimitHeaders, type RateLimitResult };
+export {
+  RATE_LIMITS,
+  type RateLimitTier,
+  type RateLimitHeaders,
+  type RateLimitResult,
+};
 
-// Redis key prefixes
-const RATE_LIMIT_PREFIX = "rl:";
+// Rate limit window (seconds)
 const WINDOW_SIZE = 60; // 1 minute in seconds
 
 // In-memory fallback for when Redis is unavailable
@@ -51,7 +55,7 @@ function checkInMemoryRateLimit(
   identifier: string,
   limit: number,
   tier: RateLimitTier,
-  apiKeyId: string | undefined
+  apiKeyId: string | undefined,
 ): RateLimitResult {
   const now = Date.now();
   const nowSeconds = Math.floor(now / 1000);
@@ -147,9 +151,9 @@ function getClientId(request: NextRequest): string {
 /**
  * Check rate limit and return result
  */
-export async function checkRateLimit(request: NextRequest): Promise<RateLimitResult> {
-  const now = Math.floor(Date.now() / 1000);
-  const windowStart = now - WINDOW_SIZE;
+export async function checkRateLimit(
+  request: NextRequest,
+): Promise<RateLimitResult> {
   const apiKey = extractApiKey(request);
 
   let tier: RateLimitTier = "ANONYMOUS";
@@ -164,10 +168,7 @@ export async function checkRateLimit(request: NextRequest): Promise<RateLimitRes
         keyHash,
         isActive: true,
         revokedAt: null,
-        OR: [
-          { expiresAt: null },
-          { expiresAt: { gt: new Date() } },
-        ],
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
       },
     });
 
@@ -184,56 +185,36 @@ export async function checkRateLimit(request: NextRequest): Promise<RateLimitRes
   }
 
   const limit = RATE_LIMITS[tier];
-  const redisKey = `${RATE_LIMIT_PREFIX}${identifier}`;
 
-  // Check if Redis is available
-  const redisAvailable = await isRedisAvailable();
-
-  if (!redisAvailable) {
-    // Fallback: use in-memory rate limiting (fail-safe, not fail-open)
-    logger.warn("[RateLimit] Redis unavailable, using in-memory fallback");
+  // Distributed rate limiting via Upstash; falls back to per-instance in-memory
+  // when Upstash is not configured or unreachable (fail-safe, not fail-open).
+  const limiter = getSlidingWindowLimiter(tier, limit);
+  if (!limiter) {
     return checkInMemoryRateLimit(identifier, limit, tier, apiKeyId);
   }
 
-  const redis = getRedis();
-
-  // Use sliding window with sorted sets
-  // Each request adds a timestamp, we count requests in the window
-  const multi = redis.multi();
-
-  // Remove old entries outside the window
-  multi.zremrangebyscore(redisKey, 0, windowStart);
-
-  // Count current requests in window
-  multi.zcard(redisKey);
-
-  // Add current request
-  multi.zadd(redisKey, now, `${now}:${Math.random().toString(36).slice(2)}`);
-
-  // Set expiry on the key
-  multi.expire(redisKey, WINDOW_SIZE * 2);
-
-  const results = await multi.exec();
-
-  // Get count before adding current request
-  const currentCount = (results?.[1]?.[1] as number) || 0;
-  const remaining = Math.max(0, limit - currentCount - 1);
-  const allowed = currentCount < limit;
-
-  return {
-    allowed,
-    limit,
-    remaining,
-    reset: now + WINDOW_SIZE,
-    tier,
-    apiKeyId,
-  };
+  try {
+    const { success, remaining, reset } = await limiter.limit(identifier);
+    return {
+      allowed: success,
+      limit,
+      remaining,
+      reset: Math.floor(reset / 1000), // Upstash returns a ms timestamp
+      tier,
+      apiKeyId,
+    };
+  } catch {
+    logger.warn("[RateLimit] Upstash unavailable, using in-memory fallback");
+    return checkInMemoryRateLimit(identifier, limit, tier, apiKeyId);
+  }
 }
 
 /**
  * Create rate limit headers for response
  */
-export function createRateLimitHeaders(result: RateLimitResult): RateLimitHeaders {
+export function createRateLimitHeaders(
+  result: RateLimitResult,
+): RateLimitHeaders {
   const headers: RateLimitHeaders = {
     "X-RateLimit-Limit": result.limit.toString(),
     "X-RateLimit-Remaining": result.remaining.toString(),
@@ -250,7 +231,9 @@ export function createRateLimitHeaders(result: RateLimitResult): RateLimitHeader
 /**
  * Rate limit error response
  */
-export function rateLimitExceededResponse(result: RateLimitResult): NextResponse {
+export function rateLimitExceededResponse(
+  result: RateLimitResult,
+): NextResponse {
   const headers = createRateLimitHeaders(result);
 
   return NextResponse.json(
@@ -266,7 +249,7 @@ export function rateLimitExceededResponse(result: RateLimitResult): NextResponse
     {
       status: 429,
       headers,
-    }
+    },
   );
 }
 
@@ -278,7 +261,7 @@ export async function trackApiUsage(
   endpoint: string,
   method: string,
   responseTimeMs: number,
-  isError: boolean
+  isError: boolean,
 ): Promise<void> {
   if (!apiKeyId) return;
 
@@ -292,7 +275,7 @@ export async function trackApiUsage(
       now.getHours(),
       0,
       0,
-      0
+      0,
     );
 
     // Upsert usage record
@@ -330,7 +313,10 @@ export async function trackApiUsage(
       },
     });
   } catch (error) {
-    logger.error("[ApiUsage] Failed to track usage:", error instanceof Error ? error : new Error(String(error)));
+    logger.error(
+      "[ApiUsage] Failed to track usage:",
+      error instanceof Error ? error : new Error(String(error)),
+    );
   }
 }
 
@@ -338,7 +324,10 @@ export async function trackApiUsage(
  * Middleware wrapper for rate-limited API routes
  */
 export function withRateLimit<T extends NextResponse>(
-  handler: (request: NextRequest, rateLimitResult: RateLimitResult) => Promise<T>
+  handler: (
+    request: NextRequest,
+    rateLimitResult: RateLimitResult,
+  ) => Promise<T>,
 ) {
   return async (request: NextRequest): Promise<NextResponse> => {
     const startTime = Date.now();
@@ -363,7 +352,13 @@ export function withRateLimit<T extends NextResponse>(
       const endpoint = request.nextUrl.pathname;
       const method = request.method;
 
-      await trackApiUsage(result.apiKeyId, endpoint, method, responseTime, isError);
+      await trackApiUsage(
+        result.apiKeyId,
+        endpoint,
+        method,
+        responseTime,
+        isError,
+      );
 
       return response;
     } catch (error) {
@@ -372,7 +367,13 @@ export function withRateLimit<T extends NextResponse>(
       const endpoint = request.nextUrl.pathname;
       const method = request.method;
 
-      await trackApiUsage(result.apiKeyId, endpoint, method, responseTime, true);
+      await trackApiUsage(
+        result.apiKeyId,
+        endpoint,
+        method,
+        responseTime,
+        true,
+      );
 
       throw error;
     }

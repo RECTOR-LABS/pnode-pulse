@@ -9,9 +9,14 @@
 
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
-import { getReportQueue } from "@/lib/queue";
+import { getReportQueue, isQueueEnabled } from "@/lib/queue";
 
-const ReportTypeSchema = z.enum(["WEEKLY_SUMMARY", "DAILY_DIGEST", "MONTHLY_SLA", "CUSTOM"]);
+const ReportTypeSchema = z.enum([
+  "WEEKLY_SUMMARY",
+  "DAILY_DIGEST",
+  "MONTHLY_SLA",
+  "CUSTOM",
+]);
 const ReportScheduleSchema = z.enum(["DAILY", "WEEKLY", "MONTHLY", "CUSTOM"]);
 const ReportScopeSchema = z.enum(["ALL_NODES", "PORTFOLIO"]);
 
@@ -23,7 +28,7 @@ function calculateNextSendAt(
   hour: number,
   dayOfWeek?: number | null,
   dayOfMonth?: number | null,
-  _timezone: string = "UTC"
+  _timezone: string = "UTC",
 ): Date {
   const now = new Date();
   const next = new Date(now);
@@ -159,7 +164,7 @@ export const reportsRouter = createTRPCRouter({
         channelIds: z.array(z.string()).default([]),
         scope: ReportScopeSchema.default("PORTFOLIO"),
         portfolioId: z.string().optional(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       // Get or create portfolio if scope is PORTFOLIO
@@ -176,7 +181,7 @@ export const reportsRouter = createTRPCRouter({
         input.sendHour,
         input.sendDayOfWeek,
         input.sendDayOfMonth,
-        input.timezone
+        input.timezone,
       );
 
       const report = await ctx.db.scheduledReport.create({
@@ -219,7 +224,7 @@ export const reportsRouter = createTRPCRouter({
         scope: ReportScopeSchema.optional(),
         portfolioId: z.string().nullable().optional(),
         isEnabled: z.boolean().optional(),
-      })
+      }),
     )
     .mutation(async ({ ctx, input }) => {
       // Verify ownership
@@ -233,13 +238,22 @@ export const reportsRouter = createTRPCRouter({
 
       // Calculate new next send time if schedule changed
       let nextSendAt = existing.nextSendAt;
-      if (input.schedule || input.sendHour !== undefined || input.sendDayOfWeek !== undefined || input.sendDayOfMonth !== undefined) {
+      if (
+        input.schedule ||
+        input.sendHour !== undefined ||
+        input.sendDayOfWeek !== undefined ||
+        input.sendDayOfMonth !== undefined
+      ) {
         nextSendAt = calculateNextSendAt(
           input.schedule ?? existing.schedule,
           input.sendHour ?? existing.sendHour,
-          input.sendDayOfWeek !== undefined ? input.sendDayOfWeek : existing.sendDayOfWeek,
-          input.sendDayOfMonth !== undefined ? input.sendDayOfMonth : existing.sendDayOfMonth,
-          input.timezone ?? existing.timezone
+          input.sendDayOfWeek !== undefined
+            ? input.sendDayOfWeek
+            : existing.sendDayOfWeek,
+          input.sendDayOfMonth !== undefined
+            ? input.sendDayOfMonth
+            : existing.sendDayOfMonth,
+          input.timezone ?? existing.timezone,
         );
       }
 
@@ -250,12 +264,18 @@ export const reportsRouter = createTRPCRouter({
           ...(input.schedule && { schedule: input.schedule }),
           ...(input.timezone && { timezone: input.timezone }),
           ...(input.sendHour !== undefined && { sendHour: input.sendHour }),
-          ...(input.sendDayOfWeek !== undefined && { sendDayOfWeek: input.sendDayOfWeek }),
-          ...(input.sendDayOfMonth !== undefined && { sendDayOfMonth: input.sendDayOfMonth }),
+          ...(input.sendDayOfWeek !== undefined && {
+            sendDayOfWeek: input.sendDayOfWeek,
+          }),
+          ...(input.sendDayOfMonth !== undefined && {
+            sendDayOfMonth: input.sendDayOfMonth,
+          }),
           ...(input.recipients && { recipients: input.recipients }),
           ...(input.channelIds && { channelIds: input.channelIds }),
           ...(input.scope && { scope: input.scope }),
-          ...(input.portfolioId !== undefined && { portfolioId: input.portfolioId }),
+          ...(input.portfolioId !== undefined && {
+            portfolioId: input.portfolioId,
+          }),
           ...(input.isEnabled !== undefined && { isEnabled: input.isEnabled }),
           nextSendAt,
         },
@@ -322,15 +342,21 @@ export const reportsRouter = createTRPCRouter({
         },
       });
 
-      // Queue report generation
-      const queue = getReportQueue();
-      await queue.add("generate_report", {
-        type: "generate_report",
-        reportId: report.id,
-        sessionId: input.sessionId,
-      });
+      // Queue report generation. Requires the background worker + Redis, which
+      // are absent on the serverless deployment, so this is skipped unless
+      // ENABLE_QUEUE is set (see isQueueEnabled).
+      let queued = false;
+      if (isQueueEnabled()) {
+        const queue = getReportQueue();
+        await queue.add("generate_report", {
+          type: "generate_report",
+          reportId: report.id,
+          sessionId: input.sessionId,
+        });
+        queued = true;
+      }
 
-      return { deliveryId: delivery.id, queued: true };
+      return { deliveryId: delivery.id, queued };
     }),
 
   /**
@@ -343,7 +369,7 @@ export const reportsRouter = createTRPCRouter({
         sessionId: z.string(),
         page: z.number().min(1).default(1),
         pageSize: z.number().min(1).max(50).default(20),
-      })
+      }),
     )
     .query(async ({ ctx, input }) => {
       // Verify ownership

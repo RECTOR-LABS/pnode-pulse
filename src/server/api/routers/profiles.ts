@@ -15,10 +15,15 @@ const updateProfileInput = z.object({
   displayName: z.string().min(3).max(32).optional(),
   bio: z.string().max(500).optional(),
   avatarUrl: z.string().url().optional(),
-  links: z.array(z.object({
-    type: z.enum(["website", "twitter", "discord", "github", "telegram"]),
-    url: z.string().url(),
-  })).max(5).optional(),
+  links: z
+    .array(
+      z.object({
+        type: z.enum(["website", "twitter", "discord", "github", "telegram"]),
+        url: z.string().url(),
+      }),
+    )
+    .max(5)
+    .optional(),
   isPublic: z.boolean().optional(),
   showNodeStats: z.boolean().optional(),
   showBadges: z.boolean().optional(),
@@ -33,7 +38,10 @@ export const profilesRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const payload = await verifyToken(input.token);
       if (!payload.valid || !payload.userId) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: payload.error || "Invalid token" });
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: payload.error || "Invalid token",
+        });
       }
 
       const profile = await ctx.db.operatorProfile.findUnique({
@@ -75,7 +83,10 @@ export const profilesRouter = createTRPCRouter({
       });
 
       if (!profile) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Profile not found" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Profile not found",
+        });
       }
 
       // Don't expose private fields
@@ -88,7 +99,9 @@ export const profilesRouter = createTRPCRouter({
         totalNodes: profile.showNodeStats ? profile.totalNodes : null,
         totalUptime: profile.showNodeStats ? profile.totalUptime : null,
         totalStorage: profile.showNodeStats ? profile.totalStorage : null,
-        avgCpuEfficiency: profile.showNodeStats ? profile.avgCpuEfficiency : null,
+        avgCpuEfficiency: profile.showNodeStats
+          ? profile.avgCpuEfficiency
+          : null,
         rank: profile.rank,
         badges: profile.showBadges ? profile.badges : [],
         createdAt: profile.createdAt,
@@ -99,15 +112,20 @@ export const profilesRouter = createTRPCRouter({
    * Create operator profile
    */
   create: publicProcedure
-    .input(z.object({
-      token: z.string(),
-      displayName: z.string().min(3).max(32),
-      bio: z.string().max(500).optional(),
-    }))
+    .input(
+      z.object({
+        token: z.string(),
+        displayName: z.string().min(3).max(32),
+        bio: z.string().max(500).optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const payload = await verifyToken(input.token);
       if (!payload.valid || !payload.userId) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: payload.error || "Invalid token" });
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: payload.error || "Invalid token",
+        });
       }
 
       const userId = payload.userId;
@@ -163,14 +181,14 @@ export const profilesRouter = createTRPCRouter({
           SELECT
             COUNT(DISTINCT n.id) as node_count,
             COALESCE(SUM(m.uptime), 0) as total_uptime,
-            COALESCE(SUM(m."fileSize"), 0) as total_storage,
-            COALESCE(AVG(m."cpuPercent"), 0) as avg_cpu
-          FROM "Node" n
+            COALESCE(SUM(m.file_size), 0) as total_storage,
+            COALESCE(AVG(m.cpu_percent), 0) as avg_cpu
+          FROM nodes n
           LEFT JOIN (
-            SELECT DISTINCT ON ("nodeId") *
-            FROM "NodeMetric"
-            ORDER BY "nodeId", time DESC
-          ) m ON m."nodeId" = n.id
+            SELECT DISTINCT ON (node_id) *
+            FROM node_metrics
+            ORDER BY node_id, time DESC
+          ) m ON m.node_id = n.id
           WHERE n.id = ANY(${nodeIds})
         `;
 
@@ -206,7 +224,10 @@ export const profilesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const payload = await verifyToken(input.token);
       if (!payload.valid || !payload.userId) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: payload.error || "Invalid token" });
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: payload.error || "Invalid token",
+        });
       }
 
       const profile = await ctx.db.operatorProfile.findUnique({
@@ -214,7 +235,10 @@ export const profilesRouter = createTRPCRouter({
       });
 
       if (!profile) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Profile not found" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Profile not found",
+        });
       }
 
       // Check if new display name is taken
@@ -251,10 +275,12 @@ export const profilesRouter = createTRPCRouter({
    * Get leaderboard of top operators
    */
   leaderboard: publicProcedure
-    .input(z.object({
-      metric: z.enum(["uptime", "nodes", "storage"]).default("uptime"),
-      limit: z.number().min(1).max(100).default(20),
-    }))
+    .input(
+      z.object({
+        metric: z.enum(["uptime", "nodes", "storage"]).default("uptime"),
+        limit: z.number().min(1).max(100).default(20),
+      }),
+    )
     .query(async ({ ctx, input }) => {
       const orderBy = {
         uptime: { totalUptime: "desc" as const },
@@ -296,7 +322,10 @@ export const profilesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const payload = await verifyToken(input.token);
       if (!payload.valid || !payload.userId) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: payload.error || "Invalid token" });
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: payload.error || "Invalid token",
+        });
       }
 
       // Get verified node claims
@@ -326,14 +355,14 @@ export const profilesRouter = createTRPCRouter({
         SELECT
           COUNT(DISTINCT n.id) as node_count,
           COALESCE(SUM(m.uptime), 0) as total_uptime,
-          COALESCE(SUM(m."fileSize"), 0) as total_storage,
-          COALESCE(AVG(m."cpuPercent"), 0) as avg_cpu
-        FROM "Node" n
+          COALESCE(SUM(m.file_size), 0) as total_storage,
+          COALESCE(AVG(m.cpu_percent), 0) as avg_cpu
+        FROM nodes n
         LEFT JOIN (
-          SELECT DISTINCT ON ("nodeId") *
-          FROM "NodeMetric"
-          ORDER BY "nodeId", time DESC
-        ) m ON m."nodeId" = n.id
+          SELECT DISTINCT ON (node_id) *
+          FROM node_metrics
+          ORDER BY node_id, time DESC
+        ) m ON m.node_id = n.id
         WHERE n.id = ANY(${nodeIds})
       `;
 

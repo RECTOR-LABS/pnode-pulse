@@ -48,19 +48,22 @@ export const badgesRouter = createTRPCRouter({
    * List all available badges
    */
   list: publicProcedure
-    .input(z.object({
-      tier: z.enum(["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY"]).optional(),
-    }).optional())
+    .input(
+      z
+        .object({
+          tier: z
+            .enum(["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY"])
+            .optional(),
+        })
+        .optional(),
+    )
     .query(async ({ ctx, input }) => {
       const badges = await ctx.db.badge.findMany({
         where: {
           isActive: true,
           tier: input?.tier,
         },
-        orderBy: [
-          { tier: "asc" },
-          { displayOrder: "asc" },
-        ],
+        orderBy: [{ tier: "asc" }, { displayOrder: "asc" }],
       });
 
       return badges;
@@ -108,7 +111,10 @@ export const badgesRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const payload = await verifyToken(input.token);
       if (!payload.valid || !payload.userId) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: payload.error || "Invalid token" });
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: payload.error || "Invalid token",
+        });
       }
 
       const profile = await ctx.db.operatorProfile.findUnique({
@@ -132,14 +138,19 @@ export const badgesRouter = createTRPCRouter({
    * Toggle featured status of a badge
    */
   toggleFeatured: publicProcedure
-    .input(z.object({
-      token: z.string(),
-      badgeId: z.string(),
-    }))
+    .input(
+      z.object({
+        token: z.string(),
+        badgeId: z.string(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const payload = await verifyToken(input.token);
       if (!payload.valid || !payload.userId) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: payload.error || "Invalid token" });
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: payload.error || "Invalid token",
+        });
       }
 
       const profile = await ctx.db.operatorProfile.findUnique({
@@ -147,7 +158,10 @@ export const badgesRouter = createTRPCRouter({
       });
 
       if (!profile) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Profile not found" });
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Profile not found",
+        });
       }
 
       const operatorBadge = await ctx.db.operatorBadge.findFirst({
@@ -195,7 +209,10 @@ export const badgesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const payload = await verifyToken(input.token);
       if (!payload.valid || !payload.userId) {
-        throw new TRPCError({ code: "UNAUTHORIZED", message: payload.error || "Invalid token" });
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: payload.error || "Invalid token",
+        });
       }
 
       const profile = await ctx.db.operatorProfile.findUnique({
@@ -239,14 +256,14 @@ export const badgesRouter = createTRPCRouter({
         >`
           SELECT
             COALESCE(SUM(m.uptime), 0) as total_uptime,
-            COALESCE(SUM(m."fileSize"), 0) as total_storage,
-            COALESCE(AVG(m."cpuPercent"), 0) as avg_cpu
-          FROM "Node" n
+            COALESCE(SUM(m.file_size), 0) as total_storage,
+            COALESCE(AVG(m.cpu_percent), 0) as avg_cpu
+          FROM nodes n
           LEFT JOIN (
-            SELECT DISTINCT ON ("nodeId") *
-            FROM "NodeMetric"
-            ORDER BY "nodeId", time DESC
-          ) m ON m."nodeId" = n.id
+            SELECT DISTINCT ON (node_id) *
+            FROM node_metrics
+            ORDER BY node_id, time DESC
+          ) m ON m.node_id = n.id
           WHERE n.id = ANY(${nodeIds})
         `;
 

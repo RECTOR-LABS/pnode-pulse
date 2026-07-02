@@ -25,6 +25,17 @@ function getRedisConfig() {
   };
 }
 
+/**
+ * Whether background queue processing is enabled. Requires Redis + a running
+ * worker process (`npm run alert-processor` / `report-processor`), so it is off
+ * by default — notably on serverless deployments where there is no Redis or
+ * long-lived worker. Enqueue sites must guard on this before touching a queue,
+ * otherwise BullMQ would attempt to connect to a Redis that is not present.
+ */
+export function isQueueEnabled(): boolean {
+  return process.env.ENABLE_QUEUE === "true";
+}
+
 // Queue names
 export const QUEUE_NAMES = {
   ALERTS: "alerts",
@@ -135,7 +146,7 @@ export function getReportQueue(): Queue<ReportJobData> {
 export function createWorker<T>(
   queueName: string,
   processor: (job: Job<T>) => Promise<void>,
-  concurrency = DEFAULT_WORKER_CONCURRENCY
+  concurrency = DEFAULT_WORKER_CONCURRENCY,
 ): Worker<T> {
   return new Worker(queueName, processor, {
     connection: getRedisConfig(),
@@ -165,7 +176,7 @@ export async function scheduleAlertEvaluation(): Promise<void> {
       repeat: {
         every: ALERT_EVALUATION_INTERVAL_MS,
       },
-    }
+    },
   );
 
   // Add escalation processing job
@@ -176,7 +187,7 @@ export async function scheduleAlertEvaluation(): Promise<void> {
       repeat: {
         every: ALERT_ESCALATION_INTERVAL_MS,
       },
-    }
+    },
   );
 }
 
@@ -202,7 +213,7 @@ export async function scheduleReportChecks(): Promise<void> {
       repeat: {
         every: 60000, // 1 minute
       },
-    }
+    },
   );
 }
 
