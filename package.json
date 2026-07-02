@@ -26,6 +26,8 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.1.0",
+    "@prisma/adapter-neon": "^6.19.1",
     "@prisma/client": "^6.19.0",
     "@sentry/nextjs": "^10.30.0",
     "@solana/wallet-adapter-base": "^0.9.27",

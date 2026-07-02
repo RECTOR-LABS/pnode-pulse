@@ -1,6 +1,12 @@
 /**
  * Database client singleton
  *
+ * Runs Prisma over the Neon serverless driver adapter (WebSocket-pooled),
+ * which is required for Postgres access from Vercel Functions / Fluid Compute.
+ * The adapter is constructed lazily-safe: the underlying pool does not connect
+ * until the first query, so importing this module during `next build` (when
+ * DATABASE_URL may be absent) does not throw.
+ *
  * Usage:
  * ```ts
  * import { db } from "@/lib/db";
@@ -9,20 +15,37 @@
  */
 
 import { PrismaClient } from "@prisma/client";
+import { PrismaNeon } from "@prisma/adapter-neon";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-export const db =
-  globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+function createPrismaClient(): PrismaClient {
+  const adapter = new PrismaNeon({
+    connectionString: process.env.DATABASE_URL,
   });
+  return new PrismaClient({
+    adapter,
+    log:
+      process.env.NODE_ENV === "development"
+        ? ["query", "error", "warn"]
+        : ["error"],
+  });
+}
+
+export const db = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = db;
 }
 
 // Re-export types for convenience
-export type { Node, NodeMetric, NodePeer, NetworkStats, CollectionJob, JobStatus } from "@prisma/client";
+export type {
+  Node,
+  NodeMetric,
+  NodePeer,
+  NetworkStats,
+  CollectionJob,
+  JobStatus,
+} from "@prisma/client";
