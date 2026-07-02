@@ -6,6 +6,11 @@
   "github": {
     "silent": true
   },
+  "git": {
+    "deploymentEnabled": {
+      "main": false
+    }
+  },
   "crons": [
     { "path": "/api/cron/retention", "schedule": "0 3 * * *" },
     { "path": "/api/cron/collect", "schedule": "0 6 * * *" },
