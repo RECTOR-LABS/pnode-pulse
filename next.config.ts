@@ -40,9 +40,6 @@ const ContentSecurityPolicy = [
   .join("; ");
 
 const nextConfig: NextConfig = {
-  // Enable standalone output for Docker deployment
-  output: "standalone",
-
   // Redirect /en/* to /* for SEO (avoid duplicate content)
   // The middleware serves default locale content at / without prefix
   async redirects() {
@@ -58,23 +55,6 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
     ];
-  },
-
-  // Tier-1 Vercel migration: when running as the Vercel front-end (PULSE_API_URL
-  // set), proxy every /api/* request to the VPS backend so the browser stays
-  // same-origin (no CORS, no client changes). beforeFiles => precedence over the
-  // locally-built API route handlers (an afterFiles/vercel.json rewrite is
-  // shadowed by static routes like /api/health). Gated on PULSE_API_URL so the
-  // VPS monolith and local dev (var unset) serve /api/* themselves and never
-  // proxy to themselves (which would infinite-loop).
-  async rewrites() {
-    const apiUrl = process.env.PULSE_API_URL;
-    if (!apiUrl) return [];
-    return {
-      beforeFiles: [
-        { source: "/api/:path*", destination: `${apiUrl}/api/:path*` },
-      ],
-    };
   },
 
   // Optimize images
@@ -213,16 +193,6 @@ const nextConfig: NextConfig = {
               "frame-ancestors 'self'",
               "frame-ancestors *",
             ),
-          },
-        ],
-      },
-      // Real-time API - no cache
-      {
-        source: "/api/realtime",
-        headers: [
-          {
-            key: "Cache-Control",
-            value: "no-store, no-cache, must-revalidate",
           },
         ],
       },
