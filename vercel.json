@@ -5,5 +5,10 @@
   "regions": ["fra1"],
   "github": {
     "silent": true
-  }
+  },
+  "crons": [
+    { "path": "/api/cron/retention", "schedule": "0 3 * * *" },
+    { "path": "/api/cron/collect", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/rollups", "schedule": "0 9 * * *" }
+  ]
 }
