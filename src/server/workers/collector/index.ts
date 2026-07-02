@@ -10,7 +10,6 @@
 
 import { db } from "@/lib/db";
 import { PUBLIC_PNODES } from "@/lib/prpc";
-import { publishMetricsUpdate } from "@/lib/redis/pubsub";
 import { logger } from "@/lib/logger";
 
 // Import sub-modules
@@ -110,19 +109,6 @@ export async function runCollection(): Promise<CollectionSummary> {
         );
         await updateNodeStatus(node.id, true, result.version?.version);
         successfulAddresses.add(result.address); // Track successful query
-
-        // Publish real-time metrics update
-        const ramPercent =
-          result.stats.ram_total > 0
-            ? (result.stats.ram_used / result.stats.ram_total) * 100
-            : 0;
-        await publishMetricsUpdate(
-          node.id,
-          result.stats.cpu_percent,
-          ramPercent,
-          result.stats.uptime,
-          Number(result.stats.file_size),
-        ).catch(() => {}); // Silently ignore publish errors
 
         if (result.pods) {
           await updatePeers(node.id, result.pods);

@@ -12,7 +12,6 @@ type MockPRPCClient = ReturnType<typeof createClient>;
 // Mock dependencies
 vi.mock("@/lib/db");
 vi.mock("@/lib/prpc");
-vi.mock("@/lib/redis/pubsub");
 
 describe("Collector Worker - Node Collection", () => {
   beforeEach(() => {
