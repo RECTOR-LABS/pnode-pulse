@@ -40,6 +40,8 @@
     "@trpc/react-query": "^11.0.0",
     "@trpc/server": "^11.0.0",
     "@types/pg": "^8.15.6",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
     "bs58": "^6.0.0",
     "bullmq": "^5.65.1",
     "date-fns": "^4.1.0",
