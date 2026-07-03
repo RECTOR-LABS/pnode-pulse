@@ -40,17 +40,17 @@
 
 **Repository**: [RECTOR-LABS/pnode-pulse](https://github.com/RECTOR-LABS/pnode-pulse)
 **License**: MIT (Open Core)
-**Phase**: Live — deployed at [pulse.rectorspace.com](https://pulse.rectorspace.com) (Vercel frontend → VPS API)
+**Phase**: Live — all-Vercel serverless + Neon Postgres at [pulse.rectorspace.com](https://pulse.rectorspace.com) (migrated off the reclabs3 VPS, 2026-07-03)
 
 ## Tech Stack
 
-| Layer      | Technology                                                      |
-| ---------- | --------------------------------------------------------------- |
-| Frontend   | Next.js 16 (App Router), React 19, TypeScript 5, Tailwind CSS 4 |
-| Backend    | tRPC v11, Node.js 24, Prisma 6                                  |
-| Database   | PostgreSQL + TimescaleDB                                        |
-| Cache      | Redis (ioredis, BullMQ)                                         |
-| Deployment | Vercel (frontend) → VPS Docker API (`green`, single-container)  |
+| Layer      | Technology                                                       |
+| ---------- | ---------------------------------------------------------------- |
+| Frontend   | Next.js 16 (App Router), React 19, TypeScript 5, Tailwind CSS 4  |
+| Backend    | tRPC v11, Node.js 24, Prisma 6                                   |
+| Database   | Neon Postgres (serverless) via Prisma 6 + `@prisma/adapter-neon` |
+| Cache      | In-memory rate-limiter (Redis/Upstash optional, not provisioned) |
+| Deployment | Vercel serverless (functions + daily Cron); no VPS               |
 
 ## Commands
 
@@ -212,7 +212,34 @@ curl -X POST http://<ip-address>:6000/rpc \
 | 5000 | Atlas server    | Internal     |
 | 3000 | XandMiner GUI   | Localhost    |
 
-## Deployment
+## Deployment (Current — Vercel + Neon)
+
+All-Vercel serverless: Next.js App Router + `/api` route handlers + a **daily
+Vercel Cron** for the collector, on **Neon Postgres**. **No VPS.**
+
+- **Deploy:** `vercel --prod` (manual). Git auto-deploy from `main` is
+  intentionally **disabled** (`vercel.json` → `git.deploymentEnabled.main=false`),
+  so pushing to `main` does not deploy.
+- **DB:** Neon (Frankfurt, Free), provisioned via the **Vercel–Neon integration**;
+  runtime uses `@prisma/adapter-neon` (serverless driver).
+- **DB credential:** `src/lib/db/index.ts` reads `process.env.NEON_DATABASE_URL`
+  (the integration's active, **auto-rotating** pooled URL) with a `DATABASE_URL`
+  fallback for local dev. The `NEON_*` vars are Sensitive (not readable via
+  `vercel env pull`).
+- **⚠️ Rotating the DB password:** do **NOT** use the Neon console "Reset
+  password" — on this integration-managed DB it does not propagate to the compute
+  (fresh passwords fail `28P01`). Rotate via **Vercel dashboard → Storage →
+  pnode-pulse-db → Settings → "Secure This Resource → Rotate Secrets"**, then
+  `vercel --prod` to pick up the new secret.
+- **Data:** config-only (node registry); metrics repopulate via the daily
+  collector cron. Neon Free = 0.5 GB — no raw-history backfill.
+
+---
+
+## Deployment (HISTORICAL — retired reclabs3 VPS, superseded 2026-07-03)
+
+> Retained for the reclabs3 decommission + historical reference only. This is
+> **not** how the app runs anymore.
 
 **VPS**: 151.245.137.75 (rectorspace.com)
 **User**: pnodepulse
