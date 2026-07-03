@@ -23,7 +23,12 @@ const globalForPrisma = globalThis as unknown as {
 
 function createPrismaClient(): PrismaClient {
   const adapter = new PrismaNeon({
-    connectionString: process.env.DATABASE_URL,
+    // Prefer the Vercel–Neon integration's managed pooled URL: it is the credential
+    // the compute actually authenticates against and auto-rotates. Fall back to
+    // DATABASE_URL for local dev / tests. NOTE: this DB is integration-managed, so
+    // console-side password resets do NOT propagate to the compute — DATABASE_URL is
+    // not the source of truth in prod. See docs / handoff for rotation procedure.
+    connectionString: process.env.NEON_DATABASE_URL || process.env.DATABASE_URL,
   });
   return new PrismaClient({
     adapter,
