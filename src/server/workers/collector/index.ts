@@ -16,6 +16,7 @@ import { logger } from "@/lib/logger";
 import type { CollectionSummary } from "./types";
 import { COLLECTION_INTERVAL, PRPC_PORT } from "./types";
 import { collectFromNode } from "./node-poller";
+import { fetchNetworkGossip, directPollSet } from "./poll-targets";
 import { getOrCreateNode, updateNodeStatus } from "./node-repository";
 import { saveMetrics } from "./metrics-saver";
 import { discoverNodes } from "./node-discovery";
@@ -41,26 +42,25 @@ export async function runCollection(): Promise<CollectionSummary> {
   });
 
   try {
-    // Get all known nodes from DB
-    const knownNodes = await db.node.findMany({
-      select: { address: true },
+    // Known DB addresses — the fallback poll set if every seed is unreachable.
+    const knownAddresses = (
+      await db.node.findMany({ select: { address: true } })
+    ).map((n) => n.address);
+
+    // Pull fresh network membership from a seed, then directly poll ONLY the
+    // seeds + gossip-public nodes. Private/stale nodes expose :6000 to no client
+    // and are covered by federation (processPrivateNodeMetrics) below, so polling
+    // every accumulated address just wastes the function budget and floods logs
+    // with expected failures.
+    const gossip = await fetchNetworkGossip(PUBLIC_PNODES);
+    const addresses = directPollSet(PUBLIC_PNODES, gossip, knownAddresses);
+
+    logger.info("Collecting from nodes", {
+      count: addresses.length,
+      source: gossip ? "gossip-public + seeds" : "fallback: known DB nodes",
     });
 
-    // Also include seed nodes if not already in DB
-    const allAddresses = new Set(knownNodes.map((n) => n.address));
-    for (const seedIp of PUBLIC_PNODES) {
-      const seedAddress = `${seedIp}:${PRPC_PORT}`;
-      if (!allAddresses.has(seedAddress)) {
-        allAddresses.add(seedAddress);
-        // Create seed node in DB
-        await getOrCreateNode(seedAddress);
-      }
-    }
-
-    const addresses = Array.from(allAddresses);
-    logger.info("Collecting from nodes", { count: addresses.length });
-
-    // Collect from all nodes in parallel
+    // Collect from the selected nodes in parallel
     const results = await Promise.all(addresses.map(collectFromNode));
 
     let successCount = 0;
@@ -118,7 +118,9 @@ export async function runCollection(): Promise<CollectionSummary> {
       } else {
         await updateNodeStatus(node.id, false);
         failedCount++;
-        logger.warn("Collection failed for node", {
+        // Expected for public nodes momentarily unreachable — debug, not warn,
+        // to avoid flooding logs (see poll-targets.ts rationale).
+        logger.debug("Collection failed for node", {
           address: result.address,
           error: result.error,
         });
